@@ -17,7 +17,7 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/actuator/health", "/api/auth/**", "/api/resources/**", "/api/roadmaps/**", "/api/notes/**").permitAll()
+                .requestMatchers("/actuator/health", "/api/auth/**", "/api/resources/**", "/api/roadmaps/**", "/api/notes/**", "/oauth2/**", "/login/oauth2/**").permitAll()
                 .anyRequest().authenticated());
 
         if (oauthEnabled) {
