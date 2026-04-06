@@ -1,4 +1,4 @@
-# ShareHub (RuoYi-Vue-Plus Implementation Starter)
+# ShareHub 原创资料分享平台
 
 基于你给出的实施方案落地的首版工程骨架：
 - 后端：Spring Boot 3 + GitHub OAuth + 资料/路线/笔记/简历/互动/治理 API 骨架
