@@ -1,0 +1,9 @@
+{
+  "button": ["default", "hover", "disabled", "loading"],
+  "input": ["default", "focus", "error", "disabled"],
+  "card": ["default", "hover"],
+  "modal": ["default", "open", "closed"],
+  "table": ["default", "empty", "loading"],
+  "tag": ["default", "selected"],
+  "pagination": ["default", "disabled"]
+}

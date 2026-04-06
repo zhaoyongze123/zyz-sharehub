@@ -1,0 +1,27 @@
+{
+  "colors": {
+    "brand-600": "#0f766e",
+    "bg-page": "#f6f8fa",
+    "bg-card": "#ffffff",
+    "text-primary": "#0f172a",
+    "text-secondary": "#475569",
+    "border-default": "#dbe2ea"
+  },
+  "spacing": {
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 20,
+    "6": 24
+  },
+  "radius": {
+    "md": 10,
+    "lg": 16
+  },
+  "breakpoints": {
+    "sm": 640,
+    "md": 768,
+    "lg": 1024,
+    "xl": 1200
+  }
+}

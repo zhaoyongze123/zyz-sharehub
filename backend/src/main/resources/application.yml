@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sharehub-backend
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+sharehub:
+  auth:
+    github:
+      enabled: ${GITHUB_OAUTH_ENABLED:false}
+  storage:
+    spaces:
+      endpoint: ${DO_SPACES_ENDPOINT:}
+      region: ${DO_SPACES_REGION:}
+      bucket: ${DO_SPACES_BUCKET:}
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}

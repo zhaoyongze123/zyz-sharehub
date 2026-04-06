@@ -1,0 +1,88 @@
+openapi: 3.0.3
+info:
+  title: ShareHub API
+  version: 0.1.0
+paths:
+  /api/auth/github/login:
+    get:
+      summary: 获取 GitHub 登录地址
+  /api/auth/me:
+    get:
+      summary: 获取当前用户
+  /api/resources:
+    post:
+      summary: 创建资料
+    get:
+      summary: 资料列表
+  /api/resources/{id}:
+    get:
+      summary: 资料详情
+    put:
+      summary: 更新资料
+    delete:
+      summary: 删除资料
+  /api/resources/{id}/publish:
+    post:
+      summary: 发布资料
+  /api/roadmaps:
+    post:
+      summary: 创建路线
+    get:
+      summary: 路线列表
+  /api/roadmaps/{id}:
+    get:
+      summary: 路线详情
+  /api/roadmaps/{id}/nodes:
+    post:
+      summary: 新增路线节点
+  /api/roadmaps/{id}/progress:
+    post:
+      summary: 更新学习进度
+  /api/notes:
+    post:
+      summary: 创建笔记
+    get:
+      summary: 笔记列表
+  /api/notes/{id}:
+    get:
+      summary: 笔记详情
+    put:
+      summary: 更新笔记
+    delete:
+      summary: 删除笔记
+  /api/resumes/generate:
+    post:
+      summary: 生成简历
+  /api/resumes/{id}:
+    get:
+      summary: 简历详情
+  /api/resumes/{id}/download:
+    get:
+      summary: 下载简历
+  /api/resources/{id}/comments:
+    post:
+      summary: 发表评论
+  /api/comments/{id}/reply:
+    post:
+      summary: 回复评论
+  /api/resources/{id}/favorite:
+    post:
+      summary: 收藏资料
+  /api/resources/{id}/like:
+    post:
+      summary: 点赞资料
+  /api/reports:
+    post:
+      summary: 举报内容
+  /api/admin/reports:
+    get:
+      summary: 举报列表
+  /api/admin/reports/{id}/resolve:
+    post:
+      summary: 处理举报
+  /api/admin/resources/{id}/block:
+    post:
+      summary: 下架资料
+  /api/admin/users/{id}/ban:
+    post:
+      summary: 封禁用户

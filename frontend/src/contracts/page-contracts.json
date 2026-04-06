@@ -1,0 +1,9 @@
+{
+  "home": ["hero", "feature-cards", "latest-resources"],
+  "resource-list": ["filter-bar", "list", "pagination", "empty-state"],
+  "resource-detail": ["header", "meta", "content", "interaction", "comments"],
+  "resource-publish": ["basic-info", "upload", "preview", "submit"],
+  "roadmap": ["tree", "progress", "linked-resource"],
+  "note": ["editor", "preview", "visibility"],
+  "resume": ["template-selector", "preview", "download"]
+}
