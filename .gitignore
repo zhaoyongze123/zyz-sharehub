@@ -14,6 +14,8 @@ frontend/dist/
 # Env
 .env
 *.local
+deploy/.env.prod
+deploy/certbot/
 
 # Workspace data
 output/
