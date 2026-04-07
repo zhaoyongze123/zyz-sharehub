@@ -1,7 +1,7 @@
 package com.sharehub.resume;
 
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
+import com.sharehub.common.NotFoundException;
 import com.sharehub.files.FileCategory;
 import com.sharehub.files.FileRecord;
 import com.sharehub.files.FileStorageService;
@@ -15,66 +15,50 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/resumes")
 public class ResumeController {
 
-    private final InMemoryStore store;
+    private final ResumeRepository resumeRepository;
     private final FileStorageService fileStorageService;
 
-    public ResumeController(InMemoryStore store, FileStorageService fileStorageService) {
-        this.store = store;
+    public ResumeController(ResumeRepository resumeRepository, FileStorageService fileStorageService) {
+        this.resumeRepository = resumeRepository;
         this.fileStorageService = fileStorageService;
     }
 
     @PostMapping("/generate")
-    public ApiResponse<Map<String, Object>> generate(@RequestBody Map<String, Object> req) {
-        long id = store.nextId();
+    public ApiResponse<ResumeDto> generate(@RequestBody Map<String, Object> req) {
         String templateKey = String.valueOf(req.getOrDefault("templateKey", "default"));
-        byte[] pdfBytes = fileStorageService.buildSimplePdf("ShareHub Resume #" + id, "template=" + templateKey);
+        byte[] pdfBytes = fileStorageService.buildSimplePdf("ShareHub Resume", "template=" + templateKey);
         StoredFileDto storedFile = fileStorageService.storeBytes(
-            "resume:" + id,
+            "resume:pending",
             FileCategory.RESUME_PDF,
             "RESUME",
-            String.valueOf(id),
-            "resume-" + id + ".pdf",
+            "pending",
+            "resume-" + templateKey + ".pdf",
             MediaType.APPLICATION_PDF_VALUE,
             pdfBytes
         );
-
-        Map<String, Object> saved = new HashMap<>();
-        saved.put("id", id);
-        saved.put("templateKey", templateKey);
-        saved.put("status", "GENERATED");
-        saved.put("fileId", storedFile.id());
-        saved.put("fileUrl", "/api/resumes/" + id + "/download");
-        store.resumes.put(id, saved);
+        ResumeDto saved = resumeRepository.create(templateKey, storedFile.id());
         return ApiResponse.ok(saved);
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Object> detail(@PathVariable Long id) {
-        return ApiResponse.ok(store.resumes.get(id));
+    public ApiResponse<ResumeDto> detail(@PathVariable Long id) {
+        return ApiResponse.ok(resumeRepository.find(id));
     }
 
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
-        Object found = store.resumes.get(id);
-        if (!(found instanceof Map<?, ?> resumeMap)) {
-            return ResponseEntity.notFound().build();
+        ResumeDto resume = resumeRepository.find(id);
+        if (resume.fileId() == null) {
+            throw new NotFoundException("RESUME_FILE_NOT_FOUND");
         }
-
-        Object fileId = resumeMap.get("fileId");
-        if (fileId == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Optional<FileRecord> record = fileStorageService.load(UUID.fromString(String.valueOf(fileId)));
+        Optional<FileRecord> record = fileStorageService.load(resume.fileId());
         if (record.isEmpty()) {
             return ResponseEntity.notFound().build();
         }

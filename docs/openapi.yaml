@@ -17,6 +17,24 @@ paths:
       responses:
         '200':
           description: 成功
+  /api/auth/avatar:
+    post:
+      summary: 上传用户头像
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 文件校验失败
   /api/resources:
     get:
       summary: 资料分页列表
@@ -189,6 +207,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 简历不存在
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF

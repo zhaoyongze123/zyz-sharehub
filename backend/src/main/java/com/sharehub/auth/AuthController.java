@@ -21,9 +21,11 @@ import java.util.Map;
 public class AuthController {
 
     private final FileStorageService fileStorageService;
+    private final UserProfileRepository userProfileRepository;
 
-    public AuthController(FileStorageService fileStorageService) {
+    public AuthController(FileStorageService fileStorageService, UserProfileRepository userProfileRepository) {
         this.fileStorageService = fileStorageService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @GetMapping("/github/login")
@@ -41,16 +43,10 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ApiResponse<Map<String, Object>> me(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof OAuth2User user)) {
-            return ApiResponse.fail("NOT_LOGGED_IN");
-        }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("name", user.getAttribute("name"));
-        result.put("login", user.getAttribute("login"));
-        result.put("avatarUrl", user.getAttribute("avatar_url"));
-        return ApiResponse.ok(result);
+    public ApiResponse<UserProfileDto> me(Authentication authentication) {
+        String login = resolveOwner(authentication);
+        String name = resolveName(authentication, login);
+        return ApiResponse.ok(userProfileRepository.upsert(login, name, null));
     }
 
     @PostMapping("/logout")
@@ -61,7 +57,9 @@ public class AuthController {
     @PostMapping(path = "/avatar", consumes = "multipart/form-data")
     public ApiResponse<StoredFileDto> uploadAvatar(Authentication authentication, @RequestPart("file") MultipartFile file) {
         String owner = resolveOwner(authentication);
+        userProfileRepository.upsert(owner, resolveName(authentication, owner), null);
         StoredFileDto stored = fileStorageService.storeMultipart(owner, FileCategory.AVATAR, "USER_AVATAR", owner, file);
+        userProfileRepository.updateAvatar(owner, stored.id());
         return ApiResponse.ok(stored);
     }
 
@@ -73,5 +71,15 @@ public class AuthController {
             }
         }
         return "local-dev-user";
+    }
+
+    private String resolveName(Authentication authentication, String fallback) {
+        if (authentication != null && authentication.getPrincipal() instanceof OAuth2User user) {
+            Object name = user.getAttribute("name");
+            if (name != null && !String.valueOf(name).isBlank()) {
+                return String.valueOf(name);
+            }
+        }
+        return fallback;
     }
 }
