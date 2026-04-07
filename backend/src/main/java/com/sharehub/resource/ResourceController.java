@@ -1,57 +1,117 @@
 package com.sharehub.resource;
 
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
+import com.sharehub.files.FileCategory;
+import com.sharehub.files.FileStorageService;
+import com.sharehub.files.StoredFileDto;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/resources")
 public class ResourceController {
 
-    private final InMemoryStore store;
+    private final ResourceRepository repository;
+    private final FileStorageService fileStorageService;
 
-    public ResourceController(InMemoryStore store) {
-        this.store = store;
+    public ResourceController(ResourceRepository repository, FileStorageService fileStorageService) {
+        this.repository = repository;
+        this.fileStorageService = fileStorageService;
     }
 
     @PostMapping
     public ApiResponse<ResourceDto> create(@Valid @RequestBody ResourceDto req) {
-        long id = store.nextId();
-        ResourceDto saved = new ResourceDto(id, req.title(), req.type(), req.summary(), req.tags(), req.externalUrl(), req.objectKey(), req.visibility(), "DRAFT");
-        store.resources.put(id, saved);
-        return ApiResponse.ok(saved);
+        ResourceEntity entity = new ResourceEntity();
+        entity.setTitle(req.title());
+        entity.setType(req.type());
+        entity.setSummary(req.summary());
+        entity.setTags(req.tags());
+        entity.setExternalUrl(req.externalUrl());
+        entity.setObjectKey(req.objectKey());
+        entity.setVisibility(req.visibility());
+        entity.setStatus("DRAFT");
+        return ApiResponse.ok(repository.save(entity).toDto());
     }
 
     @GetMapping
-    public ApiResponse<List<Object>> list() {
-        return ApiResponse.ok(new ArrayList<>(store.resources.values()));
+    public ApiResponse<List<ResourceDto>> list() {
+        return ApiResponse.ok(repository.findAll().stream().map(ResourceEntity::toDto).toList());
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Object> detail(@PathVariable Long id) {
-        return ApiResponse.ok(store.resources.get(id));
+    public ApiResponse<ResourceDto> detail(@PathVariable Long id) {
+        return repository.findById(id)
+            .map(ResourceEntity::toDto)
+            .map(ApiResponse::ok)
+            .orElseGet(() -> ApiResponse.fail("NOT_FOUND"));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<ResourceDto> update(@PathVariable Long id, @Valid @RequestBody ResourceDto req) {
-        ResourceDto saved = new ResourceDto(id, req.title(), req.type(), req.summary(), req.tags(), req.externalUrl(), req.objectKey(), req.visibility(), req.status() == null ? "DRAFT" : req.status());
-        store.resources.put(id, saved);
-        return ApiResponse.ok(saved);
+        return repository.findById(id)
+            .map(existing -> {
+                existing.setTitle(req.title());
+                existing.setType(req.type());
+                existing.setSummary(req.summary());
+                existing.setTags(req.tags());
+                existing.setExternalUrl(req.externalUrl());
+                existing.setObjectKey(req.objectKey());
+                existing.setVisibility(req.visibility());
+                existing.setStatus(req.status() == null ? existing.getStatus() : req.status());
+                return ApiResponse.ok(repository.save(existing).toDto());
+            })
+            .orElseGet(() -> ApiResponse.fail("NOT_FOUND"));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<String> delete(@PathVariable Long id) {
-        store.resources.remove(id);
+        repository.deleteById(id);
         return ApiResponse.ok("DELETED");
     }
 
     @PostMapping("/{id}/publish")
-    public ApiResponse<Object> publish(@PathVariable Long id) {
-        Object data = store.resources.get(id);
-        return ApiResponse.ok(data);
+    public ApiResponse<ResourceDto> publish(@PathVariable Long id) {
+        return repository.findById(id)
+            .map(entity -> {
+                entity.setStatus("PUBLISHED");
+                return ApiResponse.ok(repository.save(entity).toDto());
+            })
+            .orElseGet(() -> ApiResponse.fail("NOT_FOUND"));
+    }
+
+    @PostMapping(path = "/{id}/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Map<String, Object>> uploadAttachment(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return repository.findById(id)
+            .map(entity -> {
+                StoredFileDto stored = fileStorageService.storeMultipart(
+                    "resource:" + id,
+                    FileCategory.RESOURCE_ATTACHMENT,
+                    "RESOURCE",
+                    String.valueOf(id),
+                    file
+                );
+                entity.setObjectKey(stored.id().toString());
+                repository.save(entity);
+
+                Map<String, Object> result = new HashMap<>();
+                result.put("resourceId", id);
+                result.put("file", stored);
+                return ApiResponse.ok(result);
+            })
+            .orElseGet(() -> ApiResponse.fail("RESOURCE_NOT_FOUND"));
     }
 }
