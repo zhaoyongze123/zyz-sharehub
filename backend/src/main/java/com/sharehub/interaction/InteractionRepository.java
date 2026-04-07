@@ -1,7 +1,8 @@
 package com.sharehub.interaction;
 
-import com.sharehub.common.PageResponse;
+import com.sharehub.admin.AdminAuditLogDto;
 import com.sharehub.common.NotFoundException;
+import com.sharehub.common.PageResponse;
 import com.sharehub.resource.ResourceDto;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -62,7 +63,7 @@ public class InteractionRepository {
                 bindLong(statement, 3, parentId);
                 statement.setString(4, DEFAULT_USER_KEY);
                 statement.setString(5, content);
-            statement.setString(6, STATUS_VISIBLE);
+                statement.setString(6, STATUS_VISIBLE);
                 statement.setTimestamp(7, Timestamp.from(Instant.now()));
                 return statement;
             },
@@ -91,6 +92,15 @@ public class InteractionRepository {
             resourceId
         );
         return total == null ? 0 : total;
+    }
+
+    public int removeFavorite(Long resourceId) {
+        jdbcTemplate.update(
+            "DELETE FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
+            resourceId,
+            DEFAULT_USER_KEY
+        );
+        return (int) count("SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL", resourceId);
     }
 
     public List<CommentNodeDto> listCommentTreeByResource(Long resourceId) {
@@ -221,6 +231,15 @@ public class InteractionRepository {
         return total == null ? 0 : total;
     }
 
+    public int removeLike(Long resourceId) {
+        jdbcTemplate.update(
+            "DELETE FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
+            resourceId,
+            DEFAULT_USER_KEY
+        );
+        return (int) count("SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL", resourceId);
+    }
+
     public ReportRecord saveReport(Long resourceId, String reason, String reporter) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
@@ -272,20 +291,50 @@ public class InteractionRepository {
         if (updated == 0) {
             throw new NotFoundException("REPORT_NOT_FOUND");
         }
+        appendAuditLog("RESOLVE_REPORT", "REPORT", String.valueOf(id), "{}");
+        return findReport(id);
+    }
 
+    public void appendAuditLog(String action, String targetType, String targetId, String details) {
         jdbcTemplate.update(
             """
                 INSERT INTO admin_audit_logs (action, target_type, target_id, operator_key, details, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-            "RESOLVE_REPORT",
-            "REPORT",
-            String.valueOf(id),
+            action,
+            targetType,
+            targetId,
             DEFAULT_OPERATOR_KEY,
-            "{}",
+            details == null ? "{}" : details,
             Timestamp.from(Instant.now())
         );
-        return findReport(id);
+    }
+
+    public PageResponse<AdminAuditLogDto> listAuditLogs(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM admin_audit_logs", Long.class);
+        int offset = (safePage - 1) * safePageSize;
+        List<AdminAuditLogDto> items = jdbcTemplate.query(
+            """
+                SELECT id, action, target_type, target_id, operator_key, details, created_at
+                FROM admin_audit_logs
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> new AdminAuditLogDto(
+                resultSet.getLong("id"),
+                resultSet.getString("action"),
+                resultSet.getString("target_type"),
+                resultSet.getString("target_id"),
+                resultSet.getString("operator_key"),
+                resultSet.getString("details"),
+                resultSet.getTimestamp("created_at").toInstant()
+            ),
+            safePageSize,
+            offset
+        );
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
     private ParentTarget findParentTarget(Long parentId) {

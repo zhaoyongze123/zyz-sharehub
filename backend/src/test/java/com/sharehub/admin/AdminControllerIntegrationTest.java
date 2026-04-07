@@ -48,6 +48,10 @@ public class AdminControllerIntegrationTest {
         mvc.perform(post("/api/admin/reports/" + reportId + "/resolve"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("RESOLVED"));
+
+        mvc.perform(get("/api/admin/audit-logs"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].action").exists());
     }
 
     @Test
@@ -121,5 +125,47 @@ public class AdminControllerIntegrationTest {
         mvc.perform(get("/api/resources/" + resourceId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").value(resourceId.intValue()));
+    }
+
+    @Test
+    void shouldResolveReportAndAutoRemoveResource() throws Exception {
+        String createResponse = mvc.perform(post("/api/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"举报资料","type":"PDF","visibility":"PUBLIC"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> resourcePayload = mapper.readValue(createResponse, Map.class);
+        Long resourceId = Long.valueOf(String.valueOf(((Map<?, ?>) resourcePayload.get("data")).get("id")));
+
+        mvc.perform(post("/api/resources/" + resourceId + "/publish"))
+            .andExpect(status().isOk());
+
+        String reportResponse = mvc.perform(post("/api/reports")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("resourceId", String.valueOf(resourceId), "reason", "spam"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> reportPayload = mapper.readValue(reportResponse, Map.class);
+        Long reportId = Long.valueOf(String.valueOf(((Map<?, ?>) reportPayload.get("data")).get("id")));
+
+        mvc.perform(post("/api/admin/reports/" + reportId + "/resolve"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("RESOLVED"));
+
+        mvc.perform(get("/api/resources/" + resourceId))
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value("RESOURCE_REMOVED"));
+
+        mvc.perform(get("/api/admin/audit-logs"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].action").value("AUTO_REMOVE_RESOURCE"));
     }
 }

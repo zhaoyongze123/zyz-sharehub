@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -72,6 +73,35 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.favorites").value(1))
             .andExpect(jsonPath("$.data.likes").value(1))
             .andExpect(jsonPath("$.data.reports").value(1));
+
+        mvc.perform(post("/api/resources/1/favorite"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(1));
+
+        mvc.perform(delete("/api/resources/1/favorite"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(0));
+
+        mvc.perform(delete("/api/resources/1/favorite"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(0));
+
+        mvc.perform(post("/api/resources/1/like"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.likes").value(1));
+
+        mvc.perform(delete("/api/resources/1/like"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.likes").value(0));
+
+        mvc.perform(delete("/api/resources/1/like"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.likes").value(0));
+
+        mvc.perform(get("/api/resources/1/interactions"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(0))
+            .andExpect(jsonPath("$.data.likes").value(0));
 
         mvc.perform(post("/api/admin/comments/2/hide"))
             .andExpect(status().isOk())

@@ -3,10 +3,12 @@ package com.sharehub.admin;
 import com.sharehub.auth.UserProfileDto;
 import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
+import com.sharehub.common.PageResponse;
 import com.sharehub.interaction.InteractionRepository;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resource.ResourceEntity;
 import com.sharehub.resource.ResourceRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,25 +36,50 @@ public class AdminController {
         return ApiResponse.ok(interactionRepository.listReports());
     }
 
+    @GetMapping("/audit-logs")
+    public ApiResponse<PageResponse<AdminAuditLogDto>> auditLogs(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int pageSize
+    ) {
+        return ApiResponse.ok(interactionRepository.listAuditLogs(page, pageSize));
+    }
+
     @PostMapping("/reports/{id}/resolve")
+    @Transactional
     public ApiResponse<InteractionRepository.ReportRecord> resolve(@PathVariable Long id) {
         InteractionRepository.ReportRecord resolved = interactionRepository.resolveReport(id);
+        if ("RESOURCE".equalsIgnoreCase(resolved.targetType())) {
+            resourceRepository.findById(resolved.targetId()).ifPresent(resource -> {
+                resource.setStatus("REMOVED");
+                resourceRepository.save(resource);
+            });
+            interactionRepository.appendAuditLog(
+                "AUTO_REMOVE_RESOURCE",
+                "RESOURCE",
+                String.valueOf(resolved.targetId()),
+                "{\"fromReportId\":\"" + id + "\"}"
+            );
+        }
         return ApiResponse.ok(resolved);
     }
 
     @PostMapping("/resources/{id}/block")
+    @Transactional
     public ApiResponse<ResourceDto> blockResource(@PathVariable Long id) {
         ResourceEntity resource = resourceRepository.findById(id)
             .orElseThrow(() -> new com.sharehub.common.NotFoundException("RESOURCE_NOT_FOUND"));
         resource.setStatus("REMOVED");
+        interactionRepository.appendAuditLog("BLOCK_RESOURCE", "RESOURCE", String.valueOf(id), "{}");
         return ApiResponse.ok(resourceRepository.save(resource).toDto());
     }
 
     @PostMapping("/resources/{id}/restore")
+    @Transactional
     public ApiResponse<ResourceDto> restoreResource(@PathVariable Long id) {
         ResourceEntity resource = resourceRepository.findById(id)
             .orElseThrow(() -> new com.sharehub.common.NotFoundException("RESOURCE_NOT_FOUND"));
         resource.setStatus("PUBLISHED");
+        interactionRepository.appendAuditLog("RESTORE_RESOURCE", "RESOURCE", String.valueOf(id), "{}");
         return ApiResponse.ok(resourceRepository.save(resource).toDto());
     }
 
@@ -67,12 +94,18 @@ public class AdminController {
     }
 
     @PostMapping("/comments/{id}/hide")
+    @Transactional
     public ApiResponse<InteractionRepository.CommentRecord> hideComment(@PathVariable Long id) {
-        return ApiResponse.ok(interactionRepository.updateCommentStatus(id, "HIDDEN"));
+        InteractionRepository.CommentRecord record = interactionRepository.updateCommentStatus(id, "HIDDEN");
+        interactionRepository.appendAuditLog("HIDE_COMMENT", "COMMENT", String.valueOf(id), "{}");
+        return ApiResponse.ok(record);
     }
 
     @PostMapping("/comments/{id}/restore")
+    @Transactional
     public ApiResponse<InteractionRepository.CommentRecord> restoreComment(@PathVariable Long id) {
-        return ApiResponse.ok(interactionRepository.updateCommentStatus(id, "VISIBLE"));
+        InteractionRepository.CommentRecord record = interactionRepository.updateCommentStatus(id, "VISIBLE");
+        interactionRepository.appendAuditLog("RESTORE_COMMENT", "COMMENT", String.valueOf(id), "{}");
+        return ApiResponse.ok(record);
     }
 }

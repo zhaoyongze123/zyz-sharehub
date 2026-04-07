@@ -401,9 +401,19 @@ paths:
       responses:
         '200':
           description: 成功
+    delete:
+      summary: 取消收藏资料
+      responses:
+        '200':
+          description: 成功
   /api/resources/{id}/like:
     post:
       summary: 点赞资料
+      responses:
+        '200':
+          description: 成功
+    delete:
+      summary: 取消点赞资料
       responses:
         '200':
           description: 成功
@@ -422,6 +432,12 @@ paths:
   /api/admin/reports:
     get:
       summary: 举报列表
+      responses:
+        '200':
+          description: 成功
+  /api/admin/audit-logs:
+    get:
+      summary: 操作审计日志列表
       responses:
         '200':
           description: 成功

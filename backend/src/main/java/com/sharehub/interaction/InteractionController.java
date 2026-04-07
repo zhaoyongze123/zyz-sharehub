@@ -38,9 +38,21 @@ public class InteractionController {
         return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
     }
 
+    @DeleteMapping("/resources/{id}/favorite")
+    public ApiResponse<Map<String, Object>> unfavorite(@PathVariable Long id) {
+        int total = repository.removeFavorite(id);
+        return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
+    }
+
     @PostMapping("/resources/{id}/like")
     public ApiResponse<Map<String, Object>> like(@PathVariable Long id) {
         int total = repository.addLike(id);
+        return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
+    }
+
+    @DeleteMapping("/resources/{id}/like")
+    public ApiResponse<Map<String, Object>> unlike(@PathVariable Long id) {
+        int total = repository.removeLike(id);
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
     }
 
