@@ -36,11 +36,11 @@ cd /Users/mac/Documents/New\ project
 ## 关键实现
 
 - 每次启动后立即执行一轮
-- 之后每到下一个整点再执行一轮
-- 默认在次日 09:00 自动停止
+- 之后由 macOS `launchd` 在每个整点再执行一轮
+- 到 09:00 后入口脚本会主动卸载 LaunchAgent
 - 每轮调用 `codex exec`
 - 默认单轮超时 3000 秒，避免单次卡死整夜
-- 使用 `caffeinate -dimsu` 保持机器不休眠
+- 使用 `caffeinate -dimsu -t` 保持机器不休眠直到截止时间
 
 ## 可调参数
 

@@ -2,21 +2,12 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PID_FILE="${PROJECT_ROOT}/output/overnight/state/autopilot.pid"
+LAUNCHD_LABEL="com.sharehub.overnight.autopilot"
+PLIST_PATH="${HOME}/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
 CAFFEINATE_PID_FILE="${PROJECT_ROOT}/output/overnight/state/caffeinate.pid"
 
-if [[ ! -f "${PID_FILE}" ]]; then
-  echo "没有找到运行中的自动推进 PID 文件"
-  exit 0
-fi
-
-PID="$(cat "${PID_FILE}")"
-if kill -0 "${PID}" >/dev/null 2>&1; then
-  kill "${PID}"
-  echo "已停止自动推进，PID=${PID}"
-else
-  echo "PID=${PID} 不存在，清理残留 PID 文件"
-fi
+launchctl bootout "gui/$(id -u)" "${PLIST_PATH}" >/dev/null 2>&1 || true
+echo "已卸载 LaunchAgent：${LAUNCHD_LABEL}"
 
 if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
   CAFFEINATE_PID="$(cat "${CAFFEINATE_PID_FILE}")"
@@ -27,4 +18,4 @@ if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
   rm -f "${CAFFEINATE_PID_FILE}"
 fi
 
-rm -f "${PID_FILE}"
+rm -f "${PROJECT_ROOT}/output/overnight/state/caffeinate-seconds.txt"
