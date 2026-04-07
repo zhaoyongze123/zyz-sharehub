@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Repository
 public class UserProfileRepository {
@@ -81,13 +83,32 @@ public class UserProfileRepository {
         return findOptional(login).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
     }
 
+    public UserProfileDto findById(Long id) {
+        return findOptionalById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+    }
+
+    public UserProfileDto updateStatus(Long id, String status) {
+        int affected = jdbcTemplate.update("UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", status, id);
+        if (affected == 0) {
+            throw new NotFoundException("USER_NOT_FOUND");
+        }
+        return findById(id);
+    }
+
+    public void ensureActive(String login) {
+        UserProfileDto profile = findByLogin(login);
+        if ("BANNED".equalsIgnoreCase(profile.status())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "USER_BANNED");
+        }
+    }
+
     private Optional<UserProfileDto> findOptional(String login) {
         List<UserProfileDto> results = jdbcTemplate.query(
             """
                 SELECT id, login, name, avatar_file_id, status
                 FROM users
-                WHERE login = ?
-                """,
+            WHERE login = ?
+            """,
             (resultSet, rowNum) -> mapUser(resultSet),
             login
         );
@@ -115,5 +136,18 @@ public class UserProfileRepository {
 
     private String nullable(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private Optional<UserProfileDto> findOptionalById(Long id) {
+        List<UserProfileDto> results = jdbcTemplate.query(
+            """
+                SELECT id, login, name, avatar_file_id, status
+                FROM users
+                WHERE id = ?
+                """,
+            (resultSet, rowNum) -> mapUser(resultSet),
+            id
+        );
+        return results.stream().findFirst();
     }
 }

@@ -1,5 +1,7 @@
 package com.sharehub.admin;
 
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.interaction.InteractionRepository;
 import org.springframework.web.bind.annotation.*;
@@ -11,9 +13,11 @@ import java.util.List;
 public class AdminController {
 
     private final InteractionRepository interactionRepository;
+    private final UserProfileRepository userProfileRepository;
 
-    public AdminController(InteractionRepository interactionRepository) {
+    public AdminController(InteractionRepository interactionRepository, UserProfileRepository userProfileRepository) {
         this.interactionRepository = interactionRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @GetMapping("/reports")
@@ -33,7 +37,12 @@ public class AdminController {
     }
 
     @PostMapping("/users/{id}/ban")
-    public ApiResponse<String> banUser(@PathVariable Long id) {
-        return ApiResponse.ok("BANNED_USER_" + id);
+    public ApiResponse<UserProfileDto> banUser(@PathVariable Long id) {
+        return ApiResponse.ok(userProfileRepository.updateStatus(id, "BANNED"));
+    }
+
+    @PostMapping("/users/{id}/unban")
+    public ApiResponse<UserProfileDto> unbanUser(@PathVariable Long id) {
+        return ApiResponse.ok(userProfileRepository.updateStatus(id, "ACTIVE"));
     }
 }

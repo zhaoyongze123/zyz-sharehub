@@ -1,9 +1,9 @@
 package com.sharehub.interaction;
 
 import com.sharehub.common.ApiResponse;
-import org.springframework.web.bind.annotation.*;
-
+import java.util.List;
 import java.util.Map;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
@@ -19,6 +19,11 @@ public class InteractionController {
     public ApiResponse<InteractionRepository.CommentRecord> comment(@PathVariable Long id, @RequestBody Map<String, String> req) {
         InteractionRepository.CommentRecord comment = repository.saveComment(id, req.get("content"), null);
         return ApiResponse.ok(comment);
+    }
+
+    @GetMapping("/resources/{id}/comments")
+    public ApiResponse<java.util.List<CommentNodeDto>> comments(@PathVariable Long id) {
+        return ApiResponse.ok(repository.listCommentTreeByResource(id));
     }
 
     @PostMapping("/comments/{id}/reply")
@@ -37,6 +42,11 @@ public class InteractionController {
     public ApiResponse<Map<String, Object>> like(@PathVariable Long id) {
         int total = repository.addLike(id);
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
+    }
+
+    @GetMapping("/resources/{id}/interactions")
+    public ApiResponse<InteractionSummaryDto> interactions(@PathVariable Long id) {
+        return ApiResponse.ok(repository.summarizeResource(id));
     }
 
     @PostMapping("/reports")

@@ -51,6 +51,7 @@ public class MeService {
 
     public MeDto aggregate(String ownerKey) {
         UserProfileDto profile = userProfileRepository.upsert(ownerKey, ownerKey, null);
+        userProfileRepository.ensureActive(ownerKey);
         Long resourceCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM resources WHERE owner_key = ?",
             Long.class,

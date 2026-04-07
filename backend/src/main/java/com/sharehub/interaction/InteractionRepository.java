@@ -8,8 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
@@ -89,6 +88,54 @@ public class InteractionRepository {
             resourceId
         );
         return total == null ? 0 : total;
+    }
+
+    public List<CommentNodeDto> listCommentTreeByResource(Long resourceId) {
+        List<CommentRecord> records = jdbcTemplate.query(
+            """
+                SELECT id, resource_id, note_id, parent_id, content, status
+                FROM comments
+                WHERE resource_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+            (resultSet, rowNum) -> new CommentRecord(
+                resultSet.getLong("id"),
+                nullableLong(resultSet, "resource_id"),
+                nullableLong(resultSet, "note_id"),
+                nullableLong(resultSet, "parent_id"),
+                resultSet.getString("content"),
+                resultSet.getString("status")
+            ),
+            resourceId
+        );
+        Map<Long, CommentNodeDto> byId = new LinkedHashMap<>();
+        for (CommentRecord record : records) {
+            byId.put(record.id(), CommentNodeDto.from(record));
+        }
+        List<CommentNodeDto> roots = new ArrayList<>();
+        for (CommentNodeDto node : byId.values()) {
+            if (node.parentId() == null) {
+                roots.add(node);
+                continue;
+            }
+            CommentNodeDto parent = byId.get(node.parentId());
+            if (parent == null) {
+                roots.add(node);
+                continue;
+            }
+            parent.children().add(node);
+        }
+        return roots;
+    }
+
+    public InteractionSummaryDto summarizeResource(Long resourceId) {
+        return new InteractionSummaryDto(
+            resourceId,
+            count("SELECT COUNT(*) FROM comments WHERE resource_id = ?", resourceId),
+            count("SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL", resourceId),
+            count("SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL", resourceId),
+            count("SELECT COUNT(*) FROM reports WHERE target_type = 'RESOURCE' AND target_id = ?", resourceId)
+        );
     }
 
     public PageResponse<ResourceDto> listFavoriteResources(String userKey, int page, int pageSize) {
@@ -287,6 +334,11 @@ public class InteractionRepository {
             return List.of();
         }
         return Arrays.asList(tags.split(","));
+    }
+
+    private long count(String sql, Long resourceId) {
+        Long value = jdbcTemplate.queryForObject(sql, Long.class, resourceId);
+        return value == null ? 0L : value;
     }
 
     private void bindLong(PreparedStatement statement, int index, Long value) throws SQLException {

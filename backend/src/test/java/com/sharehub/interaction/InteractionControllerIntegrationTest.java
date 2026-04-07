@@ -10,9 +10,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,5 +59,18 @@ public class InteractionControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("OPEN"))
             .andExpect(jsonPath("$.data.targetId").value(1));
+
+        mvc.perform(get("/api/resources/1/comments"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].children", hasSize(1)));
+
+        mvc.perform(get("/api/resources/1/interactions"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.resourceId").value(1))
+            .andExpect(jsonPath("$.data.comments").value(2))
+            .andExpect(jsonPath("$.data.favorites").value(1))
+            .andExpect(jsonPath("$.data.likes").value(1))
+            .andExpect(jsonPath("$.data.reports").value(1));
     }
 }

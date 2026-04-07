@@ -377,6 +377,11 @@ paths:
         '404':
           description: 简历或文件不存在
   /api/resources/{id}/comments:
+    get:
+      summary: 获取资源评论树
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 发表评论
       responses:
@@ -399,6 +404,12 @@ paths:
   /api/resources/{id}/like:
     post:
       summary: 点赞资料
+      responses:
+        '200':
+          description: 成功
+  /api/resources/{id}/interactions:
+    get:
+      summary: 获取资源互动聚合计数
       responses:
         '200':
           description: 成功
@@ -434,3 +445,13 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 用户不存在
+  /api/admin/users/{id}/unban:
+    post:
+      summary: 解封用户
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 用户不存在
