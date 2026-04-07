@@ -47,10 +47,14 @@
         <!-- 工作区名称和操作 -->
         <div class="sidebar-header">
           <span class="workspace-name dropdown-trigger" title="工作区名称">ShareHub Vault <div class="i-carbon-chevron-down text-xs ml-1"></div></span>
-          <div class="actions">
-            <!-- 新建按钮 -->
-            <button title="新建笔记" @click="createNewNote"><div class="i-carbon-document-add"></div></button>
-            <button title="新建文件夹" @click="promptCreateFolder"><div class="i-carbon-folder-add"></div></button>
+          <div class="actions flex gap-2">
+            <!-- 新建按钮（增加文字和明显样式便于识别） -->
+            <button class="action-btn" title="新建笔记" @click="createNewNote">
+              <div class="i-carbon-document-add text-base"></div><span class="text-xs">新建</span>
+            </button>
+            <button class="action-btn" title="新建文件夹" @click="promptCreateFolder">
+              <div class="i-carbon-folder-add text-base"></div>
+            </button>
           </div>
         </div>
 
@@ -166,14 +170,32 @@
               class="title-input" 
               placeholder="未命名" 
               @input="triggerAutoSave"
+              :disabled="editMode === 'read'"
             />
             <div class="save-status">
               <div v-if="saveStatus === 'saving'" class="status saving"><div class="i-carbon-progress-5 spin"></div> 保存中...</div>
               <div v-else-if="saveStatus === 'saved'" class="status success"><div class="i-carbon-checkmark"></div> 已保存</div>
               <div v-else-if="saveStatus === 'error'" class="status error"><div class="i-carbon-warning"></div> 存储失败</div>
             </div>
+            <!-- 编辑/阅读模式切换 -->
+            <div class="mode-toggle bg-gray-100 p-1 flex rounded-md ml-auto mr-4 text-sm font-medium">
+              <button 
+                class="px-2 py-1 rounded flex items-center transition-colors outline-none"
+                :class="editMode === 'edit' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'"
+                @click="editMode = 'edit'"
+              >
+                <div class="i-carbon-edit mr-1"></div>编辑
+              </button>
+              <button 
+                class="px-2 py-1 rounded flex items-center transition-colors outline-none ml-1"
+                :class="editMode === 'read' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'"
+                @click="editMode = 'read'"
+              >
+                <div class="i-carbon-book mr-1"></div>阅读
+              </button>
+            </div>
             <!-- 右侧大纲切换 -->
-            <button class="toggle-sidebar-btn ml-auto" @click="isRightSidebarOpen = !isRightSidebarOpen" title="右侧大纲">
+            <button class="toggle-sidebar-btn" @click="isRightSidebarOpen = !isRightSidebarOpen" title="右侧大纲">
               <div class="i-carbon-list"></div>
             </button>
           </div>
@@ -195,13 +217,21 @@
           </div>
 
           <!-- 真正的编辑器部分 -->
-          <div class="editor-content-area">
+          <div class="editor-content-area relative h-full">
             <textarea 
+              v-if="editMode === 'edit'"
               v-model="activeNote.content" 
-              class="markdown-editor" 
+              class="markdown-editor w-full h-full" 
               placeholder="开始编写您的 Markdown 笔记... (可以输入大纲标题)"
               @input="triggerAutoSave"
             ></textarea>
+            <div 
+              v-else 
+              class="markdown-preview w-full h-full overflow-y-auto mt-4 px-4 pb-12"
+            >
+              <div v-if="!activeNote.content" class="text-gray-400 italic text-sm">笔记内容为空</div>
+              <div v-else class="whitespace-pre-wrap text-gray-800 leading-relaxed text-base">{{ activeNote.content }}</div>
+            </div>
           </div>
         </template>
         <div v-else class="empty-editor">
@@ -248,6 +278,9 @@ const store = useLocalNoteStore()
 // 控制布局展开与收起 (切换视图按钮功能)
 const isSidebarOpen = ref(true)
 const isRightSidebarOpen = ref(true)
+
+// 编辑/阅读模式状态
+const editMode = ref<'edit' | 'read'>('edit')
 
 // 当前左侧面板的视图模式 (文件树 files / 搜索框 search / 标签筛选 tags)
 const viewMode = ref<'files'|'search'|'tags'>('files')
@@ -463,8 +496,8 @@ const outline = computed(() => {
   display: flex; align-items: center; cursor: pointer;
 }
 .workspace-name:hover { background-color: #e5e7eb; border-radius: 4px; padding: 2px 4px; margin-left: -4px; }
-.sidebar-header .actions button { cursor: pointer; color: #6b7280; background: none; border: none; padding: 4px; border-radius: 4px; margin-left: 2px; }
-.sidebar-header .actions button:hover { background-color: #e5e7eb; color: #111827; }
+.sidebar-header .actions button { cursor: pointer; color: #4b5563; background: #e5e7eb; border: none; padding: 4px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; transition: all 0.2s; font-weight: 500;}
+.sidebar-header .actions button:hover { background-color: #d1d5db; color: #111827; }
 
 .sidebar-content {
   flex: 1; overflow-y: auto; padding: 8px 0;
