@@ -21,7 +21,9 @@
         <div class="flex items-center gap-2 text-sm border-r pr-4">
           <span class="text-gray-500">模板:</span>
           <select v-model="currentTemplate" class="border border-gray-200 rounded px-2 py-1 bg-white cursor-pointer shadow-sm">
-            <option value="classic">经典单栏</option>
+            <option value="classic">经典基础</option>
+            <option value="professional">沉稳商务</option>
+            <option value="modern">现代左右</option>
           </select>
         </div>
         <BaseButton variant="secondary" @click="resetToDefault" class="text-sm">重置</BaseButton>
@@ -277,7 +279,7 @@
         <!-- The component itself now handles the white background & pagination line repeating -->
         <div class="relative w-[794px] min-w-[794px] shrink-0 mx-auto z-10 shadow-2xl rounded-sm overflow-hidden">
              <!-- Note: passing focus mechanism via events -->
-             <ResumeClassicTemplate :modules="modules" ref="resumeTemplateRef" @focus-field="handleFocusField" />
+             <component :is="templateComponents[currentTemplate]" :modules="modules" ref="resumeTemplateRef" @focus-field="handleFocusField" />
         </div>
         
         <div class="h-20 w-full shrink-0"></div> <!-- extra bottom padding -->
@@ -291,6 +293,8 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import draggable from 'vuedraggable'
 import BaseButton from '@/components/base/BaseButton.vue'
 import ResumeClassicTemplate from '@/components/business/ResumeClassicTemplate.vue'
+import ResumeProfessionalTemplate from '@/components/business/ResumeProfessionalTemplate.vue'
+import ResumeModernTemplate from '@/components/business/ResumeModernTemplate.vue'
 import html2pdf from 'html2pdf.js'
 import { useAppStore } from '@/stores/app'
 
@@ -303,6 +307,7 @@ const exporting = ref(false)
 const saving = ref(false)
 const saveTime = ref('')
 const currentTemplate = ref('classic')
+const templateComponents: Record<string, any> = { classic: ResumeClassicTemplate, professional: ResumeProfessionalTemplate, modern: ResumeModernTemplate }
 
 const defaultModules = [
   {
@@ -363,7 +368,7 @@ const defaultModules = [
   }
 ]
 
-const versions = ref<{id: string, name: string, data: any}[]>([])
+const versions = ref<{id: string, name: string, data: any, template?: string}[]>([])
 const currentVersionId = ref('v1')
 
 const normalizeData = (mods: any[]) => {
@@ -476,13 +481,14 @@ const uploadAvatar = (e: Event) => {
 
 // Watch data deep to debounced auto-save 
 let saveTimer: any = null
-watch(modules, () => {
+watch([modules, currentTemplate], () => {
   saving.value = true
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     const idx = versions.value.findIndex(v => v.id === currentVersionId.value)
     if (idx !== -1) {
       versions.value[idx].data = JSON.parse(JSON.stringify(modules.value))
+      versions.value[idx].template = currentTemplate.value
       localStorage.setItem('resume_versions', JSON.stringify(versions.value))
       saving.value = false
       const d = new Date()
@@ -497,6 +503,7 @@ onMounted(() => {
     versions.value = JSON.parse(saved)
     currentVersionId.value = versions.value[0].id
     modules.value = normalizeData(JSON.parse(JSON.stringify(versions.value[0].data)))
+    if (versions.value[0].template) currentTemplate.value = versions.value[0].template
   } else {
     versions.value = [{ id: 'v1', name: '默认简历', data: JSON.parse(JSON.stringify(defaultModules)) }]
     localStorage.setItem('resume_versions', JSON.stringify(versions.value))
@@ -505,7 +512,10 @@ onMounted(() => {
 
 const switchVersion = () => {
   const target = versions.value.find(v => v.id === currentVersionId.value)
-  if (target) modules.value = normalizeData(JSON.parse(JSON.stringify(target.data)))
+  if (target) {
+    modules.value = normalizeData(JSON.parse(JSON.stringify(target.data)))
+    if (target.template) currentTemplate.value = target.template
+  }
 }
 const createNewVersion = () => {
   const id = 'v' + Date.now()

@@ -1,0 +1,84 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5] [cursor=pointer]:
+      - generic [ref=e6]: SB
+      - generic [ref=e7]: ShareBase
+    - navigation [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: 探索发现
+        - link "资料广场" [ref=e11] [cursor=pointer]:
+          - /url: /resources
+          - generic [ref=e13]: 资料广场
+        - link "路线图" [ref=e14] [cursor=pointer]:
+          - /url: /roadmaps
+          - generic [ref=e16]: 路线图
+        - link "社区" [ref=e17] [cursor=pointer]:
+          - /url: /community
+          - generic [ref=e19]: 社区
+      - generic [ref=e20]:
+        - generic [ref=e21]: 工作台
+        - link "发布资料" [ref=e22] [cursor=pointer]:
+          - /url: /publish/resource
+          - generic [ref=e24]: 发布资料
+        - link "编排路线" [ref=e25] [cursor=pointer]:
+          - /url: /publish/roadmap
+          - generic [ref=e27]: 编排路线
+        - link "记录笔记" [ref=e28] [cursor=pointer]:
+          - /url: /editor/note
+          - generic [ref=e30]: 记录笔记
+        - link "我的履历" [ref=e31] [cursor=pointer]:
+          - /url: /resume
+          - generic [ref=e33]: 我的履历
+    - generic [ref=e35] [cursor=pointer]:
+      - img "avatar" [ref=e36]
+      - generic [ref=e37]:
+        - generic [ref=e38]: 未登录
+        - generic [ref=e39]: 个人帐户
+  - generic [ref=e40]:
+    - banner [ref=e41]:
+      - heading "笔记编辑" [level=1] [ref=e43]
+      - generic [ref=e45] [cursor=pointer]:
+        - generic [ref=e47]: 全局检索...
+        - generic [ref=e48]: ⌘K
+    - main [ref=e49]:
+      - generic [ref=e50]:
+        - navigation [ref=e63]:
+          - generic [ref=e64]:
+            - button "文件树视图" [ref=e65] [cursor=pointer]
+            - button "全文搜索" [ref=e67] [cursor=pointer]
+            - button "标签筛选" [ref=e69] [cursor=pointer]
+          - button "本地库设置" [ref=e72] [cursor=pointer]
+        - complementary [ref=e74]:
+          - generic [ref=e75]:
+            - generic "工作区名称" [ref=e76] [cursor=pointer]: ShareHub Vault
+            - generic [ref=e78]:
+              - button "笔记" [ref=e79] [cursor=pointer]:
+                - generic [ref=e81]: 笔记
+              - button "目录" [ref=e82] [cursor=pointer]:
+                - generic [ref=e84]: 目录
+          - generic [ref=e88]:
+            - generic [ref=e89] [cursor=pointer]:
+              - generic [ref=e92]: 默认笔记本
+              - button "删除文件夹" [ref=e93]
+            - generic [ref=e96] [cursor=pointer]:
+              - generic [ref=e98]: 欢迎使用本地笔记
+              - button "删除笔记" [ref=e99]
+        - main [ref=e102]:
+          - generic [ref=e103]:
+            - button "收起/展开面板" [ref=e104] [cursor=pointer]
+            - textbox "未命名" [ref=e106]: 欢迎使用本地笔记
+            - button "删除当前笔记" [ref=e107] [cursor=pointer]
+            - generic [ref=e109]:
+              - button "编辑" [ref=e110] [cursor=pointer]: 编辑
+              - button "阅读" [ref=e112] [cursor=pointer]: 阅读
+            - button "右侧大纲" [ref=e114] [cursor=pointer]
+          - generic [ref=e118]:
+            - generic [ref=e119]: 入门
+            - textbox "添加标签..." [ref=e121]
+          - textbox "开始编写您的 Markdown 笔记... (可以输入大纲标题)" [ref=e123]: "这是一篇基于本地存储的笔记。 ## 特性 - 完全本地化，数据不上传云端 - 自动保存 - 实时 Markdown 预览 - 文件夹分类与标签管理"
+        - complementary [ref=e124]:
+          - generic [ref=e125]:
+            - generic [ref=e126]: 大纲
+            - button [ref=e127] [cursor=pointer]
+          - list [ref=e130]:
+            - listitem [ref=e131] [cursor=pointer]: 特性
