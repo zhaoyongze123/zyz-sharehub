@@ -1,6 +1,7 @@
 package com.sharehub.interaction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.config.AdminTokenFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,7 +118,7 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.favorites").value(0))
             .andExpect(jsonPath("$.data.likes").value(0));
 
-        mvc.perform(post("/api/admin/comments/2/hide"))
+        mvc.perform(adminPost("/api/admin/comments/2/hide"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("HIDDEN"));
 
@@ -130,7 +131,7 @@ public class InteractionControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.comments").value(1));
 
-        mvc.perform(post("/api/admin/comments/2/restore"))
+        mvc.perform(adminPost("/api/admin/comments/2/restore"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("VISIBLE"));
 
@@ -142,5 +143,9 @@ public class InteractionControllerIntegrationTest {
         mvc.perform(get("/api/resources/1/interactions"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.comments").value(2));
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {
+        return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
 }

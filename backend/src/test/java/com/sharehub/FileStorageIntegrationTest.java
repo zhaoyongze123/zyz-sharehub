@@ -1,5 +1,6 @@
 package com.sharehub;
 
+import com.sharehub.auth.RequestAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -18,6 +19,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class FileStorageIntegrationTest {
+
+    private static final String USER_KEY = "local-dev-user";
 
     @Autowired
     private MockMvc mockMvc;
@@ -62,7 +65,9 @@ class FileStorageIntegrationTest {
             payload
         );
 
-        mockMvc.perform(multipart("/api/auth/avatar").file(file))
+        mockMvc.perform(multipart("/api/auth/avatar")
+                .file(file)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isBadRequest());
     }
 }

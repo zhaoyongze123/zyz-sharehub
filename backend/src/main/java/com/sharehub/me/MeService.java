@@ -23,8 +23,6 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MeService {
-
-    private static final String DEFAULT_OWNER_KEY = "local-dev-user";
     private static final Duration RECENT_RESOURCE_WINDOW = Duration.ofDays(7);
     private static final String PUBLISHED_STATUS = "PUBLISHED";
     private static final String DRAFT_STATUS = "DRAFT";
@@ -89,11 +87,11 @@ public class MeService {
         );
     }
 
-    public PageResponse<ResourceDto> myResources(String status, String visibility, int page, int pageSize) {
+    public PageResponse<ResourceDto> myResources(String ownerKey, String status, String visibility, int page, int pageSize) {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
         Page<ResourceEntity> pageResult = resourceRepository.findByOwnerAndFilters(
-            DEFAULT_OWNER_KEY,
+            ownerKey,
             normalize(status),
             normalize(visibility),
             PageRequest.of(safePage - 1, safePageSize)
@@ -106,21 +104,28 @@ public class MeService {
         );
     }
 
-    public PageResponse<RoadmapWorkbenchDto> myRoadmaps(String status, int page, int pageSize) {
-        return roadmapJdbcRepository.listWorkbenchByOwner(DEFAULT_OWNER_KEY, status, page, pageSize);
+    public PageResponse<RoadmapWorkbenchDto> myRoadmaps(String ownerKey, String status, int page, int pageSize) {
+        return roadmapJdbcRepository.listWorkbenchByOwner(ownerKey, status, page, pageSize);
     }
 
-    public PageResponse<ResourceDto> myFavorites(int page, int pageSize) {
-        return interactionRepository.listFavoriteResources(DEFAULT_OWNER_KEY, page, pageSize);
+    public PageResponse<ResourceDto> myFavorites(String ownerKey, int page, int pageSize) {
+        return interactionRepository.listFavoriteResources(ownerKey, page, pageSize);
     }
 
-    public PageResponse<NoteDto> myNotes(String status, int page, int pageSize) {
-        return noteRepository.listByOwner(DEFAULT_OWNER_KEY, status, page, pageSize);
+    public PageResponse<NoteDto> myNotes(String ownerKey, String status, int page, int pageSize) {
+        return noteRepository.listByOwner(ownerKey, status, page, pageSize);
     }
 
-    public PageResponse<ResumeDto> myResumes(String status, String templateKey, String keyword, int page, int pageSize) {
+    public PageResponse<ResumeDto> myResumes(
+        String ownerKey,
+        String status,
+        String templateKey,
+        String keyword,
+        int page,
+        int pageSize
+    ) {
         return resumeRepository.list(
-            DEFAULT_OWNER_KEY,
+            ownerKey,
             page,
             pageSize,
             normalize(status),

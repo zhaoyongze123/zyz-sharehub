@@ -19,16 +19,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class AuthControllerIntegrationTest {
 
+    private static final String USER_KEY = "local-dev-user";
+
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void shouldReturnLocalDevUserProfile() throws Exception {
-        mockMvc.perform(get("/api/auth/me"))
+    void shouldReturnCurrentUserProfileWhenUserHeaderProvided() throws Exception {
+        mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.code").value("OK"))
-            .andExpect(jsonPath("$.data.login").value("local-dev-user"))
+            .andExpect(jsonPath("$.message").value("OK"))
+            .andExpect(jsonPath("$.data.login").value(USER_KEY))
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }
 
@@ -41,12 +44,33 @@ class AuthControllerIntegrationTest {
             "png".getBytes()
         );
 
-        mockMvc.perform(multipart("/api/auth/avatar").file(file))
+        mockMvc.perform(multipart("/api/auth/avatar")
+                .file(file)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("OK"))
             .andExpect(jsonPath("$.data.category").value("AVATAR"));
 
-        mockMvc.perform(get("/api/auth/me"))
+        mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.avatarUrl").exists());
+    }
+
+    @Test
+    void shouldRejectAnonymousRequestsForCurrentUserEndpoints() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "png".getBytes()
+        );
+
+        mockMvc.perform(get("/api/auth/me"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(multipart("/api/auth/avatar").file(file))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
     }
 }

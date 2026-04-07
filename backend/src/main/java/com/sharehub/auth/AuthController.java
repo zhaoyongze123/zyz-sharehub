@@ -4,13 +4,13 @@ import com.sharehub.common.ApiResponse;
 import com.sharehub.files.FileCategory;
 import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,10 +22,16 @@ public class AuthController {
 
     private final FileStorageService fileStorageService;
     private final UserProfileRepository userProfileRepository;
+    private final RequestAccessService requestAccessService;
 
-    public AuthController(FileStorageService fileStorageService, UserProfileRepository userProfileRepository) {
+    public AuthController(
+        FileStorageService fileStorageService,
+        UserProfileRepository userProfileRepository,
+        RequestAccessService requestAccessService
+    ) {
         this.fileStorageService = fileStorageService;
         this.userProfileRepository = userProfileRepository;
+        this.requestAccessService = requestAccessService;
     }
 
     @GetMapping("/github/login")
@@ -43,8 +49,8 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ApiResponse<UserProfileDto> me(Authentication authentication) {
-        String login = resolveOwner(authentication);
+    public ApiResponse<UserProfileDto> me(Authentication authentication, HttpServletRequest request) {
+        String login = requestAccessService.requireUser(authentication, request);
         String name = resolveName(authentication, login);
         UserProfileDto profile = userProfileRepository.upsert(login, name, null);
         userProfileRepository.ensureActive(login);
@@ -57,23 +63,17 @@ public class AuthController {
     }
 
     @PostMapping(path = "/avatar", consumes = "multipart/form-data")
-    public ApiResponse<StoredFileDto> uploadAvatar(Authentication authentication, @RequestPart("file") MultipartFile file) {
-        String owner = resolveOwner(authentication);
+    public ApiResponse<StoredFileDto> uploadAvatar(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestPart("file") MultipartFile file
+    ) {
+        String owner = requestAccessService.requireUser(authentication, request);
         userProfileRepository.upsert(owner, resolveName(authentication, owner), null);
         userProfileRepository.ensureActive(owner);
         StoredFileDto stored = fileStorageService.storeMultipart(owner, FileCategory.AVATAR, "USER_AVATAR", owner, file);
         userProfileRepository.updateAvatar(owner, stored.id());
         return ApiResponse.ok(stored);
-    }
-
-    private String resolveOwner(Authentication authentication) {
-        if (authentication != null && authentication.getPrincipal() instanceof OAuth2User user) {
-            Object login = user.getAttribute("login");
-            if (login != null) {
-                return String.valueOf(login);
-            }
-        }
-        return "local-dev-user";
     }
 
     private String resolveName(Authentication authentication, String fallback) {
@@ -85,4 +85,5 @@ public class AuthController {
         }
         return fallback;
     }
+
 }

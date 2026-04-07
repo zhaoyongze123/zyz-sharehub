@@ -1,5 +1,6 @@
 package com.sharehub.admin;
 
+import com.sharehub.config.AdminTokenFilter;
 import com.sharehub.interaction.InteractionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,7 +42,7 @@ public class AdminControllerIntegrationTest {
         interactionRepository.saveReport(1L, "spam", "alice");
         interactionRepository.saveReport(2L, "abuse", "bob");
 
-        mvc.perform(get("/api/admin/reports")
+        mvc.perform(adminGet("/api/admin/reports")
                 .param("page", "1")
                 .param("pageSize", "1")
                 .param("status", "OPEN")
@@ -57,7 +59,7 @@ public class AdminControllerIntegrationTest {
         interactionRepository.appendAuditLog("BLOCK_RESOURCE", "RESOURCE", "42", "{}");
         interactionRepository.appendAuditLog("HIDE_COMMENT", "COMMENT", "7", "{}");
 
-        mvc.perform(get("/api/admin/audit-logs")
+        mvc.perform(adminGet("/api/admin/audit-logs")
                 .param("page", "1")
                 .param("pageSize", "10")
                 .param("action", "BLOCK_RESOURCE")
@@ -67,5 +69,24 @@ public class AdminControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items.length()").value(1))
             .andExpect(jsonPath("$.data.items[0].action").value("BLOCK_RESOURCE"))
             .andExpect(jsonPath("$.data.items[0].targetType").value("RESOURCE"));
+    }
+
+    @Test
+    void adminEndpointsRejectMissingToken() throws Exception {
+        mvc.perform(get("/api/admin/reports"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+
+        mvc.perform(get("/api/admin/audit-logs"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    private MockHttpServletRequestBuilder adminGet(String uri) {
+        return get(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
+    }
+
+    private MockHttpServletRequestBuilder adminPost(String uri) {
+        return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
 }

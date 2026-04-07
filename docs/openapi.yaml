@@ -14,15 +14,29 @@ paths:
   /api/auth/me:
     get:
       summary: 获取当前用户
+      description: 需要登录态，支持 OAuth 会话或本地联调头 X-User-Key
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me:
     get:
       summary: 个人中心聚合信息
+      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录，需先完成 OAuth
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/resources:
     get:
       summary: 获取我的发布资料列表
@@ -50,6 +64,12 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/roadmaps:
     get:
       summary: 获取我的路线列表
@@ -73,6 +93,12 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/favorites:
     get:
       summary: 获取我的收藏资料列表
@@ -92,6 +118,12 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
@@ -115,6 +147,12 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/resumes:
     get:
       summary: 获取我的简历工作台列表
@@ -184,15 +222,16 @@ paths:
                               format: date-time
                       total:
                         type: integer
-                      pageNum:
-                        type: integer
-                      pageSize:
-                        type: integer
-                  message:
-                    type: string
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/auth/avatar:
     post:
       summary: 上传用户头像
+      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；文件为 jpg/png，大小不得超过 5MB
       requestBody:
         required: true
         content:
@@ -207,7 +246,17 @@ paths:
         '200':
           description: 成功
         '400':
-          description: 文件校验失败
+          description: 文件校验失败（格式 / 大小）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resources:
     get:
       summary: 资料分页列表
@@ -574,6 +623,7 @@ paths:
   /api/admin/reports:
     get:
       summary: 举报列表
+      description: 仅管理员可查看，支持分页+状态+目标类型筛选
       parameters:
         - name: page
           in: query
@@ -600,9 +650,22 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 无效登录或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/audit-logs:
     get:
       summary: 操作审计日志列表
+      description: 管理员专用接口，按 actor/action/目标类型可筛选
       parameters:
         - name: page
           in: query
@@ -629,12 +692,37 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或无权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/reports/{id}/resolve:
     post:
       summary: 处理举报
+      description: 管理员接口，修改举报状态为 RESOLVED
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 举报不存在
           content:
@@ -644,9 +732,22 @@ paths:
   /api/admin/resources/{id}/block:
     post:
       summary: 下架资料
+      description: 管理员可标记资料为 blocked
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或无权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 资料不存在
           content:
@@ -656,9 +757,22 @@ paths:
   /api/admin/resources/{id}/restore:
     post:
       summary: 恢复资料
+      description: 管理员将资料从 blocked 状态恢复
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或无权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 资料不存在
           content:
@@ -668,9 +782,22 @@ paths:
   /api/admin/users/{id}/ban:
     post:
       summary: 封禁用户
+      description: 管理员接口，将用户状态标记为 BANNED
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 用户不存在
           content:
@@ -680,9 +807,22 @@ paths:
   /api/admin/users/{id}/unban:
     post:
       summary: 解封用户
+      description: 管理员将用户重新置为活跃
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 用户不存在
           content:
@@ -692,9 +832,22 @@ paths:
   /api/admin/comments/{id}/hide:
     post:
       summary: 隐藏评论
+      description: 管理员接口，隐藏评论后前端不再展示
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或无权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 评论不存在
           content:
@@ -704,9 +857,22 @@ paths:
   /api/admin/comments/{id}/restore:
     post:
       summary: 恢复评论
+      description: 管理员恢复隐藏的评论
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录或无权限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 需要管理员角色
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 评论不存在
           content:

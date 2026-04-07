@@ -1,6 +1,7 @@
 package com.sharehub.me;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.auth.RequestAccessService;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class MeControllerIntegrationTest {
+
+    private static final String USER_KEY = "local-dev-user";
 
     @Autowired
     private MockMvc mockMvc;
@@ -75,7 +78,7 @@ class MeControllerIntegrationTest {
         mockMvc.perform(post("/api/resources/1/favorite"))
             .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/me"))
+        mockMvc.perform(get("/api/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.profile.login").value("local-dev-user"))
             .andExpect(jsonPath("$.data.myResourceCount").value(1))
@@ -163,21 +166,32 @@ class MeControllerIntegrationTest {
         mockMvc.perform(post("/api/resources/" + firstResourceId + "/favorite"))
             .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/me/resources").param("page", "1").param("pageSize", "10"))
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(2))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
 
-        mockMvc.perform(get("/api/me/resources").param("status", "DRAFT"))
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", "DRAFT"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(2));
 
-        mockMvc.perform(get("/api/me/resources").param("visibility", "PRIVATE"))
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("visibility", "PRIVATE"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
 
-        mockMvc.perform(get("/api/me/roadmaps").param("page", "1").param("pageSize", "10").param("status", "PUBLISHED"))
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10")
+                .param("status", "PUBLISHED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("路线A"))
@@ -185,17 +199,28 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].completedNodeCount").value(1))
             .andExpect(jsonPath("$.data.items[0].progressPercent").value(50));
 
-        mockMvc.perform(get("/api/me/favorites").param("page", "1").param("pageSize", "10"))
+        mockMvc.perform(get("/api/me/favorites")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料A"));
 
-        mockMvc.perform(get("/api/me/notes").param("page", "1").param("pageSize", "10").param("status", "PUBLISHED"))
+        mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10")
+                .param("status", "PUBLISHED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("笔记A"));
 
-        mockMvc.perform(get("/api/me/resumes").param("page", "1").param("pageSize", "10").param("status", "GENERATED"))
+        mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10")
+                .param("status", "GENERATED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(2))
             .andExpect(jsonPath("$.data.items[0].fileSize").isNumber())
@@ -203,6 +228,7 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].fileUpdatedAt").exists());
 
         mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .param("templateKey", "resume-a")
                 .param("page", "1")
                 .param("pageSize", "10"))
@@ -212,6 +238,7 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].fileName").value("resume-resume-a.pdf"));
 
         mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .param("keyword", "RESUME-B")
                 .param("page", "1")
                 .param("pageSize", "10"))
@@ -219,12 +246,23 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-b"));
 
-        mockMvc.perform(get("/api/me"))
+        mockMvc.perform(get("/api/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.myResourceCount").value(2))
             .andExpect(jsonPath("$.data.recentResourceCount").value(2))
             .andExpect(jsonPath("$.data.publishedResourceCount").value(0))
             .andExpect(jsonPath("$.data.draftNoteCount").value(0))
             .andExpect(jsonPath("$.data.generatedResumeCount").value(2));
+    }
+
+    @Test
+    void shouldRejectAnonymousAccessToPersonalCenter() throws Exception {
+        mockMvc.perform(get("/api/me"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/me/resources"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
     }
 }
