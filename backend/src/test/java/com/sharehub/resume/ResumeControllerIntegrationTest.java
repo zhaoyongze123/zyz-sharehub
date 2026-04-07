@@ -57,7 +57,11 @@ class ResumeControllerIntegrationTest {
 
         mockMvc.perform(get("/api/resumes/" + id))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.fileUrl").value("/api/resumes/" + id + "/download"));
+            .andExpect(jsonPath("$.data.fileUrl").value("/api/resumes/" + id + "/download"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-classic.pdf"))
+            .andExpect(jsonPath("$.data.fileSize").isNumber())
+            .andExpect(jsonPath("$.data.fileCreatedAt").exists())
+            .andExpect(jsonPath("$.data.fileUpdatedAt").exists());
 
         mockMvc.perform(get("/api/resumes/" + id + "/download"))
             .andExpect(status().isOk())
@@ -78,10 +82,12 @@ class ResumeControllerIntegrationTest {
         Map<?, ?> data = (Map<?, ?>) payload.get("data");
         Long id = Long.valueOf(String.valueOf(data.get("id")));
 
-        mockMvc.perform(get("/api/resumes"))
+        mockMvc.perform(get("/api/resumes").param("status", "GENERATED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.items[0].id").value(id.intValue()));
+            .andExpect(jsonPath("$.data.items[0].id").value(id.intValue()))
+            .andExpect(jsonPath("$.data.items[0].fileName").value("resume-classic.pdf"))
+            .andExpect(jsonPath("$.data.items[0].fileSize").isNumber());
 
         mockMvc.perform(delete("/api/resumes/" + id))
             .andExpect(status().isOk())

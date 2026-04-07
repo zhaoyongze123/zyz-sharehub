@@ -9,6 +9,7 @@ import com.sharehub.files.StoredFileDto;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,10 +57,15 @@ public class ResourceController {
     @GetMapping
     public ApiResponse<PageResponse<ResourceDto>> list(
         @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "12") int pageSize
+        @RequestParam(defaultValue = "12") int pageSize,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String visibility
     ) {
-        Page<ResourceDto> result = repository.findAll(PageRequest.of(page, pageSize)).map(ResourceEntity::toDto);
-        return ApiResponse.ok(PageResponse.from(result));
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, pageSize);
+        PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        Page<ResourceEntity> result = repository.findByStatusAndVisibility(status, visibility, pageable);
+        return ApiResponse.ok(PageResponse.from(result.map(ResourceEntity::toDto)));
     }
 
     @GetMapping("/featured")

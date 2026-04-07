@@ -106,10 +106,36 @@ class MeControllerIntegrationTest {
                     """))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/roadmaps")
+        String roadmapResponse = mockMvc.perform(post("/api/roadmaps")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"路线A","description":"desc-a","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(roadmapResponse, Map.class).get("data")).get("id").toString());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点1","orderNo":1}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点2","orderNo":2}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"percent":50,"completedNodeIds":[1]}
                     """))
             .andExpect(status().isOk());
 
@@ -133,24 +159,40 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(2))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
 
-        mockMvc.perform(get("/api/me/roadmaps").param("page", "1").param("pageSize", "10"))
+        mockMvc.perform(get("/api/me/resources").param("status", "DRAFT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2));
+
+        mockMvc.perform(get("/api/me/resources").param("visibility", "PRIVATE"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.items[0].title").value("路线A"));
+            .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
+
+        mockMvc.perform(get("/api/me/roadmaps").param("page", "1").param("pageSize", "10").param("status", "PUBLISHED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线A"))
+            .andExpect(jsonPath("$.data.items[0].nodeCount").value(2))
+            .andExpect(jsonPath("$.data.items[0].completedNodeCount").value(1))
+            .andExpect(jsonPath("$.data.items[0].progressPercent").value(50));
 
         mockMvc.perform(get("/api/me/favorites").param("page", "1").param("pageSize", "10"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料A"));
 
-        mockMvc.perform(get("/api/me/notes").param("page", "1").param("pageSize", "10"))
+        mockMvc.perform(get("/api/me/notes").param("page", "1").param("pageSize", "10").param("status", "PUBLISHED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("笔记A"));
 
-        mockMvc.perform(get("/api/me/resumes").param("page", "1").param("pageSize", "10"))
+        mockMvc.perform(get("/api/me/resumes").param("page", "1").param("pageSize", "10").param("status", "GENERATED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-a"));
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-a"))
+            .andExpect(jsonPath("$.data.items[0].fileName").value("resume-resume-a.pdf"))
+            .andExpect(jsonPath("$.data.items[0].fileSize").isNumber())
+            .andExpect(jsonPath("$.data.items[0].fileCreatedAt").exists())
+            .andExpect(jsonPath("$.data.items[0].fileUpdatedAt").exists());
     }
 }

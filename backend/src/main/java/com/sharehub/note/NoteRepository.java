@@ -70,16 +70,24 @@ public class NoteRepository {
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
-    public PageResponse<NoteDto> listByOwner(String ownerKey, int page, int pageSize) {
+    public PageResponse<NoteDto> listByOwner(String ownerKey, String status, int page, int pageSize) {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notes WHERE owner_key = ?", Long.class, ownerKey);
+        String normalizedStatus = normalize(status);
+        Long total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM notes WHERE owner_key = ? AND (? IS NULL OR status = ?)",
+            Long.class,
+            ownerKey,
+            normalizedStatus,
+            normalizedStatus
+        );
         int offset = (safePage - 1) * safePageSize;
         List<NoteDto> items = jdbcTemplate.query(
             """
                 SELECT id, title, content_md, visibility, status
                 FROM notes
                 WHERE owner_key = ?
+                  AND (? IS NULL OR status = ?)
                 ORDER BY id DESC
                 LIMIT ? OFFSET ?
                 """,
@@ -91,6 +99,8 @@ public class NoteRepository {
                 resultSet.getString("status")
             ),
             ownerKey,
+            normalizedStatus,
+            normalizedStatus,
             safePageSize,
             offset
         );
@@ -155,5 +165,12 @@ public class NoteRepository {
 
     private String defaultStatus(String status) {
         return status == null || status.isBlank() ? "DRAFT" : status;
+    }
+
+    private String normalize(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        return status;
     }
 }

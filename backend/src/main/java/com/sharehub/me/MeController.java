@@ -5,7 +5,7 @@ import com.sharehub.common.PageResponse;
 import com.sharehub.note.NoteDto;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resume.ResumeDto;
-import com.sharehub.roadmap.RoadmapDto;
+import com.sharehub.roadmap.RoadmapWorkbenchDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,17 +29,20 @@ public class MeController {
     @GetMapping("/resources")
     public ApiResponse<PageResponse<ResourceDto>> myResources(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int pageSize
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String visibility
     ) {
-        return ApiResponse.ok(meService.myResources(page, pageSize));
+        return ApiResponse.ok(meService.myResources(status, visibility, page, pageSize));
     }
 
     @GetMapping("/roadmaps")
-    public ApiResponse<PageResponse<RoadmapDto>> myRoadmaps(
+    public ApiResponse<PageResponse<RoadmapWorkbenchDto>> myRoadmaps(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int pageSize
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status
     ) {
-        return ApiResponse.ok(meService.myRoadmaps(page, pageSize));
+        return ApiResponse.ok(meService.myRoadmaps(status, page, pageSize));
     }
 
     @GetMapping("/favorites")
@@ -53,16 +56,18 @@ public class MeController {
     @GetMapping("/notes")
     public ApiResponse<PageResponse<NoteDto>> myNotes(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int pageSize
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status
     ) {
-        return ApiResponse.ok(meService.myNotes(page, pageSize));
+        return ApiResponse.ok(meService.myNotes(status, page, pageSize));
     }
 
     @GetMapping("/resumes")
     public ApiResponse<PageResponse<ResumeDto>> myResumes(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int pageSize
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status
     ) {
-        return ApiResponse.ok(meService.myResumes(page, pageSize));
+        return ApiResponse.ok(meService.myResumes(status, page, pageSize));
     }
 }

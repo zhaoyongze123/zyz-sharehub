@@ -5,6 +5,8 @@ import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,23 +49,35 @@ public class ResumeRepository {
         return find(keyHolder.getKey().longValue());
     }
 
-    public PageResponse<ResumeDto> list(String ownerKey, int page, int pageSize) {
+    public PageResponse<ResumeDto> list(String ownerKey, int page, int pageSize, String statusFilter) {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM resumes WHERE owner_key = ?", Long.class, ownerKey);
+        String baseFilter = "WHERE owner_key = ?";
+        List<Object> paramList = new ArrayList<>();
+        paramList.add(ownerKey);
+        if (statusFilter != null && !statusFilter.isBlank()) {
+            baseFilter += " AND status = ?";
+            paramList.add(statusFilter);
+        }
+
+        String countSql = "SELECT COUNT(*) FROM resumes " + baseFilter;
+        Long total = jdbcTemplate.queryForObject(countSql, Long.class, paramList.toArray());
         int offset = (safePage - 1) * safePageSize;
-        List<ResumeDto> items = jdbcTemplate.query(
+        StringBuilder query = new StringBuilder(
             """
-                SELECT id, template_key, status, file_id
-                FROM resumes
-                WHERE owner_key = ?
-                ORDER BY id DESC
-                LIMIT ? OFFSET ?
-                """,
+                SELECT r.id, r.template_key, r.status, r.file_id, f.filename, f.size, f.created_at AS file_created_at, f.updated_at AS file_updated_at
+                FROM resumes r
+                LEFT JOIN files f ON r.file_id = f.id
+                """
+        );
+        query.append(baseFilter);
+        query.append(" ORDER BY r.created_at DESC LIMIT ? OFFSET ?");
+        paramList.add(safePageSize);
+        paramList.add(offset);
+        List<ResumeDto> items = jdbcTemplate.query(
+            query.toString(),
             (resultSet, rowNum) -> mapResume(resultSet),
-            ownerKey,
-            safePageSize,
-            offset
+            paramList.toArray()
         );
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
@@ -91,9 +105,10 @@ public class ResumeRepository {
     private Optional<ResumeDto> findOptional(Long id) {
         List<ResumeDto> results = jdbcTemplate.query(
             """
-                SELECT id, template_key, status, file_id
-                FROM resumes
-                WHERE id = ?
+                SELECT r.id, r.template_key, r.status, r.file_id, f.filename, f.size, f.created_at AS file_created_at, f.updated_at AS file_updated_at
+                FROM resumes r
+                LEFT JOIN files f ON r.file_id = f.id
+                WHERE r.id = ?
                 """,
             (resultSet, rowNum) -> mapResume(resultSet),
             id
@@ -104,9 +119,10 @@ public class ResumeRepository {
     private Optional<ResumeDto> findOptionalOwned(Long id, String ownerKey) {
         List<ResumeDto> results = jdbcTemplate.query(
             """
-                SELECT id, template_key, status, file_id
-                FROM resumes
-                WHERE id = ? AND owner_key = ?
+                SELECT r.id, r.template_key, r.status, r.file_id, f.filename, f.size, f.created_at AS file_created_at, f.updated_at AS file_updated_at
+                FROM resumes r
+                LEFT JOIN files f ON r.file_id = f.id
+                WHERE r.id = ? AND r.owner_key = ?
                 """,
             (resultSet, rowNum) -> mapResume(resultSet),
             id,
@@ -118,12 +134,21 @@ public class ResumeRepository {
     private ResumeDto mapResume(ResultSet resultSet) throws SQLException {
         Long id = resultSet.getLong("id");
         UUID fileId = resultSet.getObject("file_id", UUID.class);
+        String fileName = resultSet.getString("filename");
+        long fileSize = resultSet.getLong("size");
+        Instant fileCreatedAt = resultSet.getObject("file_created_at", Instant.class);
+        Instant fileUpdatedAt = resultSet.getObject("file_updated_at", Instant.class);
         return new ResumeDto(
             id,
             resultSet.getString("template_key"),
             resultSet.getString("status"),
             fileId,
             "/api/resumes/" + id + "/download"
+            ,
+            fileName,
+            fileSize == 0 && resultSet.wasNull() ? null : fileSize,
+            fileCreatedAt,
+            fileUpdatedAt
         );
     }
 }

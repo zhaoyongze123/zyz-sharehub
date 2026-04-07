@@ -54,9 +54,10 @@ public class ResumeController {
     @GetMapping
     public ApiResponse<PageResponse<ResumeDto>> list(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int pageSize
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status
     ) {
-        return ApiResponse.ok(resumeRepository.list("local-dev-user", page, pageSize));
+        return ApiResponse.ok(resumeRepository.list("local-dev-user", page, pageSize, status));
     }
 
     @GetMapping("/{id}")

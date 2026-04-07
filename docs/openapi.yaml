@@ -39,6 +39,14 @@ paths:
             type: integer
             minimum: 1
             default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: visibility
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: 成功
@@ -58,6 +66,10 @@ paths:
             type: integer
             minimum: 1
             default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: 成功
@@ -96,6 +108,10 @@ paths:
             type: integer
             minimum: 1
             default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: 成功
@@ -115,6 +131,10 @@ paths:
             type: integer
             minimum: 1
             default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: 成功
@@ -150,6 +170,14 @@ paths:
           schema:
             type: integer
             default: 12
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: visibility
+          schema:
+            type: string
       responses:
         '200':
           description: 成功
@@ -318,6 +346,10 @@ paths:
             type: integer
             minimum: 1
             default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: 成功

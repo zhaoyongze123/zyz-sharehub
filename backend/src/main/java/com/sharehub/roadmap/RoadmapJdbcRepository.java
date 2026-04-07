@@ -100,6 +100,53 @@ public class RoadmapJdbcRepository {
     return PageResponse.of(records, safePage, safePageSize, total);
   }
 
+  public PageResponse<RoadmapWorkbenchDto> listWorkbenchByOwner(String ownerKey, String status, int page, int pageSize) {
+    int safePage = Math.max(1, page);
+    int safePageSize = Math.max(1, pageSize);
+    String normalizedStatus = normalize(status);
+    Long total =
+        jdbc.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM roadmaps
+                WHERE owner_key = ?
+                  AND (? IS NULL OR status = ?)
+                """,
+            Long.class,
+            ownerKey,
+            normalizedStatus,
+            normalizedStatus);
+    int offset = (safePage - 1) * safePageSize;
+    List<RoadmapWorkbenchDto> items =
+        jdbc.query(
+            """
+                SELECT r.id,
+                       r.title,
+                       r.description,
+                       r.visibility,
+                       r.status,
+                       COUNT(n.id) AS node_count,
+                       p.payload AS progress_payload
+                FROM roadmaps r
+                LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN roadmap_progress p
+                  ON p.roadmap_id = r.id AND p.user_key = ?
+                WHERE r.owner_key = ?
+                  AND (? IS NULL OR r.status = ?)
+                GROUP BY r.id, r.title, r.description, r.visibility, r.status, p.payload
+                ORDER BY r.id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (rs, rowNum) -> mapWorkbench(rs),
+            ownerKey,
+            ownerKey,
+            normalizedStatus,
+            normalizedStatus,
+            safePageSize,
+            offset);
+    return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
+  }
+
   public Optional<RoadmapDto> findById(Long id) {
     List<RoadmapDto> results =
         jdbc.query(
@@ -225,5 +272,49 @@ public class RoadmapJdbcRepository {
     } catch (JsonProcessingException exception) {
       throw new IllegalStateException("Unable to deserialize progress", exception);
     }
+  }
+
+  private RoadmapWorkbenchDto mapWorkbench(ResultSet resultSet) throws java.sql.SQLException {
+    Map<String, Object> progress = deserialize(resultSet.getString("progress_payload"));
+    int nodeCount = resultSet.getInt("node_count");
+    int completedNodeCount = extractCompletedNodeCount(progress);
+    int percent = extractPercent(progress, nodeCount, completedNodeCount);
+    return new RoadmapWorkbenchDto(
+        resultSet.getLong("id"),
+        resultSet.getString("title"),
+        resultSet.getString("description"),
+        resultSet.getString("visibility"),
+        resultSet.getString("status"),
+        nodeCount,
+        completedNodeCount,
+        percent);
+  }
+
+  private int extractCompletedNodeCount(Map<String, Object> progress) {
+    if (progress == null) {
+      return 0;
+    }
+    Object value = progress.get("completedNodeIds");
+    if (value instanceof List<?> list) {
+      return list.size();
+    }
+    return 0;
+  }
+
+  private int extractPercent(Map<String, Object> progress, int nodeCount, int completedNodeCount) {
+    if (progress != null && progress.get("percent") instanceof Number number) {
+      return number.intValue();
+    }
+    if (nodeCount <= 0) {
+      return 0;
+    }
+    return (int) Math.round((completedNodeCount * 100.0) / nodeCount);
+  }
+
+  private String normalize(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value;
   }
 }

@@ -1,5 +1,6 @@
 package com.sharehub.resume;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public record ResumeDto(
@@ -7,6 +8,10 @@ public record ResumeDto(
     String templateKey,
     String status,
     UUID fileId,
-    String fileUrl
+    String fileUrl,
+    String fileName,
+    Long fileSize,
+    Instant fileCreatedAt,
+    Instant fileUpdatedAt
 ) {
 }
