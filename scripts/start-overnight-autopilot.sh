@@ -17,7 +17,7 @@ if [[ -f "${PID_FILE}" ]]; then
   fi
 fi
 
-nohup caffeinate -dimsu "${PROJECT_ROOT}/scripts/overnight-loop.sh" >> "${START_LOG}" 2>&1 &
+nohup bash -lc "cd '${PROJECT_ROOT}' && exec caffeinate -dimsu ./scripts/overnight-loop.sh" >> "${START_LOG}" 2>&1 &
 AUTOPILOT_PID=$!
 echo "${AUTOPILOT_PID}" > "${PID_FILE}"
 
