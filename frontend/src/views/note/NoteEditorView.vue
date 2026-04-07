@@ -46,14 +46,14 @@
       <aside class="sidebar-left" v-show="isSidebarOpen">
         <!-- 工作区名称和操作 -->
         <div class="sidebar-header">
-          <span class="workspace-name dropdown-trigger" title="工作区名称">ShareHub Vault <div class="i-carbon-chevron-down text-xs ml-1"></div></span>
-          <div class="actions flex gap-2">
+          <span class="workspace-name dropdown-trigger truncate" title="工作区名称">ShareHub Vault <div class="i-carbon-chevron-down text-xs ml-1"></div></span>
+          <div class="actions flex gap-1 flex-shrink-0">
             <!-- 新建按钮（增加文字和明显样式便于识别） -->
             <button class="action-btn" title="新建笔记" @click="createNewNote">
-              <div class="i-carbon-document-add text-base"></div><span class="text-xs">新建</span>
+              <div class="i-carbon-document-add text-sm"></div><span class="text-xs">笔记</span>
             </button>
             <button class="action-btn" title="新建文件夹" @click="promptCreateFolder">
-              <div class="i-carbon-folder-add text-base"></div>
+              <div class="i-carbon-folder-add text-sm"></div><span class="text-xs">目录</span>
             </button>
           </div>
         </div>
@@ -455,8 +455,8 @@ const outline = computed(() => {
 /* 最左侧工具丝带 App Ribbon */
 .app-ribbon {
   width: 48px;
-  background-color: #f3f4f6;
-  border-right: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  border-right: 1px solid #d1d5db;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -478,9 +478,9 @@ const outline = computed(() => {
 
 /* 左侧栏 Sidebar Left */
 .sidebar-left {
-  width: 280px;
-  background-color: #f9fafb;
-  border-right: 1px solid #e5e7eb;
+  width: 290px;
+  background-color: #f4f5f7;
+  border-right: 1px solid #d1d5db;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -494,9 +494,10 @@ const outline = computed(() => {
 .workspace-name {
   font-weight: 600; font-size: 14px; color: #374151;
   display: flex; align-items: center; cursor: pointer;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .workspace-name:hover { background-color: #e5e7eb; border-radius: 4px; padding: 2px 4px; margin-left: -4px; }
-.sidebar-header .actions button { cursor: pointer; color: #4b5563; background: #e5e7eb; border: none; padding: 4px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; transition: all 0.2s; font-weight: 500;}
+.sidebar-header .actions button { cursor: pointer; color: #4b5563; background: #e5e7eb; border: none; padding: 4px 6px; border-radius: 6px; display: flex; align-items: center; gap: 2px; transition: all 0.2s; font-weight: 500;}
 .sidebar-header .actions button:hover { background-color: #d1d5db; color: #111827; }
 
 .sidebar-content {
