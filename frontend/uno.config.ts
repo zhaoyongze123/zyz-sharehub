@@ -1,10 +1,12 @@
 import { defineConfig, presetUno } from 'unocss'
 import presetIcons from '@unocss/preset-icons'
+import presetTypography from '@unocss/preset-typography'
 
 export default defineConfig({
   presets: [
     presetUno(),
-    presetIcons()
+    presetIcons(),
+    presetTypography()
   ],
   theme: {
     colors: {

@@ -254,10 +254,10 @@
             ></textarea>
             <div 
               v-else 
-              class="markdown-preview w-full h-full overflow-y-auto mt-4 px-4 pb-12"
+              class="markdown-preview w-full h-full overflow-y-auto mt-4 px-4 pb-12 prose max-w-none"
             >
               <div v-if="!activeNote.content" class="text-gray-400 italic text-sm">笔记内容为空</div>
-              <div v-else class="whitespace-pre-wrap text-gray-800 leading-relaxed text-base">{{ activeNote.content }}</div>
+              <div v-else class="markdown-body" v-html="renderedContent"></div>
             </div>
           </div>
         </template>
@@ -298,6 +298,8 @@
 import { ref, computed } from 'vue'
 import { useLocalNoteStore } from '@/stores/localNote'
 import { useRouter } from 'vue-router'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const router = useRouter()
 const store = useLocalNoteStore()
@@ -322,6 +324,13 @@ let saveTimeout: any = null
 
 const activeNote = computed(() => store.activeNote)
 const newTag = ref('')
+
+const renderedContent = computed(() => {
+  if (!activeNote.value?.content) return ''
+  const htmlResult = marked(activeNote.value.content)
+  // handle marked output properly as it might be string or Promise
+  return DOMPurify.sanitize(htmlResult as string)
+})
 
 const startInitialize = () => {
   store.initialize()

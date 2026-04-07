@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "axios": "^1.8.4",
+    "dompurify": "^3.3.3",
+    "html2pdf.js": "^0.14.0",
+    "marked": "^18.0.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.12",
     "vue-router": "^4.5.1",
@@ -17,8 +20,11 @@
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.20",
+    "@types/dompurify": "^3.0.5",
+    "@types/marked": "^5.0.2",
     "@types/node": "^22.14.1",
     "@unocss/preset-icons": "^66.1.0",
+    "@unocss/preset-typography": "^66.6.7",
     "@unocss/preset-uno": "^66.1.0",
     "@unocss/reset": "^66.1.0",
     "@unocss/vite": "^66.1.0",
