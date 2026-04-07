@@ -13,6 +13,8 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+public record ResumePage(List<ResumeDto> items, long total, int page, int size) {}
+
 @Repository
 public class ResumeRepository {
 
@@ -45,6 +47,33 @@ public class ResumeRepository {
 
     public ResumeDto find(Long id) {
         return findOptional(id).orElseThrow(() -> new NotFoundException("RESUME_NOT_FOUND"));
+    }
+
+    public ResumePage list(int page, int size) {
+        int currentPage = page < 1 ? 1 : page;
+        int limit = size < 1 ? 10 : size;
+        long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM resumes", Long.class);
+        int offset = (currentPage - 1) * limit;
+
+        List<ResumeDto> items = jdbcTemplate.query(
+            """
+                SELECT id, template_key, status, file_id
+                FROM resumes
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> mapResume(resultSet),
+            limit,
+            offset
+        );
+
+        return new ResumePage(items, total, currentPage, limit);
+    }
+
+    public Optional<UUID> delete(Long id) {
+        ResumeDto existing = find(id);
+        jdbcTemplate.update("DELETE FROM resumes WHERE id = ?", id);
+        return Optional.ofNullable(existing.fileId());
     }
 
     private Optional<ResumeDto> findOptional(Long id) {

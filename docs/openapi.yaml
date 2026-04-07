@@ -17,6 +17,12 @@ paths:
       responses:
         '200':
           description: 成功
+  /api/me:
+    get:
+      summary: 个人中心聚合信息
+      responses:
+        '200':
+          description: 成功
   /api/auth/avatar:
     post:
       summary: 上传用户头像
@@ -201,6 +207,25 @@ paths:
       responses:
         '200':
           description: 成功
+  /api/resumes:
+    get:
+      summary: 简历列表（分页）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
   /api/resumes/{id}:
     get:
       summary: 获取简历生成记录
@@ -209,6 +234,11 @@ paths:
           description: 成功
         '404':
           description: 简历不存在
+    delete:
+      summary: 删除简历及关联 PDF
+      responses:
+        '200':
+          description: 成功
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF

@@ -68,6 +68,10 @@ public class FileStorageService {
         return repository.findById(id);
     }
 
+    public void delete(UUID id) {
+        repository.deleteById(id);
+    }
+
     public StoredFileDto toDto(FileRecord record) {
         return new StoredFileDto(
             record.getId(),

@@ -8,11 +8,13 @@ import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -28,6 +30,17 @@ public class ResumeController {
     public ResumeController(ResumeRepository resumeRepository, FileStorageService fileStorageService) {
         this.resumeRepository = resumeRepository;
         this.fileStorageService = fileStorageService;
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> delete(@PathVariable Long id) {
+        resumeRepository.delete(id).ifPresent(fileStorageService::delete);
+        return ApiResponse.ok("DELETED");
+    }
+
+    @GetMapping
+    public ApiResponse<ResumePage> list(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.ok(resumeRepository.list(page, size));
     }
 
     @PostMapping("/generate")
