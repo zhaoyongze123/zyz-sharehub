@@ -5,6 +5,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
 PID_FILE="${STATE_DIR}/autopilot.pid"
+CAFFEINATE_PID_FILE="${STATE_DIR}/caffeinate.pid"
 START_LOG="${OUTPUT_DIR}/start.log"
 
 mkdir -p "${STATE_DIR}" "${OUTPUT_DIR}"
@@ -17,9 +18,14 @@ if [[ -f "${PID_FILE}" ]]; then
   fi
 fi
 
-nohup bash -lc "cd '${PROJECT_ROOT}' && exec caffeinate -dimsu ./scripts/overnight-loop.sh" >> "${START_LOG}" 2>&1 &
+nohup bash -lc "cd '${PROJECT_ROOT}' && exec ./scripts/overnight-loop.sh" >> "${START_LOG}" 2>&1 &
 AUTOPILOT_PID=$!
 echo "${AUTOPILOT_PID}" > "${PID_FILE}"
 
+nohup caffeinate -dimsu -w "${AUTOPILOT_PID}" >> "${START_LOG}" 2>&1 &
+CAFFEINATE_PID=$!
+echo "${CAFFEINATE_PID}" > "${CAFFEINATE_PID_FILE}"
+
 echo "已启动夜间自动推进，PID=${AUTOPILOT_PID}"
+echo "保活进程 PID=${CAFFEINATE_PID}"
 echo "日志目录：${OUTPUT_DIR}"
