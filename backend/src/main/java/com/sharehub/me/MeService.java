@@ -13,6 +13,9 @@ import com.sharehub.resume.ResumeDto;
 import com.sharehub.resume.ResumeRepository;
 import com.sharehub.roadmap.RoadmapJdbcRepository;
 import com.sharehub.roadmap.RoadmapWorkbenchDto;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +25,10 @@ import org.springframework.stereotype.Service;
 public class MeService {
 
     private static final String DEFAULT_OWNER_KEY = "local-dev-user";
+    private static final Duration RECENT_RESOURCE_WINDOW = Duration.ofDays(7);
+    private static final String PUBLISHED_STATUS = "PUBLISHED";
+    private static final String DRAFT_STATUS = "DRAFT";
+    private static final String GENERATED_STATUS = "GENERATED";
 
     private final UserProfileRepository userProfileRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -62,13 +69,23 @@ public class MeService {
             Long.class,
             ownerKey
         );
+        long safeResourceCount = resourceCount == null ? 0L : resourceCount;
+        long safeFavoriteCount = favoriteCount == null ? 0L : favoriteCount;
+        long recentResourceCount = countResourcesCreatedWithin(ownerKey, RECENT_RESOURCE_WINDOW);
+        long publishedResourceCount = countResourcesByStatus(ownerKey, PUBLISHED_STATUS);
+        long draftNoteCount = countNotesByStatus(ownerKey, DRAFT_STATUS);
+        long generatedResumeCount = countResumesByStatus(ownerKey, GENERATED_STATUS);
         return new MeDto(
             profile,
-            resourceCount == null ? 0L : resourceCount,
-            favoriteCount == null ? 0L : favoriteCount,
+            safeResourceCount,
+            safeFavoriteCount,
             roadmapJdbcRepository.countByOwner(ownerKey),
             noteRepository.countByOwner(ownerKey),
-            resumeRepository.countByOwner(ownerKey)
+            resumeRepository.countByOwner(ownerKey),
+            recentResourceCount,
+            publishedResourceCount,
+            draftNoteCount,
+            generatedResumeCount
         );
     }
 
@@ -101,8 +118,15 @@ public class MeService {
         return noteRepository.listByOwner(DEFAULT_OWNER_KEY, status, page, pageSize);
     }
 
-    public PageResponse<ResumeDto> myResumes(String status, int page, int pageSize) {
-        return resumeRepository.list(DEFAULT_OWNER_KEY, page, pageSize, status);
+    public PageResponse<ResumeDto> myResumes(String status, String templateKey, String keyword, int page, int pageSize) {
+        return resumeRepository.list(
+            DEFAULT_OWNER_KEY,
+            page,
+            pageSize,
+            normalize(status),
+            normalize(templateKey),
+            normalize(keyword)
+        );
     }
 
     private String normalize(String value) {
@@ -110,5 +134,46 @@ public class MeService {
             return null;
         }
         return value;
+    }
+
+    private long countResourcesByStatus(String ownerKey, String status) {
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND status = ?",
+            Long.class,
+            ownerKey,
+            status
+        );
+        return count == null ? 0L : count;
+    }
+
+    private long countNotesByStatus(String ownerKey, String status) {
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM notes WHERE owner_key = ? AND status = ?",
+            Long.class,
+            ownerKey,
+            status
+        );
+        return count == null ? 0L : count;
+    }
+
+    private long countResumesByStatus(String ownerKey, String status) {
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM resumes WHERE owner_key = ? AND status = ?",
+            Long.class,
+            ownerKey,
+            status
+        );
+        return count == null ? 0L : count;
+    }
+
+    private long countResourcesCreatedWithin(String ownerKey, Duration window) {
+        Instant threshold = Instant.now().minus(window);
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND created_at >= ?",
+            Long.class,
+            ownerKey,
+            Timestamp.from(threshold)
+        );
+        return count == null ? 0L : count;
     }
 }

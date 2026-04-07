@@ -55,9 +55,18 @@ public class ResumeController {
     public ApiResponse<PageResponse<ResumeDto>> list(
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int pageSize,
-        @RequestParam(required = false) String status
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String templateKey,
+        @RequestParam(required = false) String keyword
     ) {
-        return ApiResponse.ok(resumeRepository.list("local-dev-user", page, pageSize, status));
+        return ApiResponse.ok(resumeRepository.list(
+            "local-dev-user",
+            page,
+            pageSize,
+            normalize(status),
+            normalize(templateKey),
+            normalize(keyword)
+        ));
     }
 
     @GetMapping("/workbench")
@@ -96,5 +105,13 @@ public class ResumeController {
             .contentType(MediaType.APPLICATION_PDF)
             .header("Content-Disposition", "attachment; filename=\"" + file.getFilename() + "\"")
             .body(file.getData());
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

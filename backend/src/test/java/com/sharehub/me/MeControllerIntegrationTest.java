@@ -82,7 +82,11 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.myFavoriteCount").value(1))
             .andExpect(jsonPath("$.data.myRoadmapCount").value(1))
             .andExpect(jsonPath("$.data.myNoteCount").value(1))
-            .andExpect(jsonPath("$.data.myResumeCount").value(1));
+            .andExpect(jsonPath("$.data.myResumeCount").value(1))
+            .andExpect(jsonPath("$.data.recentResourceCount").value(1))
+            .andExpect(jsonPath("$.data.publishedResourceCount").value(0))
+            .andExpect(jsonPath("$.data.draftNoteCount").value(1))
+            .andExpect(jsonPath("$.data.generatedResumeCount").value(1));
     }
 
     @Test
@@ -151,6 +155,11 @@ class MeControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-a"))))
             .andExpect(status().isOk());
 
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-b"))))
+            .andExpect(status().isOk());
+
         mockMvc.perform(post("/api/resources/" + firstResourceId + "/favorite"))
             .andExpect(status().isOk());
 
@@ -188,11 +197,34 @@ class MeControllerIntegrationTest {
 
         mockMvc.perform(get("/api/me/resumes").param("page", "1").param("pageSize", "10").param("status", "GENERATED"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-a"))
-            .andExpect(jsonPath("$.data.items[0].fileName").value("resume-resume-a.pdf"))
+            .andExpect(jsonPath("$.data.total").value(2))
             .andExpect(jsonPath("$.data.items[0].fileSize").isNumber())
             .andExpect(jsonPath("$.data.items[0].fileCreatedAt").exists())
             .andExpect(jsonPath("$.data.items[0].fileUpdatedAt").exists());
+
+        mockMvc.perform(get("/api/me/resumes")
+                .param("templateKey", "resume-a")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-a"))
+            .andExpect(jsonPath("$.data.items[0].fileName").value("resume-resume-a.pdf"));
+
+        mockMvc.perform(get("/api/me/resumes")
+                .param("keyword", "RESUME-B")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-b"));
+
+        mockMvc.perform(get("/api/me"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.myResourceCount").value(2))
+            .andExpect(jsonPath("$.data.recentResourceCount").value(2))
+            .andExpect(jsonPath("$.data.publishedResourceCount").value(0))
+            .andExpect(jsonPath("$.data.draftNoteCount").value(0))
+            .andExpect(jsonPath("$.data.generatedResumeCount").value(2));
     }
 }

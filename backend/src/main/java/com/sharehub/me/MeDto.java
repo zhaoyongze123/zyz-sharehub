@@ -8,6 +8,10 @@ public record MeDto(
     long myFavoriteCount,
     long myRoadmapCount,
     long myNoteCount,
-    long myResumeCount
+    long myResumeCount,
+    long recentResourceCount,
+    long publishedResourceCount,
+    long draftNoteCount,
+    long generatedResumeCount
 ) {
 }

@@ -135,6 +135,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: templateKey
+          in: query
+          schema:
+            type: string
+          description: 按模板筛选
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 按模板名或文件名模糊筛选
       responses:
         '200':
           description: 成功
@@ -392,6 +402,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: templateKey
+          in: query
+          schema:
+            type: string
+          description: 按模板筛选
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 按模板名或文件名模糊筛选
       responses:
         '200':
           description: 成功

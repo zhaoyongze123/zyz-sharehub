@@ -101,6 +101,35 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldFilterResumesByTemplateAndKeyword() throws Exception {
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "alpha"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "beta"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/resumes")
+                .param("templateKey", "alpha")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("alpha"));
+
+        mockMvc.perform(get("/api/resumes")
+                .param("keyword", "BETA")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("beta"));
+    }
+
+    @Test
     void shouldReturnResumeWorkbenchSummary() throws Exception {
         mockMvc.perform(post("/api/resumes/generate")
                 .contentType(MediaType.APPLICATION_JSON)

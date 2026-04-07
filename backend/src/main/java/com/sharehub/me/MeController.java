@@ -66,8 +66,10 @@ public class MeController {
     public ApiResponse<PageResponse<ResumeDto>> myResumes(
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int pageSize,
-        @RequestParam(required = false) String status
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String templateKey,
+        @RequestParam(required = false) String keyword
     ) {
-        return ApiResponse.ok(meService.myResumes(status, page, pageSize));
+        return ApiResponse.ok(meService.myResumes(status, templateKey, keyword, page, pageSize));
     }
 }
