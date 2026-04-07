@@ -1,88 +1,828 @@
 openapi: 3.0.3
 info:
   title: ShareHub API
-  version: 0.1.0
+  version: 0.2.0
+  description: |
+    ShareHub 后端标准接口描述。
+    当前大部分模块仍基于内存存储和模拟行为实现，联调前请同时阅读 `docs/backend-api-reference.md`。
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境
+tags:
+  - name: auth
+  - name: resources
+  - name: roadmaps
+  - name: notes
+  - name: resumes
+  - name: interactions
+  - name: admin
 paths:
   /api/auth/github/login:
     get:
+      tags: [auth]
       summary: 获取 GitHub 登录地址
+      responses:
+        '200':
+          description: 返回登录地址
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          loginUrl:
+                            type: string
+                            example: /oauth2/authorization/github
+  /api/auth/github/callback:
+    get:
+      tags: [auth]
+      summary: 说明性 OAuth 回调接口
+      description: 当前不是 Spring Security 实际处理 OAuth 回调的入口，只返回说明信息。
+      responses:
+        '200':
+          description: 返回说明信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
   /api/auth/me:
     get:
-      summary: 获取当前用户
+      tags: [auth]
+      summary: 获取当前登录用户
+      description: 未登录时当前实现返回 `success=false` 而不是 HTTP 401。
+      responses:
+        '200':
+          description: 当前用户信息或未登录状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          login:
+                            type: string
+                          avatarUrl:
+                            type: string
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: 退出登录
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: LOGOUT_SUCCESS
   /api/resources:
-    post:
-      summary: 创建资料
     get:
+      tags: [resources]
       summary: 资料列表
+      description: 当前返回全部数据，不支持分页、筛选、排序。
+      responses:
+        '200':
+          description: 资料列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ResourceDto'
+    post:
+      tags: [resources]
+      summary: 创建资料
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceDto'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResourceDto'
+        '400':
+          description: 参数校验失败
   /api/resources/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     get:
+      tags: [resources]
       summary: 资料详情
+      description: 找不到资料时当前实现返回 `success=true, data=null`。
+      responses:
+        '200':
+          description: 资料详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        $ref: '#/components/schemas/ResourceDto'
     put:
+      tags: [resources]
       summary: 更新资料
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceDto'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResourceDto'
     delete:
+      tags: [resources]
       summary: 删除资料
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: DELETED
   /api/resources/{id}/publish:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [resources]
       summary: 发布资料
+      description: 当前实现仅回显原对象，不真正修改发布状态。
+      responses:
+        '200':
+          description: 返回当前资料对象
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        $ref: '#/components/schemas/ResourceDto'
   /api/roadmaps:
-    post:
-      summary: 创建路线
     get:
+      tags: [roadmaps]
       summary: 路线列表
+      description: 当前返回全部路线，不支持分页、筛选、排序。
+      responses:
+        '200':
+          description: 路线列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RoadmapDto'
+    post:
+      tags: [roadmaps]
+      summary: 创建路线
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoadmapDto'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RoadmapDto'
+        '400':
+          description: 参数校验失败
   /api/roadmaps/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     get:
+      tags: [roadmaps]
       summary: 路线详情
+      description: 当前只返回路线主体，不聚合节点和进度。
+      responses:
+        '200':
+          description: 路线详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        $ref: '#/components/schemas/RoadmapDto'
   /api/roadmaps/{id}/nodes:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [roadmaps]
       summary: 新增路线节点
+      description: 当前返回该路线下全部节点列表，而不是新增后的单个节点。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoadmapNodeDto'
+      responses:
+        '200':
+          description: 节点列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RoadmapNodeDto'
+        '400':
+          description: 参数校验失败
   /api/roadmaps/{id}/progress:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [roadmaps]
       summary: 更新学习进度
+      description: 当前请求体和响应体都为任意 JSON 对象，服务端不校验结构。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: 当前进度快照
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties: true
   /api/notes:
-    post:
-      summary: 创建笔记
     get:
+      tags: [notes]
       summary: 笔记列表
+      description: 当前返回全部笔记，不支持分页、筛选、排序。
+      responses:
+        '200':
+          description: 笔记列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/NoteDto'
+    post:
+      tags: [notes]
+      summary: 创建笔记
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteDto'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NoteDto'
+        '400':
+          description: 参数校验失败
   /api/notes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     get:
+      tags: [notes]
       summary: 笔记详情
+      description: 找不到笔记时当前实现返回 `success=true, data=null`。
+      responses:
+        '200':
+          description: 笔记详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        $ref: '#/components/schemas/NoteDto'
     put:
+      tags: [notes]
       summary: 更新笔记
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteDto'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/NoteDto'
     delete:
+      tags: [notes]
       summary: 删除笔记
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: DELETED
   /api/resumes/generate:
     post:
+      tags: [resumes]
       summary: 生成简历
+      description: 当前实现只生成元数据和占位下载地址，不会生成真实 PDF。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResumeMeta'
   /api/resumes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     get:
+      tags: [resumes]
       summary: 简历详情
+      responses:
+        '200':
+          description: 简历元数据
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        nullable: true
+                        $ref: '#/components/schemas/ResumeMeta'
   /api/resumes/{id}/download:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     get:
+      tags: [resumes]
       summary: 下载简历
+      description: 当前返回占位字符串，不是 PDF 文件流。
+      responses:
+        '200':
+          description: 下载占位结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: PDF_DOWNLOAD_PLACEHOLDER_1004
   /api/resources/{id}/comments:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [interactions]
       summary: 发表评论
+      description: 当前只返回生成结果，不持久化评论。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentRequest'
+      responses:
+        '200':
+          description: 评论结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          resourceId:
+                            type: integer
+                            format: int64
+                          commentId:
+                            type: integer
+                            format: int64
+                          content:
+                            type: string
+                            nullable: true
   /api/comments/{id}/reply:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [interactions]
       summary: 回复评论
+      description: 当前只返回生成结果，不持久化回复。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentRequest'
+      responses:
+        '200':
+          description: 回复结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          parentCommentId:
+                            type: integer
+                            format: int64
+                          commentId:
+                            type: integer
+                            format: int64
+                          content:
+                            type: string
+                            nullable: true
   /api/resources/{id}/favorite:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [interactions]
       summary: 收藏资料
+      description: 当前只返回占位字符串，不记录收藏状态。
+      responses:
+        '200':
+          description: 收藏成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: FAVORITED_101
   /api/resources/{id}/like:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [interactions]
       summary: 点赞资料
+      description: 当前只返回占位字符串，不记录点赞状态。
+      responses:
+        '200':
+          description: 点赞成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: LIKED_101
   /api/reports:
     post:
+      tags: [interactions]
       summary: 举报内容
+      description: 当前把请求体原样写入内存，并补充 `id` 与 `status=OPEN`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: 举报成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties: true
   /api/admin/reports:
     get:
+      tags: [admin]
       summary: 举报列表
+      description: 当前无管理员鉴权保护。
+      responses:
+        '200':
+          description: 举报列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
   /api/admin/reports/{id}/resolve:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [admin]
       summary: 处理举报
+      description: 若存在举报对象会把 `status` 更新为 `RESOLVED`，但响应只返回占位字符串。
+      responses:
+        '200':
+          description: 处理结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: RESOLVED_1006
   /api/admin/resources/{id}/block:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [admin]
       summary: 下架资料
+      description: 当前不修改资料实体状态，只返回占位字符串。
+      responses:
+        '200':
+          description: 下架结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: BLOCKED_RESOURCE_101
   /api/admin/users/{id}/ban:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
     post:
+      tags: [admin]
       summary: 封禁用户
+      description: 当前不修改用户实体状态，只返回占位字符串。
+      responses:
+        '200':
+          description: 封禁结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        example: BANNED_USER_88
+components:
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        message:
+          type: string
+      required: [success, message]
+    ResourceDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        externalUrl:
+          type: string
+        objectKey:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+      required: [title]
+    RoadmapDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+      required: [title]
+    RoadmapNodeDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+        title:
+          type: string
+        orderNo:
+          type: integer
+        resourceId:
+          type: integer
+          format: int64
+        noteId:
+          type: integer
+          format: int64
+      required: [title]
+    NoteDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        contentMd:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+      required: [title, contentMd]
+    ResumeMeta:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        templateKey:
+          type: string
+        status:
+          type: string
+        fileUrl:
+          type: string
+    ContentRequest:
+      type: object
+      properties:
+        content:
+          type: string

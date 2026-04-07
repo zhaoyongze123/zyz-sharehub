@@ -1,0 +1,11 @@
+{
+  "name": "sharehub-docs",
+  "private": true,
+  "scripts": {
+    "lint:openapi": "redocly lint openapi.yaml",
+    "build:redoc": "redocly build-docs openapi.yaml -o redoc-static.html"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^1.27.1"
+  }
+}

@@ -17,7 +17,18 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/actuator/health", "/api/auth/**", "/api/resources/**", "/api/roadmaps/**", "/api/notes/**", "/oauth2/**", "/login/oauth2/**").permitAll()
+                .requestMatchers(
+                    "/actuator/health",
+                    "/api/auth/**",
+                    "/api/resources/**",
+                    "/api/roadmaps/**",
+                    "/api/notes/**",
+                    "/oauth2/**",
+                    "/login/oauth2/**",
+                    "/v3/api-docs/**",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**"
+                ).permitAll()
                 .anyRequest().authenticated());
 
         if (oauthEnabled) {

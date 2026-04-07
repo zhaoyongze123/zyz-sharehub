@@ -22,3 +22,10 @@ sharehub:
       bucket: ${DO_SPACES_BUCKET:}
       access-key: ${DO_SPACES_ACCESS_KEY:}
       secret-key: ${DO_SPACES_SECRET_KEY:}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
