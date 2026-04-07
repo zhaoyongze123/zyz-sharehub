@@ -51,24 +51,24 @@
           <div class="account-menu-overlay" @click="menuOpen = false"></div>
           <div class="account-menu">
             <div class="account-menu-item top-profile" style="align-items: flex-start;">
-              <div class="avatar-circle" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid #111827; display: flex; align-items: center; justify-content: center; background: white;">
-                <div class="i-carbon-logo-github" style="font-size: 28px; color: #111827;"></div>
+              <div class="avatar-circle" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--app-text-main); display: flex; align-items: center; justify-content: center; background: var(--app-bg-modal);">
+                <div class="i-carbon-logo-github" style="font-size: 28px; color: var(--app-text-main);"></div>
               </div>
               <div class="profile-text" style="display: flex; flex-direction: column; margin-left: 12px; gap: 4px;">
-                <span class="profile-name" style="font-size: 16px; font-weight: 600; color: #111827; line-height: 1;">{{ authStore.profile?.nickname || '未登录' }}</span>
-                <span class="profile-type" style="font-size: 14px; color: #6b7280; line-height: 1;">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</span>
+                <span class="profile-name" style="font-size: 16px; font-weight: 600; color: var(--app-text-main); line-height: 1;">{{ authStore.profile?.nickname || '未登录' }}</span>
+                <span class="profile-type" style="font-size: 14px; color: var(--app-text-muted); line-height: 1;">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</span>
               </div>
             </div>
             
             <div class="menu-divider"></div>
             
-            <div class="menu-section-title" style="padding: 8px 16px 4px; font-size: 16px; color: #374151;">个性化</div>
+            <div class="menu-section-title" style="padding: 8px 16px 4px; font-size: 16px; color: var(--app-text-sub);">个性化</div>
             
-            <RouterLink to="/me" class="account-menu-item active-item" @click="menuOpen = false" style="background-color: #f3f4f6; border-radius: 8px; margin: 4px 8px; width: auto; padding: 8px;">
-              <div class="avatar-circle" style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid #111827; display: flex; align-items: center; justify-content: center; background: white; margin-right: 8px;">
-                <div class="i-carbon-logo-github" style="font-size: 18px; color: #111827;"></div>
+            <RouterLink to="/me" class="account-menu-item active-item" @click="menuOpen = false" style="background-color: var(--app-bg-hover); border-radius: 8px; margin: 4px 8px; width: auto; padding: 8px;">
+              <div class="avatar-circle" style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--app-text-main); display: flex; align-items: center; justify-content: center; background: var(--app-bg-modal); margin-right: 8px;">
+                <div class="i-carbon-logo-github" style="font-size: 18px; color: var(--app-text-main);"></div>
               </div>
-              <span style="font-weight: 500; color: #111827; font-size: 15px;">个人资料</span>
+              <span style="font-weight: 500; color: var(--app-text-main); font-size: 15px;">个人资料</span>
             </RouterLink>
             <RouterLink to="/me" class="account-menu-item" @click="menuOpen = false">
               <div class="i-carbon-settings menu-icon"></div>
@@ -113,7 +113,7 @@
         </div>
       </header>
 
-      <main class="content-area">
+      <main class="content-area" :class="{ 'no-padding': route.meta.fullHeight }">
         <RouterView v-slot="{ Component }">
           <Transition name="fade-slide" mode="out-in">
             <component :is="Component" />
@@ -178,14 +178,14 @@ const handleLogout = () => {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background-color: #fafafa;
-  color: #111827;
+  background-color: var(--app-bg-main);
+  color: var(--app-text-main);
 }
 
 .sidebar {
   width: 280px;
-  background-color: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background-color: var(--app-bg-nav);
+  border-right: 1px solid var(--app-border);
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
@@ -200,14 +200,14 @@ const handleLogout = () => {
   padding: 0 20px;
   gap: 12px;
   cursor: pointer;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--app-bg-hover);
   user-select: none;
 }
 
 .brand-logo {
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, #111 0%, #374151 100%);
+  background: linear-gradient(135deg, #111 0%, var(--app-text-sub) 100%);
   color: white;
   border-radius: 6px;
   display: flex;
@@ -221,7 +221,7 @@ const handleLogout = () => {
 .brand-name {
   font-weight: 600;
   font-size: 15px;
-  color: #111827;
+  color: var(--app-text-main);
   letter-spacing: -0.01em;
 }
 
@@ -243,7 +243,7 @@ const handleLogout = () => {
 .nav-title {
   font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--app-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 8px;
@@ -256,7 +256,7 @@ const handleLogout = () => {
   gap: 12px;
   padding: 8px 12px;
   border-radius: 6px;
-  color: #4b5563;
+  color: var(--app-text-sub);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -264,13 +264,13 @@ const handleLogout = () => {
 }
 
 .nav-item:hover {
-  background-color: #f3f4f6;
-  color: #111827;
+  background-color: var(--app-bg-hover);
+  color: var(--app-text-main);
 }
 
 .nav-item.router-link-active {
-  background-color: #eff6ff;
-  color: #2563eb;
+  background-color: var(--app-bg-hover);
+  color: var(--app-accent);
 }
 
 .nav-item.router-link-active .nav-icon {
@@ -285,7 +285,7 @@ const handleLogout = () => {
 
 .sidebar-footer {
   padding: 16px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--app-border);
   position: relative;
 }
 
@@ -307,7 +307,7 @@ const handleLogout = () => {
 }
 
 .account-menu {
-  background: white;
+  background: var(--app-bg-modal);
   border-radius: 16px;
   box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
   padding: 8px;
@@ -328,7 +328,7 @@ const handleLogout = () => {
   padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
-  color: #111827;
+  color: var(--app-text-main);
   font-size: 14px;
   text-decoration: none;
   gap: 12px;
@@ -336,7 +336,7 @@ const handleLogout = () => {
 }
 
 .account-menu-item:hover {
-  background-color: #f3f4f6;
+  background-color: var(--app-bg-hover);
 }
 
 .top-profile {
@@ -376,24 +376,24 @@ const handleLogout = () => {
 
 .profile-type {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--app-text-muted);
 }
 
 .menu-icon {
   width: 18px;
   height: 18px;
-  color: #4b5563;
+  color: var(--app-text-sub);
 }
 
 .arrow-icon {
   font-size: 16px;
-  color: #9ca3af;
+  color: var(--app-text-light);
   margin-left: auto;
 }
 
 .menu-divider {
   height: 1px;
-  background-color: #e5e7eb;
+  background-color: var(--app-border);
   margin: 6px 0;
 }
 
@@ -409,7 +409,7 @@ const handleLogout = () => {
 }
 
 .user-profile-mini:hover {
-  background-color: #f3f4f6;
+  background-color: var(--app-bg-hover);
 }
 
 .avatar {
@@ -434,12 +434,12 @@ const handleLogout = () => {
 .user-name {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--app-text-main);
 }
 
 .user-role {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--app-text-muted);
 }
 
 .main-container {
@@ -447,7 +447,7 @@ const handleLogout = () => {
   display: flex;
   flex-direction: column;
   position: relative;
-  background-color: #fafafa;
+  background-color: var(--app-bg-main);
 }
 
 .top-header {
@@ -458,7 +458,7 @@ const handleLogout = () => {
   padding: 0 32px;
   background-color: rgba(250, 250, 250, 0.9);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border);
   position: sticky;
   top: 0;
   z-index: 5;
@@ -467,7 +467,7 @@ const handleLogout = () => {
 .page-title {
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
+  color: var(--app-text-main);
   margin: 0;
   letter-spacing: -0.01em;
 }
@@ -483,10 +483,10 @@ const handleLogout = () => {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background-color: #ffffff;
-  border: 1px solid #e5e7eb;
+  background-color: var(--app-bg-nav);
+  border: 1px solid var(--app-border);
   border-radius: 6px;
-  color: #9ca3af;
+  color: var(--app-text-light);
   font-size: 13px;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.02);
@@ -494,9 +494,9 @@ const handleLogout = () => {
 }
 
 .search-trigger:hover {
-  border-color: #d1d5db;
+  border-color: var(--app-border-focus);
   box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-  color: #6b7280;
+  color: var(--app-text-muted);
 }
 
 .search-trigger .icon {
@@ -507,17 +507,24 @@ const handleLogout = () => {
 .search-trigger kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
-  background: #f3f4f6;
+  background: var(--app-bg-hover);
   padding: 2px 4px;
   border-radius: 4px;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  color: var(--app-text-muted);
+  border: 1px solid var(--app-border);
 }
 
 .content-area {
   flex: 1;
   overflow-y: auto;
   padding: 32px;
+}
+
+.content-area.no-padding {
+  padding: 0;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 全局搜索遮罩样式 */
@@ -540,7 +547,7 @@ const handleLogout = () => {
 .search-modal-content {
   width: 100%;
   max-width: 600px;
-  background: white;
+  background: var(--app-bg-modal);
   border-radius: 12px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   overflow: hidden;
@@ -552,12 +559,12 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .modal-search-icon {
   font-size: 24px;
-  color: #9ca3af;
+  color: var(--app-text-light);
   margin-right: 12px;
 }
 
@@ -566,21 +573,21 @@ const handleLogout = () => {
   border: none;
   font-size: 18px;
   outline: none;
-  color: #111827;
+  color: var(--app-text-main);
 }
 
 .search-input::placeholder {
-  color: #9ca3af;
+  color: var(--app-text-light);
 }
 
 .esc-kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
   font-size: 12px;
-  background: #f3f4f6;
+  background: var(--app-bg-hover);
   padding: 4px 8px;
   border-radius: 6px;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  color: var(--app-text-muted);
+  border: 1px solid var(--app-border);
   cursor: pointer;
 }
 
@@ -590,11 +597,11 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
+  background: var(--app-bg-main);
 }
 
 .search-tip {
-  color: #9ca3af;
+  color: var(--app-text-light);
   font-size: 15px;
 }
 

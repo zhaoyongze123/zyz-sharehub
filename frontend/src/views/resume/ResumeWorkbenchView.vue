@@ -1,5 +1,5 @@
 <template>
-  <div class="page-shell h-screen flex flex-col  bg-gray-100 overflow-hidden font-sans">
+  <div class="flex-1 flex flex-col bg-gray-100 overflow-hidden font-sans">
     <!-- Header Bar -->
     <header class="h-[60px] bg-white border-b px-6 flex items-center justify-between shrink-0 shadow-sm z-10 w-full">
       <div class="flex items-center gap-4">

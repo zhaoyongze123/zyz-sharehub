@@ -544,7 +544,8 @@ const scrollToHeading = (head: any, index: number) => {
 <style scoped>
 .note-workbench {
   display: flex;
-  height: calc(100vh - 60px); 
+  height: 100%;
+  flex: 1;
   background-color: transparent;
   background: var(--c-bg, #ffffff);
   color: #1f2937;

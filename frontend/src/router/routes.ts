@@ -93,13 +93,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'editor/note/:id?',
         name: 'note-editor',
         component: () => import('@/views/note/NoteEditorView.vue'),
-        meta: { title: '笔记编辑' }
+        meta: { title: '笔记编辑', fullHeight: true }
       },
       {
         path: 'resume',
         name: 'resume',
         component: () => import('@/views/resume/ResumeWorkbenchView.vue'),
-        meta: { title: '简历工作台' }
+        meta: { title: '简历工作台', fullHeight: true }
       },
       {
         path: 'me',
