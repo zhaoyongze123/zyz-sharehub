@@ -279,6 +279,10 @@ paths:
             type: integer
             default: 12
         - in: query
+          name: keyword
+          schema:
+            type: string
+        - in: query
           name: status
           schema:
             type: string
@@ -286,6 +290,20 @@ paths:
           name: visibility
           schema:
             type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: 当前实现映射到资源 `type` 字段
+        - in: query
+          name: tag
+          schema:
+            type: string
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [latest, hot]
       responses:
         '200':
           description: 成功
@@ -324,12 +342,31 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资料不存在（错误码 `RESOURCE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resources/{id}/publish:
     post:
       summary: 发布资料
       responses:
         '200':
           description: 成功
+  /api/resources/{id}/related:
+    get:
+      summary: 获取相关推荐资料
+      description: 当前按同分类或标签交集进行基础推荐，最多返回 4 条已发布资源
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资料不存在（错误码 `RESOURCE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resources/{id}/attachment:
     post:
       summary: 上传资料附件

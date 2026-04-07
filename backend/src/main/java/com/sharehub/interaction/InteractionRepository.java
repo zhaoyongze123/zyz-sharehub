@@ -152,6 +152,17 @@ public class InteractionRepository {
         );
     }
 
+    public Map<Long, InteractionSummaryDto> summarizeResources(Collection<Long> resourceIds) {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, InteractionSummaryDto> result = new HashMap<>();
+        for (Long resourceId : resourceIds) {
+            result.put(resourceId, summarizeResource(resourceId));
+        }
+        return result;
+    }
+
     public CommentRecord hideComment(Long commentId) {
         return updateCommentStatus(commentId, STATUS_HIDDEN);
     }

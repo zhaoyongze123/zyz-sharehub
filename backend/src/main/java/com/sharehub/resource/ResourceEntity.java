@@ -2,10 +2,8 @@ package com.sharehub.resource;
 
 import jakarta.persistence.*;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 @Entity
 @Table(name = "resources")
@@ -137,6 +135,26 @@ public class ResourceEntity {
     }
 
     public ResourceDto toDto() {
-        return new ResourceDto(id, title, type, summary, getTags(), externalUrl, objectKey, visibility, status);
+        return toDto(null, 0L, 0L, 0L);
+    }
+
+    public ResourceDto toDto(String author, long likes, long favorites, long downloadCount) {
+        return new ResourceDto(
+            id,
+            title,
+            type,
+            type,
+            summary,
+            getTags(),
+            externalUrl,
+            objectKey,
+            visibility,
+            status,
+            updatedAt,
+            author,
+            likes,
+            favorites,
+            downloadCount
+        );
     }
 }

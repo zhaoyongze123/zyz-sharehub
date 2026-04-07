@@ -83,6 +83,10 @@ public class UserProfileRepository {
         return findOptional(login).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
     }
 
+    public Optional<UserProfileDto> findOptionalByLogin(String login) {
+        return findOptional(login);
+    }
+
     public UserProfileDto findById(Long id) {
         return findOptionalById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
     }

@@ -183,12 +183,19 @@
 
 - `page`
 - `pageSize`
+- `keyword`
 - `status`
 - `visibility`
+- `category`
+- `tag`
+- `sortBy`
 
 真实行为：
 
 - 未传 `status` 时，只返回 `PUBLISHED`
+- `category` 当前映射到资源表的 `type`
+- `sortBy=latest` 按 `updatedAt DESC`
+- `sortBy=hot` 按点赞数降序，再按更新时间降序
 - 默认按 `updatedAt DESC`
 
 ### 5.2 `GET /api/resources/featured`
@@ -202,6 +209,15 @@
 - `200`：成功
 - `404`：不存在，错误码 `NOT_FOUND`
 - `410`：已下架，错误码 `RESOURCE_REMOVED`
+
+当前详情 / 列表返回还包含这些展示字段：
+
+- `category`
+- `updatedAt`
+- `author`
+- `likes`
+- `favorites`
+- `downloadCount`
 
 ### 5.4 `POST /api/resources`
 
@@ -223,8 +239,8 @@
 
 当前真实行为：
 
-- 直接删除
-- 当前未对“不存在”做稳定错误语义封装
+- 找到后删除
+- 不存在返回 `404 RESOURCE_NOT_FOUND`
 
 ### 5.7 `POST /api/resources/{id}/publish`
 
@@ -240,6 +256,15 @@
 - 资料不存在返回 `404 RESOURCE_NOT_FOUND`
 - 文件进入 PostgreSQL 文件表
 - 成功后把 `objectKey` 更新为文件 `id`
+
+### 5.9 `GET /api/resources/{id}/related`
+
+真实行为：
+
+- 基于同分类或标签交集做轻量推荐
+- 只返回 `PUBLISHED`
+- 排除自身
+- 最多返回 `4` 条
 
 ## 6. 路线模块
 
