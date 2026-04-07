@@ -36,14 +36,14 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
     @Query("""
         select r
         from ResourceEntity r
-        where (:status is null or r.status = :status)
+        where r.status in (:statuses)
           and (:visibility is null or r.visibility = :visibility)
-          and r.status <> 'REMOVED'
         order by r.updatedAt desc
         """)
-    Page<ResourceEntity> findVisibleByStatusAndVisibility(@Param("status") String status,
-                                                          @Param("visibility") String visibility,
-                                                          Pageable pageable);
+    Page<ResourceEntity> findVisibleByStatusInAndVisibilityOrderByUpdatedAtDesc(
+        @Param("statuses") List<String> statuses,
+        @Param("visibility") String visibility,
+        Pageable pageable);
 
     @Modifying
     @Query("update ResourceEntity r set r.status = :status where r.id = :id")

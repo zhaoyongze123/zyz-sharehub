@@ -142,6 +142,14 @@ public class InteractionRepository {
         );
     }
 
+    public CommentRecord hideComment(Long commentId) {
+        return updateCommentStatus(commentId, STATUS_HIDDEN);
+    }
+
+    public CommentRecord unhideComment(Long commentId) {
+        return updateCommentStatus(commentId, STATUS_VISIBLE);
+    }
+
     public CommentRecord updateCommentStatus(Long commentId, String status) {
         int affected = jdbcTemplate.update("UPDATE comments SET status = ? WHERE id = ?", status, commentId);
         if (affected == 0) {

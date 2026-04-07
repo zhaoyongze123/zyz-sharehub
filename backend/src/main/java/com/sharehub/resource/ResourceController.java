@@ -28,6 +28,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/resources")
@@ -66,8 +68,10 @@ public class ResourceController {
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, pageSize);
         PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        Page<ResourceEntity> result = repository.findVisibleByStatusAndVisibility(status, visibility, pageable);
-        return ApiResponse.ok(PageResponse.from(result.map(ResourceEntity::toDto)));
+        List<String> statuses = parseStatuses(status);
+        Page<ResourceEntity> result = repository.findVisibleByStatusInAndVisibilityOrderByUpdatedAtDesc(statuses, visibility, pageable);
+        long total = repository.countByStatusInAndVisibility(statuses, visibility);
+        return ApiResponse.ok(PageResponse.of(result.stream().map(ResourceEntity::toDto).toList(), safePage, safeSize, total));
     }
 
     @GetMapping("/featured")
@@ -120,6 +124,16 @@ public class ResourceController {
                 return ApiResponse.ok(repository.save(entity).toDto());
             })
             .orElseThrow(() -> new NotFoundException("NOT_FOUND"));
+    }
+
+    private List<String> parseStatuses(String status) {
+        if (status == null || status.isBlank()) {
+            return List.of("PUBLISHED");
+        }
+        return Arrays.stream(status.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toList());
     }
 
     @PostMapping(path = "/{id}/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

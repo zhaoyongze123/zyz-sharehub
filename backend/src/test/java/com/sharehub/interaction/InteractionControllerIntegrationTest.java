@@ -89,5 +89,14 @@ public class InteractionControllerIntegrationTest {
         mvc.perform(post("/api/admin/comments/2/restore"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("VISIBLE"));
+
+        mvc.perform(get("/api/resources/1/comments"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].children", hasSize(1)));
+
+        mvc.perform(get("/api/resources/1/interactions"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.comments").value(2));
     }
 }
