@@ -3,7 +3,7 @@ import type { RouteRecordRaw } from 'vue-router'
 export const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    component: () => import('@/layouts/PublicLayout.vue'),
+    component: () => import('@/layouts/EmptyLayout.vue'),
     children: [
       {
         path: '',
@@ -16,7 +16,13 @@ export const routes: RouteRecordRaw[] = [
         name: 'login',
         component: () => import('@/views/public/LoginView.vue'),
         meta: { title: '登录' }
-      },
+      }
+    ]
+  },
+  {
+    path: '/',
+    component: () => import('@/layouts/ConsoleLayout.vue'),
+    children: [
       {
         path: 'auth/callback',
         name: 'auth-callback',
@@ -48,10 +54,16 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '路线详情' }
       },
       {
-        path: 'notes',
+        path: 'community',
         name: 'notes',
         component: () => import('@/views/note/NoteListView.vue'),
-        meta: { title: '笔记广场' }
+        meta: { title: '社区' }
+      },
+      {
+        path: 'notes/settings',
+        name: 'note-settings',
+        component: () => import('@/views/note/LocalNoteSettingsView.vue'),
+        meta: { title: '本地库设置' }
       },
       {
         path: 'notes/:id',
@@ -63,37 +75,37 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
-    component: () => import('@/layouts/AppLayout.vue'),
+    component: () => import('@/layouts/ConsoleLayout.vue'),
     children: [
       {
         path: 'publish/resource',
         name: 'publish-resource',
         component: () => import('@/views/resource/PublishResourceView.vue'),
-        meta: { title: '发布资料', auth: true }
+        meta: { title: '发布资料' }
       },
       {
         path: 'publish/roadmap',
         name: 'publish-roadmap',
         component: () => import('@/views/roadmap/PublishRoadmapView.vue'),
-        meta: { title: '创建路线', auth: true }
+        meta: { title: '创建路线' }
       },
       {
         path: 'editor/note/:id?',
         name: 'note-editor',
         component: () => import('@/views/note/NoteEditorView.vue'),
-        meta: { title: '笔记编辑', auth: true }
+        meta: { title: '笔记编辑' }
       },
       {
         path: 'resume',
         name: 'resume',
         component: () => import('@/views/resume/ResumeWorkbenchView.vue'),
-        meta: { title: '简历工作台', auth: true }
+        meta: { title: '简历工作台' }
       },
       {
         path: 'me',
         name: 'me',
         component: () => import('@/views/user/ProfileView.vue'),
-        meta: { title: '个人中心', auth: true }
+        meta: { title: '个人帐户' }
       }
     ]
   },

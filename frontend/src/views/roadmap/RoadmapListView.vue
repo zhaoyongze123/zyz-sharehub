@@ -1,66 +1,270 @@
 <template>
-  <div class="page-shell view-grid">
-    <section class="section-heading">
-      <h1>路线广场</h1>
-      <p>把学习拆成阶段节点，再把资源和笔记连接进来。</p>
-    </section>
+  <div class="roadmap-paths">
+    <header class="paths-hero">
+      <div class="hero-content">
+        <h1 class="hero-title">学习路线图</h1>
+        <p class="hero-desc">精心设计的系统化成长路径，从零到一掌握核心技术栈。</p>
+        <div class="hero-stats">
+          <div class="stat-item">
+            <span class="stat-num">{{ roadmaps.length }}</span>
+            <span class="stat-label">开源路线</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num">体系化</span>
+            <span class="stat-label">知识结构</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num">实战派</span>
+            <span class="stat-label">工业级项目</span>
+          </div>
+        </div>
+      </div>
+    </header>
 
-    <div class="toolbar glass-panel">
-      <BaseInput v-model="keyword" label="搜索路线" placeholder="例如 Agent / RAG / Prompt" />
-      <BaseSelect v-model="selectedTag" label="标签" :options="tagOptions" />
+    <div class="paths-filter">
+      <div class="filter-tabs">
+        <button v-for="cat in categoryOptions" :key="cat.value"
+                class="tab-btn"
+                :class="{ active: category === cat.value }"
+                @click="category = cat.value">
+          {{ cat.label }}
+        </button>
+      </div>
+      <div class="search-box">
+        <div class="i-carbon-search search-icon"></div>
+        <input type="text" v-model="keyword" placeholder="搜索阶段或技术..." class="search-input" />
+      </div>
     </div>
 
-    <BaseEmpty v-if="!filteredRoadmaps.length" title="暂无匹配路线" description="可以切换关键词，或先创建你的第一条路线。" />
-    <div v-else class="list-grid">
-      <RoadmapCard v-for="item in filteredRoadmaps" :key="item.id" :item="item" />
-    </div>
+    <main class="paths-content">
+      <BaseErrorState v-if="status === 'error'" />
+      <BaseEmpty v-else-if="status === 'empty'" title="没有匹配的路线图" description="尝试调整搜索关键词或分类。" />
+      <div v-else-if="status === 'loading'" class="paths-grid">
+        <BaseSkeleton v-for="item in 4" :key="item" height="24rem" />
+      </div>
+      <div v-else class="paths-grid">
+        <RoadmapCard v-for="item in filteredRoadmaps" :key="item.id" :item="item" class="roadmap-feature-card" />
+      </div>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
-import BaseInput from '@/components/base/BaseInput.vue'
-import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseErrorState from '@/components/base/BaseErrorState.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
-import { roadmapTags, roadmaps } from '@/mock/roadmaps'
+import { roadmaps } from '@/mock/roadmaps'
 
-const keyword = ref('')
-const selectedTag = ref('全部')
-const tagOptions = roadmapTags.map((item) => ({ label: item, value: item }))
+const route = useRoute()
+const keyword = ref(String(route.query.keyword || ''))
+const category = ref('全部')
 
-const filteredRoadmaps = computed(() =>
-  roadmaps.filter((item) => {
-    const matchKeyword = !keyword.value || `${item.title}${item.summary}`.toLowerCase().includes(keyword.value.toLowerCase())
-    const matchTag = selectedTag.value === '全部' || item.tags.includes(selectedTag.value)
-    return matchKeyword && matchTag
+const categoryOptions = [
+  { label: '全部路线', value: '全部' },
+  { label: '后端架构', value: '后端' },
+  { label: '前端工程', value: '前端' },
+  { label: '基础底座', value: '基础' }
+]
+
+const filteredRoadmaps = computed(() => {
+  return roadmaps.filter((item) => {
+    const matchKeyword = !keyword.value || `${item.title}${item.description}`.toLowerCase().includes(keyword.value.toLowerCase())
+    const matchCategory = category.value === '全部' || item.category === category.value
+    return matchKeyword && matchCategory
   })
-)
+})
+
+const status = computed(() => {
+  if (keyword.value === 'error') return 'error'
+  if (keyword.value === 'loading') return 'loading'
+  if (!filteredRoadmaps.value.length) return 'empty'
+  return 'ready'
+})
 </script>
 
 <style scoped lang="scss">
-.view-grid {
-  display: grid;
-  gap: var(--space-5);
+.roadmap-paths {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
 }
 
-.toolbar {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  padding: var(--space-5);
+.paths-hero {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 48px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.025);
+  border: 1px solid #f3f4f6;
+  position: relative;
+  overflow: hidden;
 }
 
-.list-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-5);
+.paths-hero::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.05), transparent 70%);
+  pointer-events: none;
 }
 
-@media (max-width: 64rem) {
-  .toolbar,
-  .list-grid {
-    grid-template-columns: 1fr;
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-title {
+  font-size: 40px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 16px 0;
+  letter-spacing: -0.02em;
+}
+
+.hero-desc {
+  font-size: 18px;
+  color: #4b5563;
+  margin: 0 0 40px 0;
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 48px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.paths-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
+  position: sticky;
+  top: 80px;
+  z-index: 10;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: #111827;
+  background: #f9fafb;
+}
+
+.tab-btn.active {
+  background: #111827;
+  color: white;
+}
+
+.search-box {
+  position: relative;
+  width: 300px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.search-input {
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 0 16px 0 40px;
+  font-size: 14px;
+  color: #111827;
+  outline: none;
+  transition: all 0.2s;
+  background: #f9fafb;
+}
+
+.search-input:focus {
+  background: white;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.paths-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 32px;
+}
+
+/* Make roadmap cards look more like feature cards in this view */
+:deep(.roadmap-feature-card) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
+}
+
+:deep(.roadmap-feature-card:hover) {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 768px) {
+  .paths-hero {
+    padding: 40px 24px;
+  }
+  .paths-filter {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .filter-tabs {
+    flex-wrap: wrap;
+  }
+  .search-box {
+    width: 100%;
   }
 }
 </style>

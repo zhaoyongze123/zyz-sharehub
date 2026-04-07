@@ -1,68 +1,37 @@
 <template>
-  <div class="page-shell auth-page">
-    <section class="auth-card glass-panel">
-      <BaseTag tone="primary">GitHub OAuth</BaseTag>
-      <h1>用内容构建你的学习资产</h1>
-      <p>登录后可发布资料、组织路线、记录笔记并导出简历。当前先用前端模拟登录态，后续再切真实后端 OAuth。</p>
+  <main class="login-shell">
+    <!-- 登录面版 -->
+    <div class="glass-card login-container animate-fade-in-up">
+      <h1 class="login-title">用内容构建你的学习资产</h1>
+      <p class="login-subtitle">登录后可发布资料、组织路线、记录笔记并导出简历</p>
 
-      <div class="auth-actions">
-        <BaseButton size="lg" @click="login('user')">以普通用户进入</BaseButton>
-        <BaseButton size="lg" variant="secondary" @click="login('admin')">以管理员进入</BaseButton>
+      <div class="login-actions">
+        <a href="https://zyzsharehub.cn/oauth2/authorization/github" class="btn btn-github btn-fixed-height">
+          <svg class="github-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+          </svg>
+          使用 GitHub 继续
+        </a>
+        <RouterLink to="/" class="btn btn-secondary btn-fixed-height">先逛逛公开内容</RouterLink>
       </div>
 
-      <BaseEmpty title="回跳提示" :description="redirectTarget" />
-    </section>
-  </div>
+      <div class="login-footer">
+        继续即表示你同意 <a href="#">《用户协议》</a> 与 <a href="#">《隐私政策》</a>
+      </div>
+    </div>
+  </main>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseEmpty from '@/components/base/BaseEmpty.vue'
-import BaseTag from '@/components/base/BaseTag.vue'
-import { useAuthStore } from '@/stores/auth'
-import { useAppStore } from '@/stores/app'
+import { onMounted, onBeforeUnmount } from 'vue'
+import { RouterLink } from 'vue-router'
+import '@/assets/landing.css'
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const appStore = useAppStore()
+onMounted(() => {
+  document.body.classList.add('page-login')
+})
 
-const redirectTarget = computed(() => `登录成功后将跳转到：${String(route.query.redirect || '/')}`)
-
-function login(role: 'user' | 'admin') {
-  authStore.loginAs(role)
-  appStore.showToast('登录成功', role === 'admin' ? '已进入管理员模拟态' : '已进入普通用户模拟态')
-  router.push(String(route.query.redirect || '/'))
-}
+onBeforeUnmount(() => {
+  document.body.classList.remove('page-login')
+})
 </script>
-
-<style scoped lang="scss">
-.auth-page {
-  display: grid;
-  place-items: center;
-  min-height: calc(100vh - 8rem);
-}
-
-.auth-card {
-  width: min(32rem, 100%);
-  display: grid;
-  gap: var(--space-5);
-  padding: var(--space-10);
-}
-
-.auth-card h1,
-.auth-card p {
-  margin: 0;
-}
-
-.auth-card p {
-  color: var(--color-text-soft);
-}
-
-.auth-actions {
-  display: grid;
-  gap: var(--space-3);
-}
-</style>
