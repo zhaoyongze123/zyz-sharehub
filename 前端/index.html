@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>资料分享站 - 沉淀下一代技术资产</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./assets/components.css">
+</head>
+<body class="page-home animating">
+  
+  <!-- 动效容器 -->
+  <div class="intro-overlay" id="introOverlay">
+    <div class="typewriter-text" id="typewriterText"><span class="text-content"></span><span class="cursor intro" id="introCursor"></span></div>
+    <div class="intro-core" id="introCore"></div>
+  </div>
+
+  <nav class="navbar" id="navbar">
+    <div class="brand">ShareBase</div>
+    <div class="nav-links">
+      <a href="#focus">聚焦</a>
+      <a href="#features">能力</a>
+      <a href="#flow">流程</a>
+    </div>
+    <div class="nav-actions">
+      <a href="https://zyzsharehub.cn/oauth2/authorization/github" class="nav-login-link">登录</a>
+      <a href="https://zyzsharehub.cn/oauth2/authorization/github" class="btn btn-primary btn-pill-sm">开始使用</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <!-- 1. Hero 首屏 -->
+    <section class="hero-section">
+      <h1 class="hero-title" id="hTitle"><span id="hTitleText"></span><span class="cursor main" id="mainCursor"></span></h1>
+      <p class="hero-subtitle" id="hSubtitle">专为 Agent、MCP 与 RAG 开发者打造。极简记录，生成动态履历。</p>
+      
+      <!-- 最终承接形态的组件 -->
+      <div class="hero-search-box" id="heroSearchBox">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input type="text" placeholder="输入你想探索的体系、模型或是前沿面经..." readonly>
+      </div>
+
+      <div class="hero-actions" id="hActions">
+        <a href="https://zyzsharehub.cn/oauth2/authorization/github" class="btn btn-primary btn-pill-lg">
+          用 GitHub 登录
+        </a>
+        <a href="#features" class="btn btn-secondary btn-pill-lg">
+          浏览特性
+        </a>
+      </div>
+    </section>
+
+    <!-- 2. 聚焦 -->
+    <section id="focus" class="section">
+       <div class="focus-panel reveal" id="focusPanel" data-triggered="false">
+          <h2><span id="focusTitleText"></span><span class="cursor focus" id="focusCursor"></span></h2>
+          <p id="focusSubtitle" class="focus-subtitle">分享你的 MCP Server 配置、RAG 向量检索心得与大模型微调笔记。<br>在这里，找到同频的技术布道者。</p>
+       </div>
+    </section>
+
+    <!-- 3. 核心能力 -->
+    <section id="features" class="section section-features">
+      <div class="section-header reveal">
+        <h2 class="section-title">化繁为简。</h2>
+        <p class="section-subtitle">摒弃多余的噪音，提供纯粹的知识托管与归档体验。</p>
+      </div>
+      <div class="features-grid">
+        <div class="clean-card feature-card reveal stagger-1">
+          <div class="feature-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          </div>
+          <h3>资料托管</h3>
+          <p>高效上传架构图、配置文件与外链，原生支持版本追溯与极速分发。</p>
+        </div>
+        <div class="clean-card feature-card reveal stagger-2">
+          <div class="feature-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          </div>
+          <h3>路线编排</h3>
+          <p>构建结构化的技能图谱。将打碎的知识点，通过章节节点重新组装。</p>
+        </div>
+        <div class="clean-card feature-card reveal stagger-1">
+          <div class="feature-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </div>
+          <h3>纯粹笔记</h3>
+          <p>沉浸式 Markdown 编辑器。专注于笔下的代码块与思路，无广告打扰。</p>
+        </div>
+        <div class="clean-card feature-card reveal stagger-2">
+          <div class="feature-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          </div>
+          <h3>专业履历</h3>
+          <p>基于你的代码提交与笔记沉淀，智能分析一键排版，生成高水准简历。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 简明流程 -->
+    <section id="flow" class="section">
+      <div class="section-header reveal">
+        <h2 class="section-title">一切从简。</h2>
+        <p class="section-subtitle">没有冗长的填表，保护创作的热情。</p>
+      </div>
+      <div class="steps-list">
+        <div class="step-row reveal">
+          <div class="step-number">01</div>
+          <div class="step-text">
+            <h3>授权登录</h3>
+            <p>基于 GitHub 账号体系，一秒钟建立身份信誉，避免信息汪洋。</p>
+          </div>
+        </div>
+        <div class="step-row reveal stagger-1">
+          <div class="step-number">02</div>
+          <div class="step-text">
+            <h3>积累资产</h3>
+            <p>发布、点赞并收藏有价值的 MCP 模型接口或是前沿的面经资料。</p>
+          </div>
+        </div>
+        <div class="step-row reveal stagger-2">
+          <div class="step-number">03</div>
+          <div class="step-text">
+            <h3>一键展示</h3>
+            <p>平台会自动萃取你的学习路线与高赞笔记，随时生成精美报告。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bottom-cta reveal">
+      <h2>准备好开始了么？</h2>
+      <a href="https://zyzsharehub.cn/oauth2/authorization/github" class="btn btn-primary btn-pill-xl">
+        用 GitHub 继续
+      </a>
+    </section>
+  </main>
+
+  <footer class="container">
+     <div class="footer">
+        <div>© 2026 ShareBase. 保留所有权利。</div>
+        <div class="footer-links"><a href="#">隐私政策</a><a href="#">使用条款</a></div>
+     </div>
+  </footer>
+
+  <script src="./assets/main.js" defer></script>
+</body>
+</html>
