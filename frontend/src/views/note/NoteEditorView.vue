@@ -246,6 +246,7 @@
           <!-- 真正的编辑器部分 -->
           <div class="editor-content-area relative h-full">
             <textarea 
+              ref="editorTextareaRef"
               v-if="editMode === 'edit'"
               v-model="activeNote.content" 
               class="markdown-editor w-full h-full" 
@@ -253,6 +254,7 @@
               @input="triggerAutoSave"
             ></textarea>
             <div 
+              ref="previewContainerRef"
               v-else 
               class="markdown-preview w-full h-full overflow-y-auto mt-4 px-4 pb-12 prose max-w-none"
             >
@@ -281,7 +283,7 @@
         </div>
         <div class="outline-content">
           <ul class="toc-list" v-if="outline.length > 0">
-            <li v-for="(head, index) in outline" :key="index" :class="'toc-h' + head.level">
+            <li v-for="(head, index) in outline" :key="index" :class="'toc-h' + head.level" @click="scrollToHeading(head, index)">
               {{ head.text }}
             </li>
           </ul>
@@ -481,22 +483,62 @@ const removeTag = (index: number) => {
   triggerAutoSave()
 }
 
+const editorTextareaRef = ref<HTMLTextAreaElement | null>(null)
+const previewContainerRef = ref<HTMLDivElement | null>(null)
+
 // 大纲提取
 const outline = computed(() => {
   if (!activeNote.value) return []
   const lines = activeNote.value.content.split('\n')
   const result: any[] = []
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
     const match = line.match(/^(#{1,6})\s+(.+)/)
     if (match) {
       result.push({
         level: match[1].length,
-        text: match[2].trim()
+        text: match[2].trim(),
+        lineIndex: i
       })
     }
   }
   return result
 })
+
+const scrollToHeading = (head: any, index: number) => {
+  if (editMode.value === 'read') {
+    if (!previewContainerRef.value) return
+    const headings = previewContainerRef.value.querySelectorAll('h1, h2, h3, h4, h5, h6')
+    const target = headings[index]
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  } else {
+    if (!editorTextareaRef.value || !activeNote.value) return
+    const ta = editorTextareaRef.value
+    
+    const style = window.getComputedStyle(ta)
+    const lineHeightStr = style.lineHeight
+    let lineHeight = 27
+    if (lineHeightStr !== 'normal') {
+      lineHeight = parseFloat(lineHeightStr)
+    } else {
+      lineHeight = parseFloat(style.fontSize) * 1.5
+    }
+    ta.scrollTo({
+      top: head.lineIndex * lineHeight,
+      behavior: 'smooth'
+    })
+    
+    const lines = activeNote.value.content.split('\n')
+    let charIndex = 0
+    for (let i = 0; i < head.lineIndex; i++) {
+        charIndex += lines[i].length + 1
+    }
+    ta.focus()
+    ta.setSelectionRange(charIndex, charIndex)
+  }
+}
 </script>
 
 <style scoped>
