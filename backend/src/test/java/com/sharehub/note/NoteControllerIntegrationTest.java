@@ -1,16 +1,13 @@
 package com.sharehub.note;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -19,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 public class NoteControllerIntegrationTest {
 
     @Autowired
@@ -26,11 +24,6 @@ public class NoteControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper mapper;
-
-    @BeforeEach
-    void cleanStore() throws Exception {
-        Files.deleteIfExists(Path.of("data/notes.json"));
-    }
 
     @Test
     void createListDetailUpdateDelete() throws Exception {
@@ -52,7 +45,7 @@ public class NoteControllerIntegrationTest {
 
         mvc.perform(get("/api/notes")
                 .param("page", "1")
-                .param("size", "5"))
+                .param("pageSize", "5"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.items").isArray())
             .andExpect(jsonPath("$.data.total").value(1));

@@ -1,6 +1,7 @@
 package com.sharehub.note;
 
 import com.sharehub.common.ApiResponse;
+import com.sharehub.common.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,10 +23,10 @@ public class NoteController {
     }
 
     @GetMapping
-    public ApiResponse<NoteRepository.NotePage> list(
+    public ApiResponse<PageResponse<NoteDto>> list(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.ok(repository.list(page, size));
+        @RequestParam(defaultValue = "10") int pageSize) {
+        return ApiResponse.ok(repository.list(page, pageSize));
     }
 
     @GetMapping("/{id}")

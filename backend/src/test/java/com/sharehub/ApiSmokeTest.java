@@ -47,4 +47,14 @@ class ApiSmokeTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.title").value("Spring Boot 资料"));
     }
+
+    @Test
+    void shouldPageResources() throws Exception {
+        mockMvc.perform(get("/api/resources?page=0&pageSize=12"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.items").isArray())
+            .andExpect(jsonPath("$.data.page").value(0))
+            .andExpect(jsonPath("$.data.pageSize").value(12));
+    }
 }

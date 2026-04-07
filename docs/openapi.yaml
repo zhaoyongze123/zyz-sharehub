@@ -1,88 +1,257 @@
 openapi: 3.0.3
 info:
   title: ShareHub API
-  version: 0.1.0
+  version: 0.2.0
+servers:
+  - url: http://localhost:8080
 paths:
   /api/auth/github/login:
     get:
       summary: 获取 GitHub 登录地址
+      responses:
+        '200':
+          description: 成功
   /api/auth/me:
     get:
       summary: 获取当前用户
+      responses:
+        '200':
+          description: 成功
   /api/resources:
+    get:
+      summary: 资料分页列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 12
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 创建资料
+      responses:
+        '200':
+          description: 成功
+  /api/resources/featured:
     get:
-      summary: 资料列表
+      summary: 获取首页推荐资料
+      responses:
+        '200':
+          description: 成功
   /api/resources/{id}:
     get:
-      summary: 资料详情
+      summary: 获取资料详情
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资料不存在
     put:
       summary: 更新资料
+      responses:
+        '200':
+          description: 成功
     delete:
       summary: 删除资料
+      responses:
+        '200':
+          description: 成功
   /api/resources/{id}/publish:
     post:
       summary: 发布资料
+      responses:
+        '200':
+          description: 成功
+  /api/resources/{id}/attachment:
+    post:
+      summary: 上传资料附件
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资料不存在
   /api/roadmaps:
+    get:
+      summary: 路线分页列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 创建路线
-    get:
-      summary: 路线列表
+      responses:
+        '200':
+          description: 成功
   /api/roadmaps/{id}:
     get:
-      summary: 路线详情
+      summary: 获取路线详情
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 路线不存在
   /api/roadmaps/{id}/nodes:
     post:
-      summary: 新增路线节点
+      summary: 给路线新增节点
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 路线不存在
   /api/roadmaps/{id}/progress:
     post:
-      summary: 更新学习进度
+      summary: 更新路线学习进度
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 路线不存在
   /api/notes:
+    get:
+      summary: 笔记分页列表
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 创建笔记
-    get:
-      summary: 笔记列表
+      responses:
+        '200':
+          description: 成功
   /api/notes/{id}:
     get:
-      summary: 笔记详情
+      summary: 获取笔记详情
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 笔记不存在
     put:
       summary: 更新笔记
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 笔记不存在
     delete:
       summary: 删除笔记
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 笔记不存在
   /api/resumes/generate:
     post:
-      summary: 生成简历
+      summary: 生成简历 PDF
+      responses:
+        '200':
+          description: 成功
   /api/resumes/{id}:
     get:
-      summary: 简历详情
+      summary: 获取简历生成记录
+      responses:
+        '200':
+          description: 成功
   /api/resumes/{id}/download:
     get:
-      summary: 下载简历
+      summary: 下载简历 PDF
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 简历或文件不存在
   /api/resources/{id}/comments:
     post:
       summary: 发表评论
+      responses:
+        '200':
+          description: 成功
   /api/comments/{id}/reply:
     post:
       summary: 回复评论
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 父评论不存在
   /api/resources/{id}/favorite:
     post:
       summary: 收藏资料
+      responses:
+        '200':
+          description: 成功
   /api/resources/{id}/like:
     post:
       summary: 点赞资料
+      responses:
+        '200':
+          description: 成功
   /api/reports:
     post:
       summary: 举报内容
+      responses:
+        '200':
+          description: 成功
   /api/admin/reports:
     get:
       summary: 举报列表
+      responses:
+        '200':
+          description: 成功
   /api/admin/reports/{id}/resolve:
     post:
       summary: 处理举报
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 举报不存在
   /api/admin/resources/{id}/block:
     post:
       summary: 下架资料
+      responses:
+        '200':
+          description: 成功
   /api/admin/users/{id}/ban:
     post:
       summary: 封禁用户
+      responses:
+        '200':
+          description: 成功

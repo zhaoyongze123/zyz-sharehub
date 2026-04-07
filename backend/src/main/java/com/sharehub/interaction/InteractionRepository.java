@@ -1,101 +1,254 @@
 package com.sharehub.interaction;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PostConstruct;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import com.sharehub.common.NotFoundException;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.PreparedStatementCreator;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
+import org.springframework.stereotype.Repository;
+import org.springframework.web.server.ResponseStatusException;
 
-@Component
+@Repository
 public class InteractionRepository {
 
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final Path storage = Path.of("data/interaction.json");
-    private final AtomicLong idGen = new AtomicLong(2000);
-    private final Map<Long, CommentRecord> comments = new LinkedHashMap<>();
-    private final Map<Long, ReportRecord> reports = new LinkedHashMap<>();
-    private final Map<Long, Integer> favorites = new LinkedHashMap<>();
-    private final Map<Long, Integer> likes = new LinkedHashMap<>();
+    private static final String DEFAULT_USER_KEY = "local-dev-user";
+    private static final String DEFAULT_OPERATOR_KEY = "system-admin";
 
-    @PostConstruct
-    public void init() {
-        if (Files.exists(storage)) {
-            try {
-                Snapshot snapshot = mapper.readValue(storage.toFile(), Snapshot.class);
-                snapshot.comments().forEach(comment -> comments.put(comment.id(), comment));
-                snapshot.reports().forEach(report -> reports.put(report.id(), report));
-                favorites.putAll(snapshot.favorites());
-                likes.putAll(snapshot.likes());
-                snapshot.comments().forEach(comment -> idGen.updateAndGet(curr -> Math.max(curr, comment.id())));
-                snapshot.reports().forEach(report -> idGen.updateAndGet(curr -> Math.max(curr, report.id())));
-            } catch (IOException ignored) {
-            }
+    private final JdbcTemplate jdbcTemplate;
+
+    public InteractionRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public CommentRecord saveComment(Long resourceId, String content, Long parentId) {
+        if (content == null || content.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "COMMENT_CONTENT_REQUIRED");
+        }
+
+        Long effectiveResourceId = resourceId;
+        Long noteId = null;
+        if (parentId != null) {
+            ParentTarget parentTarget = findParentTarget(parentId);
+            effectiveResourceId = parentTarget.resourceId();
+            noteId = parentTarget.noteId();
+        }
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        Long finalResourceId = effectiveResourceId;
+        Long finalNoteId = noteId;
+        jdbcTemplate.update(
+            (PreparedStatementCreator) connection -> {
+                PreparedStatement statement = connection.prepareStatement(
+                    """
+                        INSERT INTO comments (resource_id, note_id, parent_id, author_key, content, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    new String[] {"id"}
+                );
+                bindLong(statement, 1, finalResourceId);
+                bindLong(statement, 2, finalNoteId);
+                bindLong(statement, 3, parentId);
+                statement.setString(4, DEFAULT_USER_KEY);
+                statement.setString(5, content);
+                statement.setString(6, "VISIBLE");
+                statement.setTimestamp(7, Timestamp.from(Instant.now()));
+                return statement;
+            },
+            keyHolder
+        );
+        return findComment(keyHolder.getKey().longValue());
+    }
+
+    public int addFavorite(Long resourceId) {
+        Integer exists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
+            Integer.class,
+            resourceId,
+            DEFAULT_USER_KEY
+        );
+        if (exists == null || exists == 0) {
+            jdbcTemplate.update(
+                "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
+                resourceId,
+                DEFAULT_USER_KEY
+            );
+        }
+        Integer total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL",
+            Integer.class,
+            resourceId
+        );
+        return total == null ? 0 : total;
+    }
+
+    public int addLike(Long resourceId) {
+        Integer exists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
+            Integer.class,
+            resourceId,
+            DEFAULT_USER_KEY
+        );
+        if (exists == null || exists == 0) {
+            jdbcTemplate.update(
+                "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
+                resourceId,
+                DEFAULT_USER_KEY
+            );
+        }
+        Integer total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL",
+            Integer.class,
+            resourceId
+        );
+        return total == null ? 0 : total;
+    }
+
+    public ReportRecord saveReport(Long resourceId, String reason, String reporter) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(
+            (PreparedStatementCreator) connection -> {
+                PreparedStatement statement = connection.prepareStatement(
+                    """
+                        INSERT INTO reports (target_type, target_id, reporter_key, reason, details, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    new String[] {"id"}
+                );
+                statement.setString(1, "RESOURCE");
+                statement.setLong(2, resourceId);
+                statement.setString(3, reporter == null || reporter.isBlank() ? DEFAULT_USER_KEY : reporter);
+                statement.setString(4, reason == null || reason.isBlank() ? "无" : reason);
+                statement.setString(5, null);
+                statement.setString(6, "OPEN");
+                statement.setTimestamp(7, Timestamp.from(Instant.now()));
+                return statement;
+            },
+            keyHolder
+        );
+        return findReport(keyHolder.getKey().longValue());
+    }
+
+    public List<ReportRecord> listReports() {
+        return jdbcTemplate.query(
+            """
+                SELECT id, target_type, target_id, reporter_key, reason, status
+                FROM reports
+                ORDER BY id DESC
+                """,
+            (resultSet, rowNum) -> mapReport(resultSet)
+        );
+    }
+
+    public ReportRecord resolveReport(Long id) {
+        int updated = jdbcTemplate.update(
+            """
+                UPDATE reports
+                SET status = ?, resolved_at = ?, resolved_by = ?
+                WHERE id = ?
+                """,
+            "RESOLVED",
+            Timestamp.from(Instant.now()),
+            DEFAULT_OPERATOR_KEY,
+            id
+        );
+        if (updated == 0) {
+            throw new NotFoundException("REPORT_NOT_FOUND");
+        }
+
+        jdbcTemplate.update(
+            """
+                INSERT INTO admin_audit_logs (action, target_type, target_id, operator_key, details, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+            "RESOLVE_REPORT",
+            "REPORT",
+            String.valueOf(id),
+            DEFAULT_OPERATOR_KEY,
+            "{}",
+            Timestamp.from(Instant.now())
+        );
+        return findReport(id);
+    }
+
+    private ParentTarget findParentTarget(Long parentId) {
+        List<ParentTarget> results = jdbcTemplate.query(
+            "SELECT resource_id, note_id FROM comments WHERE id = ?",
+            (resultSet, rowNum) -> new ParentTarget(
+                nullableLong(resultSet, "resource_id"),
+                nullableLong(resultSet, "note_id")
+            ),
+            parentId
+        );
+        return results.stream().findFirst().orElseThrow(() -> new NotFoundException("COMMENT_NOT_FOUND"));
+    }
+
+    private CommentRecord findComment(Long id) {
+        List<CommentRecord> results = jdbcTemplate.query(
+            """
+                SELECT id, resource_id, note_id, parent_id, content, status
+                FROM comments
+                WHERE id = ?
+                """,
+            (resultSet, rowNum) -> new CommentRecord(
+                resultSet.getLong("id"),
+                nullableLong(resultSet, "resource_id"),
+                nullableLong(resultSet, "note_id"),
+                nullableLong(resultSet, "parent_id"),
+                resultSet.getString("content"),
+                resultSet.getString("status")
+            ),
+            id
+        );
+        return results.stream().findFirst().orElseThrow(() -> new NotFoundException("COMMENT_NOT_FOUND"));
+    }
+
+    private ReportRecord findReport(Long id) {
+        List<ReportRecord> results = jdbcTemplate.query(
+            """
+                SELECT id, target_type, target_id, reporter_key, reason, status
+                FROM reports
+                WHERE id = ?
+                """,
+            (resultSet, rowNum) -> mapReport(resultSet),
+            id
+        );
+        return results.stream().findFirst().orElseThrow(() -> new NotFoundException("REPORT_NOT_FOUND"));
+    }
+
+    private ReportRecord mapReport(ResultSet resultSet) throws SQLException {
+        return new ReportRecord(
+            resultSet.getLong("id"),
+            resultSet.getString("target_type"),
+            resultSet.getLong("target_id"),
+            resultSet.getString("reason"),
+            resultSet.getString("reporter_key"),
+            resultSet.getString("status")
+        );
+    }
+
+    private Long nullableLong(ResultSet resultSet, String column) throws SQLException {
+        Object value = resultSet.getObject(column);
+        return value == null ? null : resultSet.getLong(column);
+    }
+
+    private void bindLong(PreparedStatement statement, int index, Long value) throws SQLException {
+        if (value == null) {
+            statement.setNull(index, java.sql.Types.BIGINT);
+        } else {
+            statement.setLong(index, value);
         }
     }
 
-    public synchronized CommentRecord saveComment(Long resourceId, String content, Long parentId) {
-        long id = idGen.incrementAndGet();
-        CommentRecord record = new CommentRecord(id, resourceId, content, parentId, "OPEN");
-        comments.put(id, record);
-        persist();
-        return record;
-    }
+    private record ParentTarget(Long resourceId, Long noteId) {}
 
-    public synchronized ReportRecord saveReport(Long resourceId, String reason, String reporter) {
-        long id = idGen.incrementAndGet();
-        ReportRecord report = new ReportRecord(id, resourceId, reason, reporter, "OPEN");
-        reports.put(id, report);
-        persist();
-        return report;
-    }
+    public record CommentRecord(Long id, Long resourceId, Long noteId, Long parentId, String content, String status) {}
 
-    public synchronized int addFavorite(Long resourceId) {
-        favorites.merge(resourceId, 1, Integer::sum);
-        persist();
-        return favorites.get(resourceId);
-    }
-
-    public synchronized int addLike(Long resourceId) {
-        likes.merge(resourceId, 1, Integer::sum);
-        persist();
-        return likes.get(resourceId);
-    }
-
-    public synchronized List<ReportRecord> listReports() {
-        return new ArrayList<>(reports.values());
-    }
-
-    public synchronized ReportRecord resolveReport(Long id) {
-        ReportRecord current = reports.get(id);
-        if (current == null) {
-            return null;
-        }
-        ReportRecord updated = new ReportRecord(id, current.resourceId(), current.reason(), current.reporter(), "RESOLVED");
-        reports.put(id, updated);
-        persist();
-        return updated;
-    }
-
-    private void persist() {
-        try {
-            Files.createDirectories(storage.getParent());
-            Snapshot snapshot = new Snapshot(new ArrayList<>(comments.values()), new ArrayList<>(reports.values()), new LinkedHashMap<>(favorites), new LinkedHashMap<>(likes));
-            mapper.writeValue(storage.toFile(), snapshot);
-        } catch (IOException ignored) {
-        }
-    }
-
-    private record Snapshot(List<CommentRecord> comments, List<ReportRecord> reports, Map<Long, Integer> favorites, Map<Long, Integer> likes) {}
-
-    public record CommentRecord(Long id, Long resourceId, String content, Long parentId, String status) {}
-
-    public record ReportRecord(Long id, Long resourceId, String reason, String reporter, String status) {}
+    public record ReportRecord(Long id, String targetType, Long targetId, String reason, String reporter, String status) {}
 }

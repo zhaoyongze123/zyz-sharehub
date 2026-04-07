@@ -1,16 +1,13 @@
 package com.sharehub.interaction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 public class InteractionControllerIntegrationTest {
 
     @Autowired
@@ -26,11 +24,6 @@ public class InteractionControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper mapper;
-
-    @BeforeEach
-    void reset() throws Exception {
-        Files.deleteIfExists(Path.of("data/interaction.json"));
-    }
 
     @Test
     void commentReplyFavoriteLikeReportPersisted() throws Exception {
@@ -46,7 +39,8 @@ public class InteractionControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(replyPayload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.parentId").value(1));
+                .andExpect(jsonPath("$.data.parentId").value(1))
+                .andExpect(jsonPath("$.data.resourceId").value(1));
 
         mvc.perform(post("/api/resources/1/favorite"))
             .andExpect(status().isOk())
@@ -61,6 +55,7 @@ public class InteractionControllerIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(reportPayload))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("OPEN"));
+            .andExpect(jsonPath("$.data.status").value("OPEN"))
+            .andExpect(jsonPath("$.data.targetId").value(1));
     }
 }

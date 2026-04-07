@@ -1,10 +1,14 @@
 package com.sharehub.resource;
 
 import com.sharehub.common.ApiResponse;
+import com.sharehub.common.NotFoundException;
+import com.sharehub.common.PageResponse;
 import com.sharehub.files.FileCategory;
 import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,8 +53,17 @@ public class ResourceController {
     }
 
     @GetMapping
-    public ApiResponse<List<ResourceDto>> list() {
-        return ApiResponse.ok(repository.findAll().stream().map(ResourceEntity::toDto).toList());
+    public ApiResponse<PageResponse<ResourceDto>> list(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "12") int pageSize
+    ) {
+        Page<ResourceDto> result = repository.findAll(PageRequest.of(page, pageSize)).map(ResourceEntity::toDto);
+        return ApiResponse.ok(PageResponse.from(result));
+    }
+
+    @GetMapping("/featured")
+    public ApiResponse<List<ResourceDto>> featured() {
+        return ApiResponse.ok(repository.findTop6ByPublishedOrderByUpdatedAtDesc().stream().map(ResourceEntity::toDto).toList());
     }
 
     @GetMapping("/{id}")
@@ -57,7 +71,7 @@ public class ResourceController {
         return repository.findById(id)
             .map(ResourceEntity::toDto)
             .map(ApiResponse::ok)
-            .orElseGet(() -> ApiResponse.fail("NOT_FOUND"));
+            .orElseThrow(() -> new NotFoundException("NOT_FOUND"));
     }
 
     @PutMapping("/{id}")
@@ -74,7 +88,7 @@ public class ResourceController {
                 existing.setStatus(req.status() == null ? existing.getStatus() : req.status());
                 return ApiResponse.ok(repository.save(existing).toDto());
             })
-            .orElseGet(() -> ApiResponse.fail("NOT_FOUND"));
+            .orElseThrow(() -> new NotFoundException("NOT_FOUND"));
     }
 
     @DeleteMapping("/{id}")
@@ -90,7 +104,7 @@ public class ResourceController {
                 entity.setStatus("PUBLISHED");
                 return ApiResponse.ok(repository.save(entity).toDto());
             })
-            .orElseGet(() -> ApiResponse.fail("NOT_FOUND"));
+            .orElseThrow(() -> new NotFoundException("NOT_FOUND"));
     }
 
     @PostMapping(path = "/{id}/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -112,6 +126,6 @@ public class ResourceController {
                 result.put("file", stored);
                 return ApiResponse.ok(result);
             })
-            .orElseGet(() -> ApiResponse.fail("RESOURCE_NOT_FOUND"));
+            .orElseThrow(() -> new NotFoundException("RESOURCE_NOT_FOUND"));
     }
 }
