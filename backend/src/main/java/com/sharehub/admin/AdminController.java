@@ -1,34 +1,30 @@
 package com.sharehub.admin;
 
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
+import com.sharehub.interaction.InteractionRepository;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
 
-    private final InMemoryStore store;
+    private final InteractionRepository interactionRepository;
 
-    public AdminController(InMemoryStore store) {
-        this.store = store;
+    public AdminController(InteractionRepository interactionRepository) {
+        this.interactionRepository = interactionRepository;
     }
 
     @GetMapping("/reports")
-    public ApiResponse<List<Object>> reports() {
-        return ApiResponse.ok(new ArrayList<>(store.reports.values()));
+    public ApiResponse<List<InteractionRepository.ReportRecord>> reports() {
+        return ApiResponse.ok(interactionRepository.listReports());
     }
 
     @PostMapping("/reports/{id}/resolve")
-    public ApiResponse<String> resolve(@PathVariable Long id) {
-        Object found = store.reports.get(id);
-        if (found instanceof java.util.Map<?, ?> report) {
-            ((java.util.Map<String, Object>) report).put("status", "RESOLVED");
-        }
-        return ApiResponse.ok("RESOLVED_" + id);
+    public ApiResponse<InteractionRepository.ReportRecord> resolve(@PathVariable Long id) {
+        InteractionRepository.ReportRecord resolved = interactionRepository.resolveReport(id);
+        return ApiResponse.ok(resolved);
     }
 
     @PostMapping("/resources/{id}/block")

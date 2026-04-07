@@ -1,51 +1,47 @@
 package com.sharehub.note;
 
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/notes")
 public class NoteController {
 
-    private final InMemoryStore store;
+    private final NoteRepository repository;
 
-    public NoteController(InMemoryStore store) {
-        this.store = store;
+    public NoteController(NoteRepository repository) {
+        this.repository = repository;
     }
 
     @PostMapping
     public ApiResponse<NoteDto> create(@Valid @RequestBody NoteDto req) {
-        long id = store.nextId();
-        NoteDto saved = new NoteDto(id, req.title(), req.contentMd(), req.visibility(), "PUBLISHED");
-        store.notes.put(id, saved);
+        NoteDto toSave = new NoteDto(null, req.title(), req.contentMd(), req.visibility(), req.status());
+        NoteDto saved = repository.save(toSave);
         return ApiResponse.ok(saved);
     }
 
     @GetMapping
-    public ApiResponse<List<Object>> list() {
-        return ApiResponse.ok(new ArrayList<>(store.notes.values()));
+    public ApiResponse<NoteRepository.NotePage> list(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.ok(repository.list(page, size));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Object> detail(@PathVariable Long id) {
-        return ApiResponse.ok(store.notes.get(id));
+    public ApiResponse<NoteDto> detail(@PathVariable Long id) {
+        return ApiResponse.ok(repository.find(id));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<NoteDto> update(@PathVariable Long id, @Valid @RequestBody NoteDto req) {
-        NoteDto saved = new NoteDto(id, req.title(), req.contentMd(), req.visibility(), req.status());
-        store.notes.put(id, saved);
-        return ApiResponse.ok(saved);
+        NoteDto updated = repository.upsert(id, req);
+        return ApiResponse.ok(updated);
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<String> delete(@PathVariable Long id) {
-        store.notes.remove(id);
+        repository.delete(id);
         return ApiResponse.ok("DELETED");
     }
 }
