@@ -2,12 +2,18 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LAUNCHD_LABEL="com.sharehub.overnight.autopilot"
-PLIST_PATH="${HOME}/Library/LaunchAgents/${LAUNCHD_LABEL}.plist"
-CAFFEINATE_PID_FILE="${PROJECT_ROOT}/output/overnight/state/caffeinate.pid"
+STATE_DIR="${PROJECT_ROOT}/output/overnight/state"
+PID_FILE="${STATE_DIR}/autopilot.pid"
+CAFFEINATE_PID_FILE="${STATE_DIR}/caffeinate.pid"
 
-launchctl bootout "gui/$(id -u)" "${PLIST_PATH}" >/dev/null 2>&1 || true
-echo "已卸载 LaunchAgent：${LAUNCHD_LABEL}"
+if [[ -f "${PID_FILE}" ]]; then
+  PID="$(cat "${PID_FILE}")"
+  if kill -0 "${PID}" >/dev/null 2>&1; then
+    kill "${PID}" || true
+    echo "已停止 supervisor，PID=${PID}"
+  fi
+  rm -f "${PID_FILE}"
+fi
 
 if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
   CAFFEINATE_PID="$(cat "${CAFFEINATE_PID_FILE}")"
@@ -18,4 +24,8 @@ if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
   rm -f "${CAFFEINATE_PID_FILE}"
 fi
 
-rm -f "${PROJECT_ROOT}/output/overnight/state/caffeinate-seconds.txt"
+rm -f "${STATE_DIR}/caffeinate-seconds.txt"
+pkill -f "overnight-supervisor.sh" >/dev/null 2>&1 || true
+pkill -f "launchd-overnight-entry.sh" >/dev/null 2>&1 || true
+pkill -f "run_with_timeout.py .*New project" >/dev/null 2>&1 || true
+pkill -f "codex exec --dangerously-bypass-approvals-and-sandbox -C /Users/mac/Documents/New project" >/dev/null 2>&1 || true

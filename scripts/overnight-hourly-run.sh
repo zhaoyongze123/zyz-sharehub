@@ -12,6 +12,9 @@ LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
 META_FILE="${RUN_DIR}/meta.env"
 USE_RESUME_MARKER="${STATE_DIR}/use_resume"
+NOTIFY_SCRIPT="${PROJECT_ROOT}/scripts/feishu_notify.py"
+
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 mkdir -p "${RUN_DIR}" "${STATE_DIR}"
 
@@ -56,9 +59,8 @@ fi
 echo "[$(date '+%F %T')] 开始执行第 ${RUN_ID} 轮，日志目录: ${RUN_DIR}" | tee -a "${RAW_LOG_FILE}"
 
 set +e
-python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" \
-  "${CODEX_CMD[@]}" - < "${RUN_DIR}/prompt.txt" \
-  2>&1 | tee -a "${RAW_LOG_FILE}"
+python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${CODEX_CMD[@]}" - \
+  < "${RUN_DIR}/prompt.txt" 2>&1 | tee -a "${RAW_LOG_FILE}"
 EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
@@ -76,10 +78,14 @@ cp "${LAST_MESSAGE_FILE}" "${OUTPUT_DIR}/latest-message.md" 2>/dev/null || true
 cp "${RAW_LOG_FILE}" "${OUTPUT_DIR}/latest.log" 2>/dev/null || true
 cp "${META_FILE}" "${OUTPUT_DIR}/latest-meta.env" 2>/dev/null || true
 
+SUMMARY="$(tail -n 40 "${LAST_MESSAGE_FILE}" 2>/dev/null || tail -n 30 "${RAW_LOG_FILE}" | tail -n 20)"
+
 if [[ ${EXIT_CODE} -eq 0 ]]; then
   echo "[$(date '+%F %T')] 第 ${RUN_ID} 轮完成" | tee -a "${RAW_LOG_FILE}"
+  python3 "${NOTIFY_SCRIPT}" "ShareHub 夜间推进完成 | 轮次 ${RUN_ID} | 分支 $(git -C "${PROJECT_ROOT}" branch --show-current) | 摘要: ${SUMMARY}" >> "${RAW_LOG_FILE}" 2>&1 || true
 else
   echo "[$(date '+%F %T')] 第 ${RUN_ID} 轮异常退出，exit=${EXIT_CODE}" | tee -a "${RAW_LOG_FILE}"
+  python3 "${NOTIFY_SCRIPT}" "ShareHub 夜间推进异常 | 轮次 ${RUN_ID} | exit=${EXIT_CODE} | 分支 $(git -C "${PROJECT_ROOT}" branch --show-current) | 摘要: ${SUMMARY}" >> "${RAW_LOG_FILE}" 2>&1 || true
 fi
 
 exit "${EXIT_CODE}"
