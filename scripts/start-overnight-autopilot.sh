@@ -44,7 +44,8 @@ PLIST
 
 launchctl bootout "gui/$(id -u)" "${PLIST_PATH}" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "${PLIST_PATH}"
-launchctl kickstart -k "gui/$(id -u)/${LAUNCHD_LABEL}"
+
+nohup bash -lc "cd '${PROJECT_ROOT}' && exec ./scripts/launchd-overnight-entry.sh" >> "${START_LOG}" 2>&1 &
 
 python3 - "${DEADLINE_HOUR}" <<'PY' > "${STATE_DIR}/caffeinate-seconds.txt"
 from datetime import datetime, timedelta
