@@ -1,11 +1,14 @@
 package com.sharehub.interaction;
 
+import com.sharehub.common.PageResponse;
 import com.sharehub.common.NotFoundException;
+import com.sharehub.resource.ResourceDto;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -86,6 +89,47 @@ public class InteractionRepository {
             resourceId
         );
         return total == null ? 0 : total;
+    }
+
+    public PageResponse<ResourceDto> listFavoriteResources(String userKey, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM favorites f
+                JOIN resources r ON r.id = f.resource_id
+                WHERE f.user_key = ? AND f.resource_id IS NOT NULL
+                """,
+            Long.class,
+            userKey
+        );
+        int offset = (safePage - 1) * safePageSize;
+        List<ResourceDto> items = jdbcTemplate.query(
+            """
+                SELECT r.id, r.title, r.type, r.summary, r.tags, r.external_url, r.object_key, r.visibility, r.status
+                FROM favorites f
+                JOIN resources r ON r.id = f.resource_id
+                WHERE f.user_key = ? AND f.resource_id IS NOT NULL
+                ORDER BY f.id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> new ResourceDto(
+                resultSet.getLong("id"),
+                resultSet.getString("title"),
+                resultSet.getString("type"),
+                resultSet.getString("summary"),
+                splitTags(resultSet.getString("tags")),
+                resultSet.getString("external_url"),
+                resultSet.getString("object_key"),
+                resultSet.getString("visibility"),
+                resultSet.getString("status")
+            ),
+            userKey,
+            safePageSize,
+            offset
+        );
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
     public int addLike(Long resourceId) {
@@ -236,6 +280,13 @@ public class InteractionRepository {
     private Long nullableLong(ResultSet resultSet, String column) throws SQLException {
         Object value = resultSet.getObject(column);
         return value == null ? null : resultSet.getLong(column);
+    }
+
+    private List<String> splitTags(String tags) {
+        if (tags == null || tags.isBlank()) {
+            return List.of();
+        }
+        return Arrays.asList(tags.split(","));
     }
 
     private void bindLong(PreparedStatement statement, int index, Long value) throws SQLException {

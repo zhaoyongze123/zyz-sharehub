@@ -84,4 +84,73 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.myNoteCount").value(1))
             .andExpect(jsonPath("$.data.myResumeCount").value(1));
     }
+
+    @Test
+    void shouldListPersonalWorkbenchCollections() throws Exception {
+        String firstResourceResponse = mockMvc.perform(post("/api/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"我的资料A","type":"PDF","visibility":"PUBLIC"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long firstResourceId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(firstResourceResponse, Map.class).get("data")).get("id").toString());
+
+        mockMvc.perform(post("/api/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"我的资料B","type":"DOC","visibility":"PRIVATE"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc-a","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/notes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"笔记A","contentMd":"# note-a","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-a"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resources/" + firstResourceId + "/favorite"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/resources").param("page", "1").param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
+
+        mockMvc.perform(get("/api/me/roadmaps").param("page", "1").param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线A"));
+
+        mockMvc.perform(get("/api/me/favorites").param("page", "1").param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("我的资料A"));
+
+        mockMvc.perform(get("/api/me/notes").param("page", "1").param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("笔记A"));
+
+        mockMvc.perform(get("/api/me/resumes").param("page", "1").param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-a"));
+    }
 }

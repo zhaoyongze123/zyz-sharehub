@@ -23,6 +23,101 @@ paths:
       responses:
         '200':
           description: 成功
+  /api/me/resources:
+    get:
+      summary: 获取我的发布资料列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+  /api/me/roadmaps:
+    get:
+      summary: 获取我的路线列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+  /api/me/favorites:
+    get:
+      summary: 获取我的收藏资料列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+  /api/me/notes:
+    get:
+      summary: 获取我的笔记列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+  /api/me/resumes:
+    get:
+      summary: 获取我的简历工作台列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
   /api/auth/avatar:
     post:
       summary: 上传用户头像

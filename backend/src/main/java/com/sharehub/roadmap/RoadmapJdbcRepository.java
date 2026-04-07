@@ -70,6 +70,36 @@ public class RoadmapJdbcRepository {
     return PageResponse.of(records, page, pageSize, total);
   }
 
+  public PageResponse<RoadmapDto> listByOwner(String ownerKey, int page, int pageSize) {
+    int safePage = Math.max(1, page);
+    int safePageSize = Math.max(1, pageSize);
+    long total =
+        Optional.ofNullable(
+                jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ?", Long.class, ownerKey))
+            .orElse(0L);
+    int offset = (safePage - 1) * safePageSize;
+    List<RoadmapDto> records =
+        jdbc.query(
+            """
+                SELECT id, title, description, visibility, status
+                FROM roadmaps
+                WHERE owner_key = ?
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (rs, rowNum) ->
+                new RoadmapDto(
+                    rs.getLong("id"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("visibility"),
+                    rs.getString("status")),
+            ownerKey,
+            safePageSize,
+            offset);
+    return PageResponse.of(records, safePage, safePageSize, total);
+  }
+
   public Optional<RoadmapDto> findById(Long id) {
     List<RoadmapDto> results =
         jdbc.query(

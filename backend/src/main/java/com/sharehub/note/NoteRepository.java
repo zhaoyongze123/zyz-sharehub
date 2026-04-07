@@ -70,6 +70,33 @@ public class NoteRepository {
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
+    public PageResponse<NoteDto> listByOwner(String ownerKey, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notes WHERE owner_key = ?", Long.class, ownerKey);
+        int offset = (safePage - 1) * safePageSize;
+        List<NoteDto> items = jdbcTemplate.query(
+            """
+                SELECT id, title, content_md, visibility, status
+                FROM notes
+                WHERE owner_key = ?
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> mapDto(
+                resultSet.getLong("id"),
+                resultSet.getString("title"),
+                resultSet.getString("content_md"),
+                resultSet.getString("visibility"),
+                resultSet.getString("status")
+            ),
+            ownerKey,
+            safePageSize,
+            offset
+        );
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
+    }
+
     public NoteDto find(Long id) {
         return findOptional(id).orElseThrow(() -> new NotFoundException("NOTE_NOT_FOUND"));
     }
