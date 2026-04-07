@@ -16,6 +16,7 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
+    "@iconify-json/carbon": "^1.2.20",
     "@types/node": "^22.14.1",
     "@unocss/preset-icons": "^66.1.0",
     "@unocss/preset-uno": "^66.1.0",
