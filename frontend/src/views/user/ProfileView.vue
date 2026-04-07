@@ -178,8 +178,11 @@ import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+import { useAppStore } from '@/stores/app'
+
 const router = useRouter()
 const authStore = useAuthStore()
+const appStore = useAppStore()
 
 const currentTab = ref('profile')
 
@@ -230,13 +233,14 @@ const handleSaveProfile = () => {
 
 // 偏好设置相关
 const prefForm = reactive({
-  theme: '跟随系统',
+  theme: appStore.theme,
   notifyCommunity: true,
   notifyEmail: true
 })
 
 const handleSavePreferences = () => {
-  triggerToast('偏好设置已自动保存')
+  appStore.setTheme(prefForm.theme as '跟随系统' | '浅色模式' | '深色模式')
+  triggerToast('偏好设置已自动保存并应用')
 }
 
 // 账号绑定相关
@@ -290,7 +294,7 @@ function handleDeleteAccount() {
   top: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: #10b981;
+  background: var(--app-toast-bg);
   color: white;
   padding: 10px 24px;
   border-radius: 8px;
@@ -311,7 +315,7 @@ function handleDeleteAccount() {
   max-width: 900px;
   height: 80vh;
   min-height: 500px;
-  background: white;
+  background: var(--app-bg-modal);
   border-radius: 16px;
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
   display: flex;
@@ -320,8 +324,8 @@ function handleDeleteAccount() {
 
 .settings-sidebar {
   width: 250px;
-  background: #f9fafb;
-  border-right: 1px solid #e5e7eb;
+  background: var(--app-bg-soft);
+  border-right: 1px solid var(--app-border);
   padding: 20px 12px;
   display: flex;
   flex-direction: column;
@@ -335,22 +339,22 @@ function handleDeleteAccount() {
   background: transparent;
   border: none;
   font-size: 20px;
-  color: #6b7280;
+  color: var(--app-text-muted);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
 }
 
 .close-btn:hover {
-  background: #e5e7eb;
-  color: #111827;
+  background: var(--app-border);
+  color: var(--app-text-main);
 }
 
 .settings-title {
   margin: 40px 0 16px 12px;
   font-size: 16px;
   font-weight: 600;
-  color: #111827;
+  color: var(--app-text-main);
 }
 .user-profile-header {
   display: flex;
@@ -363,7 +367,7 @@ function handleDeleteAccount() {
 .user-avatar-wrapper {
   width: 48px;
   height: 48px;
-  background: white;
+  background: var(--app-bg-modal);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -373,7 +377,7 @@ function handleDeleteAccount() {
 
 .user-avatar-icon {
   font-size: 48px;
-  color: #111827;
+  color: var(--app-text-main);
 }
 
 .user-info {
@@ -384,25 +388,25 @@ function handleDeleteAccount() {
 .user-name {
   font-size: 20px;
   font-weight: 600;
-  color: #111827;
+  color: var(--app-text-main);
   line-height: 1.2;
 }
 
 .user-type {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--app-text-muted);
   margin-top: 4px;
 }
 
 .nav-divider {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--app-border);
   margin: 16px 12px;
 }
 
 .nav-section-title {
   font-size: 16px;
-  color: #374151;
+  color: var(--app-text-sub);
   padding: 0 12px;
   margin-bottom: 8px;
   margin-top: 8px;
@@ -424,19 +428,19 @@ function handleDeleteAccount() {
   text-align: left;
   font-size: 14px;
   font-weight: 500;
-  color: #4b5563;
+  color: var(--app-text-sub);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .nav-tab:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: var(--app-bg-hover);
+  color: var(--app-text-main);
 }
 
 .nav-tab.active {
-  background: #e5e7eb;
-  color: #111827;
+  background: var(--app-border);
+  color: var(--app-text-main);
 }
 
 .tab-icon {
@@ -445,7 +449,7 @@ function handleDeleteAccount() {
 
 .settings-content {
   flex: 1;
-  background: white;
+  background: var(--app-bg-modal);
   position: relative;
 }
 
@@ -460,7 +464,7 @@ function handleDeleteAccount() {
 }
 
 .content-header {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border);
   padding-bottom: 16px;
   margin-bottom: 24px;
 }
@@ -468,14 +472,14 @@ function handleDeleteAccount() {
 .content-header h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
+  color: var(--app-text-main);
   margin: 0;
 }
 
 .setting-block {
-  background: #f9fafb;
+  background: var(--app-bg-soft);
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border);
   margin-bottom: 32px;
 }
 
@@ -486,12 +490,12 @@ function handleDeleteAccount() {
 .setting-header {
   display: flex;
   gap: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .setting-block-icon {
   font-size: 24px;
-  color: #111827;
+  color: var(--app-text-main);
 }
 
 .setting-meta h4 {
@@ -503,12 +507,12 @@ function handleDeleteAccount() {
 .setting-meta p {
   margin: 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--app-text-muted);
   line-height: 1.5;
 }
 
 .setting-action {
-  background: white;
+  background: var(--app-bg-modal);
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
 }
@@ -517,10 +521,10 @@ function handleDeleteAccount() {
   padding: 8px 16px;
   border-radius: 6px;
   border: none;
-  background: #111827;
+  background: var(--app-text-main);
   font-size: 14px;
   font-weight: 500;
-  color: white;
+  color: var(--app-bg-main);
   cursor: pointer;
   transition: opacity 0.2s;
 }
@@ -532,18 +536,18 @@ function handleDeleteAccount() {
 .btn-outline {
   padding: 8px 16px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: white;
+  border: 1px solid var(--app-border-focus);
+  background: var(--app-bg-modal);
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--app-text-sub);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-outline:hover {
-  background: #f9fafb;
-  border-color: #9ca3af;
+  background: var(--app-bg-soft);
+  border-color: var(--app-text-light);
 }
 
 .setting-list {
@@ -556,7 +560,7 @@ function handleDeleteAccount() {
   justify-content: space-between;
   align-items: flex-start;
   padding: 20px 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .avatar-item {
@@ -567,7 +571,7 @@ function handleDeleteAccount() {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--app-border);
   object-fit: cover;
 }
 
@@ -578,14 +582,14 @@ function handleDeleteAccount() {
 .item-info {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--app-text-main);
 }
 
 .item-desc {
   margin: 6px 0 0 0;
   font-size: 13px;
   font-weight: 400;
-  color: #6b7280;
+  color: var(--app-text-muted);
   max-width: 360px;
   line-height: 1.5;
 }
@@ -605,15 +609,18 @@ function handleDeleteAccount() {
   width: 280px;
   height: 38px;
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--app-border-focus);
   border-radius: 6px;
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s;
+
+  background-color: var(--app-bg-modal);
+  color: var(--app-text-main);
 }
 
 .control-input:focus, .control-textarea:focus {
-  border-color: #2563eb;
+  border-color: var(--app-accent);
 }
 
 .control-textarea {
@@ -621,20 +628,23 @@ function handleDeleteAccount() {
   max-width: 400px;
   min-height: 80px;
   padding: 10px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--app-border-focus);
   border-radius: 6px;
   font-size: 14px;
   resize: vertical;
   outline: none;
+
+  background-color: var(--app-bg-modal);
+  color: var(--app-text-main);
 }
 
 .control-select {
   padding: 8px 32px 8px 12px;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background-color: white;
+  border: 1px solid var(--app-border-focus);
+  background-color: var(--app-bg-modal);
   font-size: 14px;
-  color: #111827;
+  color: var(--app-text-main);
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
@@ -646,7 +656,7 @@ function handleDeleteAccount() {
 .save-actions {
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--app-border);
   display: flex;
   justify-content: flex-end;
 }
@@ -658,21 +668,21 @@ function handleDeleteAccount() {
   background: transparent;
   border: none;
   font-size: 14px;
-  color: #111827;
+  color: var(--app-text-main);
   font-weight: 500;
   cursor: pointer;
 }
 
 .text-danger {
-  color: #dc2626 !important;
+  color: var(--app-danger) !important;
 }
 
 .btn-danger {
   padding: 8px 16px;
   border-radius: 6px;
-  border: 1px solid #fee2e2;
-  background: #fef2f2;
-  color: #dc2626;
+  border: 1px solid var(--app-danger-border);
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -680,14 +690,14 @@ function handleDeleteAccount() {
 }
 
 .btn-danger:hover {
-  background: #fee2e2;
+  background: var(--app-danger-border);
 }
 
 .toggle-switch {
   appearance: none;
   width: 44px;
   height: 24px;
-  background: #e5e7eb;
+  background: var(--app-border);
   border-radius: 12px;
   position: relative;
   cursor: pointer;
@@ -696,7 +706,7 @@ function handleDeleteAccount() {
 }
 
 .toggle-switch:checked {
-  background: #10b981;
+  background: var(--app-toast-bg);
 }
 
 .toggle-switch::after {
@@ -706,7 +716,7 @@ function handleDeleteAccount() {
   left: 2px;
   width: 20px;
   height: 20px;
-  background: white;
+  background: var(--app-bg-modal);
   border-radius: 50%;
   transition: transform 0.3s;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -735,7 +745,7 @@ function handleDeleteAccount() {
     width: 100%;
     height: auto;
     border-right: none;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--app-border);
     padding: 16px;
   }
   .settings-title {
