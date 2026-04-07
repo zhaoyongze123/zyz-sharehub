@@ -11,6 +11,13 @@ paths:
       responses:
         '200':
           description: 成功
+  /api/auth/github/callback:
+    get:
+      summary: GitHub OAuth 回调占位说明
+      description: 实际 OAuth 回调由 Spring Security 处理，当前接口仅返回联调提示信息
+      responses:
+        '200':
+          description: 成功
   /api/auth/me:
     get:
       summary: 获取当前用户
@@ -231,7 +238,7 @@ paths:
   /api/auth/avatar:
     post:
       summary: 上传用户头像
-      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；文件为 jpg/png，大小不得超过 5MB
+      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；当前实现仅校验文件非空且大小不超过 5MB
       requestBody:
         required: true
         content:
@@ -246,7 +253,7 @@ paths:
         '200':
           description: 成功
         '400':
-          description: 文件校验失败（格式 / 大小）
+          description: 文件校验失败（当前真实实现仅覆盖空文件、缺失文件名、缺失归属信息、超过大小限制）
           content:
             application/json:
               schema:
@@ -301,6 +308,12 @@ paths:
           description: 成功
         '404':
           description: 资料不存在
+        '410':
+          description: 资料已下架
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: 更新资料
       responses:
@@ -410,21 +423,21 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 笔记不存在
+          description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
     put:
       summary: 更新笔记
       responses:
         '200':
           description: 成功
         '404':
-          description: 笔记不存在
+          description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
     delete:
       summary: 删除笔记
       responses:
         '200':
           description: 成功
         '404':
-          description: 笔记不存在
+          description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
   /api/resumes/generate:
     post:
       summary: 生成简历 PDF
@@ -434,6 +447,7 @@ paths:
   /api/resumes:
     get:
       summary: 获取我的简历分页列表
+      description: 当前实现使用固定 owner=`local-dev-user` 返回数据，暂未接入真实登录态隔离
       parameters:
         - name: page
           in: query
@@ -493,15 +507,40 @@ paths:
                       total:
                         type: integer
                         description: 总记录数
-                      pageNum:
+                      page:
                         type: integer
                       pageSize:
                         type: integer
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            templateKey:
+                              type: string
+                            status:
+                              type: string
+                            fileUrl:
+                              type: string
+                              description: 实际返回下载链接 `/api/resumes/{id}/download`
+                            fileName:
+                              type: string
+                            fileSize:
+                              type: integer
+                            fileCreatedAt:
+                              type: string
+                              format: date-time
+                            fileUpdatedAt:
+                              type: string
+                              format: date-time
                   message:
                     type: string
   /api/resumes/{id}:
     get:
       summary: 获取简历生成记录
+      description: 当前实现使用固定 owner=`local-dev-user` 返回数据，暂未接入真实登录态隔离
       responses:
         '200':
           description: 成功
@@ -509,6 +548,7 @@ paths:
           description: 简历不存在
     delete:
       summary: 删除简历记录
+      description: 当前实现使用固定 owner=`local-dev-user` 返回数据，暂未接入真实登录态隔离
       responses:
         '200':
           description: 成功
@@ -517,6 +557,7 @@ paths:
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF
+      description: 当前实现使用固定 owner=`local-dev-user` 返回数据，暂未接入真实登录态隔离
       responses:
         '200':
           description: 成功
@@ -525,6 +566,7 @@ paths:
   /api/resumes/workbench:
     get:
       summary: 获取我的简历工作台聚合信息
+      description: 当前实现使用固定 owner=`local-dev-user` 返回数据，暂未接入真实登录态隔离
       responses:
         '200':
           description: 成功
@@ -650,14 +692,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 无效登录或权限不足
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -692,14 +728,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或无权限
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -711,14 +741,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或权限不足
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -736,14 +760,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或无权限
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -786,14 +804,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或权限不足
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -811,14 +823,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或权限不足
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -836,14 +842,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或无权限
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
@@ -861,14 +861,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或无权限
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:
