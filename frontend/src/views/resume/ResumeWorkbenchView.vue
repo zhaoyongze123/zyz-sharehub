@@ -3,7 +3,6 @@
     <!-- Header Bar -->
     <header class="h-[60px] bg-white border-b px-6 flex items-center justify-between shrink-0 shadow-sm z-10 w-full">
       <div class="flex items-center gap-4">
-        <h1 class="text-xl font-bold m-0 text-gray-800">简历工作台</h1>
         <div class="text-sm text-gray-500 mt-1 flex items-center gap-2">
           <span>版本:</span>
           <select v-model="currentVersionId" @change="switchVersion" class="border-none bg-gray-50 rounded py-1 px-2 font-medium cursor-pointer shadow-sm">
