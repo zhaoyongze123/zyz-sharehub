@@ -1,168 +1,191 @@
 <template>
-  <div class="resume-wrapper relative bg-white text-dark w-[794px] min-h-[1123px] mx-auto p-[40px] text-[14px] leading-relaxed" 
-       ref="resumeRef">
-    <template v-for="module in modules" :key="module.id">
-      <div v-if="module.visible" 
-           class="module-block mb-6 relative group cursor-pointer hover:bg-blue-50/30 transition-colors rounded p-2 -mx-2 -mt-2"
-           @click="$emit('select-module', module.id)">
-        
-        <div class="absolute left-[-20px] top-4 hidden group-hover:block text-blue-500 opacity-50">✎</div>
-
-        <!-- ======================= 基础信息 ======================= -->
-        <div v-if="module.type === 'basic'" class="flex items-start justify-between border-b-[2px] border-[#333] pb-4 mb-2">
-          <div class="flex-1 text-center pr-[120px]">
-            <h1 class="text-3xl font-bold tracking-[0.2em] mb-4">{{ module.data.name || '姓名' }}</h1>
-            
-            <div class="text-sm text-gray-600 mb-2 flex justify-center items-center flex-wrap" style="gap: 4px 8px;">
-              <template v-for="(val, key) in { intent: '求职意向：'+module.data.intent, city: module.data.city, salary: module.data.salary, availability: module.data.availability }" :key="key">
-                <span v-if="module.data[key] && module.data[`${key}Visible`] !== false">{{ val }}</span>
-                <span class="text-gray-300 last:hidden" v-if="module.data[key] && module.data[`${key}Visible`] !== false">|</span>
-              </template>
+  <div class="resume-physical-page bg-white mx-auto shadow-sm" ref="resumeRef">
+    <div class="resume-wrapper">
+      <div
+        class="resume-content flex flex-col pointer-events-auto"
+        v-for="module in sortedModules"
+        :key="module.id"
+      >
+        <!-- Basic Info Module (Header) -->
+        <div v-if="module.type === 'basic' && module.visible" class="mb-5 pb-5 border-b-2 border-gray-800 flex justify-between relative resume-module-block hover:outline-dashed hover:outline-2 hover:outline-blue-400 group cursor-pointer transition-all" @click.stop="$emit('focus-field', module.id, '')">
+          <div class="flex-1">
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-wider mb-2 flex items-center gap-2">
+              <span v-if="module.data.nameVisible !== false">{{ module.data.name }}</span>
+              <span v-if="module.data.intentVisible !== false" class="text-lg font-medium text-gray-500 tracking-normal ml-3 px-2 border-l-2 border-gray-300">{{ module.data.intent }}</span>
+            </h1>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mt-3 font-medium">
+               <div v-if="module.data.phoneVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_phone')">{{ module.data.phone }}</div>
+               <div v-if="module.data.emailVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_email')">{{ module.data.email }}</div>
+               <div v-if="module.data.ageVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_age')">{{ module.data.age }}岁</div>
+               <div v-if="module.data.genderVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_gender')">{{ module.data.gender }}</div>
+               <div v-if="module.data.currentCityVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_currentCity')">现居{{ module.data.currentCity }}</div>
+               <div v-if="module.data.experienceVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_experience')">{{ module.data.experience }}</div>
             </div>
-            
-            <div class="text-sm text-gray-600 mb-2 flex justify-center items-center flex-wrap" style="gap: 4px 8px;">
-              <template v-for="(val, key) in { age: module.data.age+'岁', gender: module.data.gender, currentCity: module.data.currentCity, experience: module.data.experience }" :key="key">
-                <span v-if="module.data[key] && module.data[`${key}Visible`] !== false">{{ val }}</span>
-                <span class="text-gray-300 last:hidden" v-if="module.data[key] && module.data[`${key}Visible`] !== false">|</span>
-              </template>
-            </div>
-            
-            <div class="text-sm text-gray-600 flex justify-center items-center flex-wrap" style="gap: 4px 8px;">
-              <template v-for="(val, key) in { phone: module.data.phone, email: module.data.email }" :key="key">
-                 <span v-if="module.data[key] && module.data[`${key}Visible`] !== false">{{ val }}</span>
-                 <span class="text-gray-300 last:hidden" v-if="module.data[key] && module.data[`${key}Visible`] !== false">|</span>
-              </template>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mt-1 font-medium">
+               <div v-if="module.data.cityVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_city')">意向城市：{{ module.data.city }}</div>
+               <div v-if="module.data.salaryVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_salary')">期望薪资：{{ module.data.salary }}</div>
+               <div v-if="module.data.availabilityVisible !== false" class="flex items-center hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_basic_availability')">到岗情况：{{ module.data.availability }}</div>
             </div>
           </div>
-          <div v-if="module.data.avatarVisible !== false" class="w-[100px] h-[120px] bg-gray-100 overflow-hidden absolute right-[40px] top-[40px] border border-gray-200">
-            <img v-if="module.data.avatar" :src="module.data.avatar" alt="Avatar" class="w-full h-full object-cover">
-            <div v-else class="w-full h-full flex items-center justify-center text-gray-400 text-sm bg-[#f5f5f5]">照片</div>
+          <!-- Avatar rendering logic with event to focus upload zone -->
+          <div v-if="module.data.avatarVisible !== false && module.data.avatar" class="w-[90px] w-min-[90px] h-[120px] bg-gray-50 border border-gray-200 overflow-hidden shrink-0 shadow-sm p-1" @click.stop="$emit('focus-field', module.id, 'avatarFileInput')">
+             <img :src="module.data.avatar" class="w-full h-full object-cover" />
           </div>
         </div>
 
-        <!-- ======================= 教育背景 ======================= -->
-        <div v-if="module.type === 'education'">
-          <h2 class="text-lg font-bold border-b border-[#666] pb-1 mb-4 flex">{{ module.title }}</h2>
-          <template v-for="(edu, idx) in module.data.items" :key="idx">
-            <div v-if="edu.visible !== false" class="mb-3">
-              <div class="flex justify-between font-bold mb-1">
-                <span>{{ edu.school }}<span v-if="edu.school && edu.major"> - </span>{{ edu.major }}<span v-if="edu.major && edu.degree"> - </span>{{ edu.degree }}</span>
-                <span class="text-gray-600 font-normal">{{ edu.time }}</span>
-              </div>
-              <div class="text-[13px] text-[#444] mb-1 leading-relaxed" v-if="edu.gpa">专业成绩：{{ edu.gpa }}</div>
-              <div class="text-[13px] text-[#444] leading-relaxed" v-if="edu.courses">主修课程：{{ edu.courses }}</div>
-            </div>
-          </template>
-        </div>
-
-        <!-- ======================= 经历类 (工作/项目) ======================= -->
-        <div v-if="module.type === 'experience' || module.type === 'project'">
-          <h2 class="text-lg font-bold border-b border-[#666] pb-1 mb-4">{{ module.title }}</h2>
-          <template v-for="(work, idx) in module.data.items" :key="idx">
-            <div v-if="work.visible !== false" class="mb-4">
-              <div class="flex justify-between font-bold mb-2">
-                <span>{{ work.company }}<span v-if="work.company && work.position"> - </span>{{ work.position }}</span>
-                <span class="text-gray-600 font-normal">{{ work.time }}</span>
-              </div>
-              <ul class="list-disc list-outside pl-4 text-[13px] text-[#444] space-y-[2px]">
-                <li v-for="(desc, idx2) in work.descriptions" :key="idx2" class="pl-1">{{ desc }}</li>
-              </ul>
-            </div>
-          </template>
-        </div>
-
-        <!-- ======================= 技能特长 ======================= -->
-        <div v-if="module.type === 'skills'">
-          <h2 class="text-lg font-bold border-b border-[#666] pb-1 mb-4">{{ module.title }}</h2>
-          <div class="text-[13px] text-[#444] space-y-[4px] mb-6">
-            <div v-if="module.data.languageTextVisible !== false && module.data.languageText"><span class="font-medium">语言能力：</span>{{ module.data.languageText }}</div>
-            <div v-if="module.data.computerTextVisible !== false && module.data.computerText"><span class="font-medium">计算机：</span>{{ module.data.computerText }}</div>
-            <div v-if="module.data.teamTextVisible !== false && module.data.teamText"><span class="font-medium">团队能力：</span>{{ module.data.teamText }}</div>
-          </div>
+        <!-- Generic Template to handle repeatable list sections logic (Education / Experience) -->
+        <div v-if="(module.type === 'education' || module.type === 'experience' || module.type === 'project') && module.visible" class="mb-5 relative resume-module-block hover:outline-dashed hover:outline-2 hover:outline-blue-400 group cursor-pointer transition-all" @click.stop="$emit('focus-field', module.id, '')">
+          <!-- Section Title -->
+          <h2 class="text-base font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3 uppercase tracking-wide flex items-center gap-1.5"><span class="w-1.5 h-4 bg-gray-800 inline-block"></span>{{ module.title }}</h2>
           
-          <!-- 技能条 -->
-          <div class="flex items-end gap-16 px-6 flex-wrap" v-if="module.data.bars && module.data.bars.length > 0">
-             <template v-for="(bar, idx) in module.data.bars" :key="idx">
-               <div v-if="bar.visible !== false" class="flex flex-col items-center">
-                   <div class="text-xs text-gray-500 mb-2">{{ bar.level || '进度' }}</div>
-                   <div class="w-32 h-[2px] bg-gray-200 relative mb-3">
-                     <div class="absolute inset-y-0 left-0 bg-[#333]" :style="{ width: bar.percent + '%' }">
-                        <div class="absolute top-1/2 -mt-[4px] right-[-4px] w-[8px] h-[8px] rounded-full bg-white border-2 border-[#333]"></div>
-                     </div>
+          <div class="space-y-4">
+             <!-- VFor Items inside the section module -->
+             <div v-for="(item, idx) in module.data.items" :key="idx" v-show="item.visible !== false">
+                <!-- Row Headers (Company/School & Title & Time) -->
+                <div class="flex justify-between items-baseline font-bold text-gray-800 text-[14px]">
+                  <div class="flex items-center gap-3">
+                    <span 
+                      v-if="module.type === 'education' ? item.schoolVisible !== false : item.companyVisible !== false"
+                      @click.stop="$emit('focus-field', module.id, `input_${module.type==='education'?'edu':'exp'}_${idx}_${module.type === 'education' ? 'school' : 'company'}`)"
+                      class="hover:bg-yellow-50 px-1 rounded transition-colors cursor-[text]"
+                    >
+                      {{ module.type === 'education' ? item.school : item.company }}
+                    </span>
+                    <span v-if="module.type === 'education' && item.majorVisible !== false" class="text-gray-500 font-medium before:content-[''] before:w-[1px] before:h-[10px] before:bg-gray-300 before:mr-3 before:inline-block hover:bg-yellow-50 px-1 transition-colors rounded cursor-[text]" @click.stop="$emit('focus-field', module.id, `input_edu_${idx}_major`)">
+                      {{ item.major }}
+                    </span>
+                    <span v-if="(module.type === 'experience' || module.type === 'project') && item.positionVisible !== false" class="text-gray-500 font-medium before:content-[''] before:w-[1px] before:h-[10px] before:bg-gray-300 before:mr-3 before:inline-block hover:bg-yellow-50 px-1 transition-colors rounded cursor-[text]" @click.stop="$emit('focus-field', module.id, `input_exp_${idx}_position`)">
+                      {{ item.position }}
+                    </span>
+                  </div>
+                  <div class="text-gray-500 font-medium text-[13px] flex items-center gap-3">
+                     <span v-if="module.type === 'education' && item.degreeVisible !== false" class="hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, `input_edu_${idx}_degree`)">{{ item.degree }}</span>
+                     <span v-if="module.type === 'education' && item.gpaVisible !== false" class="hover:bg-yellow-50 px-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, `input_edu_${idx}_gpa`)">{{ item.gpa }}</span>
+                     <span v-if="item.timeVisible !== false" class="hover:bg-yellow-50 px-1 rounded transition-colors tracking-wide" @click.stop="$emit('focus-field', module.id, `input_${module.type==='education'?'edu':'exp'}_${idx}_time`)">{{ item.time }}</span>
+                  </div>
+                </div>
+                
+                <!-- Expanded Descriptions / Courses underneath the header -->
+                <div class="mt-1.5 text-[13px] text-gray-700 leading-relaxed text-justify space-y-1">
+                   <div v-if="module.type === 'education' && item.coursesVisible !== false" class="hover:bg-yellow-50 p-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, `input_edu_${idx}_courses`)">
+                     主修课程：{{ item.courses }}
                    </div>
-                   <div class="text-[13px] font-medium">{{ bar.name }}</div>
-               </div>
-             </template>
+                   
+                   <template v-if="module.type === 'experience' || module.type === 'project'">
+                     <ul class="list-none space-y-1 mt-1 ">
+                        <template v-for="(desc, dIdx) in item.descriptions" :key="dIdx">
+                          <li v-if="desc.visible !== false" class="pl-1 hover:bg-yellow-50 rounded transition-colors" @click.stop="$emit('focus-field', module.id, `input_exp_${idx}_desc_${dIdx}`)">
+                             {{ desc.text }}
+                          </li>
+                        </template>
+                     </ul>
+                   </template>
+                </div>
+             </div>
           </div>
         </div>
 
-        <!-- ======================= 纯列表型 (如荣誉证书) ======================= -->
-        <div v-if="module.type === 'textList'">
-          <h2 class="text-lg font-bold border-b border-[#666] pb-1 mb-4">{{ module.title }}</h2>
-          <ul class="list-disc list-outside pl-4 text-[13px] text-[#444] space-y-[2px]">
-            <template v-for="(txt, idx) in module.data.items" :key="idx">
-              <li v-if="txt.visible !== false" class="pl-1" :class="txt.visible !== false ? '' : 'hidden'">{{ txt.text || txt }}</li>
+        <!-- Skills Module -->
+        <div v-if="module.type === 'skills' && module.visible" class="mb-5 relative resume-module-block hover:outline-dashed hover:outline-2 hover:outline-blue-400 group cursor-pointer transition-all" @click.stop="$emit('focus-field', module.id, '')">
+          <h2 class="text-base font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3 uppercase tracking-wide flex items-center gap-1.5"><span class="w-1.5 h-4 bg-gray-800 inline-block"></span>{{ module.title }}</h2>
+          <div class="grid grid-cols-2 gap-4 text-[13px] text-gray-700">
+            <!-- text properties -->
+            <div class="col-span-2 space-y-2">
+               <div v-if="module.data.languageTextVisible !== false" class="flex items-start hover:bg-yellow-50 p-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_skills_languageText')"><span class="font-bold w-[70px] shrink-0 text-gray-800">语言能力：</span> <span class="flex-1">{{ module.data.languageText }}</span></div>
+               <div v-if="module.data.computerTextVisible !== false" class="flex items-start hover:bg-yellow-50 p-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_skills_computerText')"><span class="font-bold w-[70px] shrink-0 text-gray-800">IT 技能：</span> <span class="flex-1">{{ module.data.computerText }}</span></div>
+               <div v-if="module.data.teamTextVisible !== false" class="flex items-start hover:bg-yellow-50 p-1 rounded transition-colors" @click.stop="$emit('focus-field', module.id, 'input_skills_teamText')"><span class="font-bold w-[70px] shrink-0 text-gray-800">综合素质：</span> <span class="flex-1">{{ module.data.teamText }}</span></div>
+            </div>
+            
+            <!-- bar properties -->
+            <div 
+              v-for="(bar, idx) in module.data.bars" 
+              :key="idx" 
+              v-show="bar.visible !== false"
+              class="flex flex-col gap-1 pr-4 bg-white hover:bg-yellow-50 p-1 rounded transition-colors"
+              @click.stop="$emit('focus-field', module.id, `input_skills_bar_${idx}_name`)"
+            >
+              <div class="flex justify-between text-xs font-bold text-gray-600">
+                <span>{{ bar.name }} <span class="text-gray-400 font-normal ml-1">({{ bar.level }})</span></span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-1.5 shadow-inner">
+                <div class="bg-gray-800 h-1.5 rounded-full" :style="{ width: `${bar.percent}%` }"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single Paragraph Blob -->
+        <div v-if="module.type === 'text' && module.visible" class="mb-5 relative resume-module-block hover:outline-dashed hover:outline-2 hover:outline-blue-400 group cursor-pointer transition-all" @click.stop="$emit('focus-field', module.id, 'input_text_content')">
+          <h2 class="text-base font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3 uppercase tracking-wide flex items-center gap-1.5"><span class="w-1.5 h-4 bg-gray-800 inline-block"></span>{{ module.title }}</h2>
+          <div class="text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap hover:bg-yellow-50 p-2 rounded transition-colors">
+            {{ module.data.content || '请输入正文' }}
+          </div>
+        </div>
+        
+        <!-- Text List Module -->
+        <div v-if="module.type === 'textList' && module.visible" class="mb-5 relative resume-module-block hover:outline-dashed hover:outline-2 hover:outline-blue-400 group cursor-pointer transition-all" @click.stop="$emit('focus-field', module.id, '')">
+          <h2 class="text-base font-bold text-gray-800 border-b border-gray-300 pb-1 mb-3 uppercase tracking-wide flex items-center gap-1.5"><span class="w-1.5 h-4 bg-gray-800 inline-block"></span>{{ module.title }}</h2>
+          <ul class="list-none text-[13px] text-gray-700 leading-relaxed text-justify space-y-1 ">
+            <template v-for="(item, idx) in module.data.items" :key="idx">
+              <li v-if="item.visible !== false" class="pl-1 hover:bg-yellow-50 rounded p-1 transition-colors" @click.stop="$emit('focus-field', module.id, `input_textlist_${idx}`)">
+                {{ item.text || '...' }}
+              </li>
             </template>
           </ul>
         </div>
 
-        <!-- ======================= 纯文本型 (如自我评价) ======================= -->
-        <div v-if="module.type === 'text'">
-          <h2 class="text-lg font-bold border-b border-[#666] pb-1 mb-4">{{ module.title }}</h2>
-          <p class="text-[13px] text-[#444] leading-relaxed whitespace-pre-wrap">{{ module.data.content }}</p>
-        </div>
-
       </div>
-    </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, defineEmits, ref } from 'vue'
 
 const props = defineProps<{
   modules: any[]
 }>()
 
-defineEmits(['select-module'])
+const emit = defineEmits(['focus-field', 'select-module'])
+
+const sortedModules = computed(() => {
+  return [...props.modules].filter(m => m.visible)
+})
 
 const resumeRef = ref<HTMLElement | null>(null)
-
-defineExpose({
-  resumeRef
-})
+defineExpose({ resumeRef })
 </script>
 
+
+
 <style scoped>
-.resume-wrapper {
-  color: #333;
-  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  box-sizing: border-box;
-  /* A4 Paginated Visual Effect */
+.resume-physical-page {
+  /* Enforce Strict A4 Aspect Ratio sizing -> html2pdf parses precise boundaries */
+  width: 794px;
+  min-height: 1123px;
+  /* Make sure container is white to prevent weird overlap bugs */
+  background-color: white; 
+  /* Visual simulation of multi-page rendering markers strictly spaced to A4 */
   background-image: repeating-linear-gradient(
     to bottom,
-    white,
-    white 1120px,
-    #ddd 1120px,
-    #ddd 1123px
+    transparent,
+    transparent 1122px,
+    #ef4444 1122px, /* Tailwind Red 500 for high visibility outline */
+    #ef4444 1123px
   );
-  background-color: white;
 }
 
-/* Hide CSS page breaks during screen view, but keep standard */
-@media screen {
-  .page-break { display: none; }
+.resume-wrapper {
+  padding: 40px 48px; 
 }
 
-@media print {
-  .resume-wrapper {
-    box-shadow: none;
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    min-height: auto;
-    background-image: none !important;
-  }
+/* Specific class applied ONLY BEFORE PDF GENERATION to hide guidelines */
+.exporting-pdf {
+  min-height: auto; 
+  background-image: none !important;
+}
+.exporting-pdf .resume-module-block:hover {
+  outline: none !important;
+  background-color: transparent !important;
 }
 </style>
