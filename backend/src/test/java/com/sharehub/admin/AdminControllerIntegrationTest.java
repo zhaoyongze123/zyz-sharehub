@@ -82,4 +82,44 @@ public class AdminControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }
+
+    @Test
+    void shouldBlockAndRestoreResource() throws Exception {
+        String createResponse = mvc.perform(post("/api/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"治理资料","type":"PDF","visibility":"PUBLIC"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> payload = mapper.readValue(createResponse, Map.class);
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        Long resourceId = Long.valueOf(String.valueOf(data.get("id")));
+
+        mvc.perform(post("/api/resources/" + resourceId + "/publish"))
+            .andExpect(status().isOk());
+
+        mvc.perform(post("/api/admin/resources/" + resourceId + "/block"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("REMOVED"));
+
+        mvc.perform(get("/api/resources/" + resourceId))
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value("RESOURCE_REMOVED"));
+
+        mvc.perform(get("/api/resources"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[?(@.id==" + resourceId + ")]").isEmpty());
+
+        mvc.perform(post("/api/admin/resources/" + resourceId + "/restore"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mvc.perform(get("/api/resources/" + resourceId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(resourceId.intValue()));
+    }
 }

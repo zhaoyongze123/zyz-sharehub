@@ -29,6 +29,9 @@ public class InteractionRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    private static final String STATUS_VISIBLE = "VISIBLE";
+    private static final String STATUS_HIDDEN = "HIDDEN";
+
     public CommentRecord saveComment(Long resourceId, String content, Long parentId) {
         if (content == null || content.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "COMMENT_CONTENT_REQUIRED");
@@ -59,7 +62,7 @@ public class InteractionRepository {
                 bindLong(statement, 3, parentId);
                 statement.setString(4, DEFAULT_USER_KEY);
                 statement.setString(5, content);
-                statement.setString(6, "VISIBLE");
+            statement.setString(6, STATUS_VISIBLE);
                 statement.setTimestamp(7, Timestamp.from(Instant.now()));
                 return statement;
             },
@@ -96,6 +99,7 @@ public class InteractionRepository {
                 SELECT id, resource_id, note_id, parent_id, content, status
                 FROM comments
                 WHERE resource_id = ?
+                  AND status = 'VISIBLE'
                 ORDER BY created_at ASC, id ASC
                 """,
             (resultSet, rowNum) -> new CommentRecord(
@@ -131,11 +135,19 @@ public class InteractionRepository {
     public InteractionSummaryDto summarizeResource(Long resourceId) {
         return new InteractionSummaryDto(
             resourceId,
-            count("SELECT COUNT(*) FROM comments WHERE resource_id = ?", resourceId),
+            count("SELECT COUNT(*) FROM comments WHERE resource_id = ? AND status = 'VISIBLE'", resourceId),
             count("SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL", resourceId),
             count("SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL", resourceId),
             count("SELECT COUNT(*) FROM reports WHERE target_type = 'RESOURCE' AND target_id = ?", resourceId)
         );
+    }
+
+    public CommentRecord updateCommentStatus(Long commentId, String status) {
+        int affected = jdbcTemplate.update("UPDATE comments SET status = ? WHERE id = ?", status, commentId);
+        if (affected == 0) {
+            throw new NotFoundException("COMMENT_NOT_FOUND");
+        }
+        return findComment(commentId);
     }
 
     public PageResponse<ResourceDto> listFavoriteResources(String userKey, int page, int pageSize) {

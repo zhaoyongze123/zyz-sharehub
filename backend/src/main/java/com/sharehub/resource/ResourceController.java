@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -64,7 +66,7 @@ public class ResourceController {
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, pageSize);
         PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        Page<ResourceEntity> result = repository.findByStatusAndVisibility(status, visibility, pageable);
+        Page<ResourceEntity> result = repository.findVisibleByStatusAndVisibility(status, visibility, pageable);
         return ApiResponse.ok(PageResponse.from(result.map(ResourceEntity::toDto)));
     }
 
@@ -76,6 +78,12 @@ public class ResourceController {
     @GetMapping("/{id}")
     public ApiResponse<ResourceDto> detail(@PathVariable Long id) {
         return repository.findById(id)
+            .map(entity -> {
+                if ("REMOVED".equalsIgnoreCase(entity.getStatus())) {
+                    throw new ResponseStatusException(HttpStatus.GONE, "RESOURCE_REMOVED");
+                }
+                return entity;
+            })
             .map(ResourceEntity::toDto)
             .map(ApiResponse::ok)
             .orElseThrow(() -> new NotFoundException("NOT_FOUND"));

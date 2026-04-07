@@ -72,5 +72,22 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.favorites").value(1))
             .andExpect(jsonPath("$.data.likes").value(1))
             .andExpect(jsonPath("$.data.reports").value(1));
+
+        mvc.perform(post("/api/admin/comments/2/hide"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("HIDDEN"));
+
+        mvc.perform(get("/api/resources/1/comments"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].children", hasSize(0)));
+
+        mvc.perform(get("/api/resources/1/interactions"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.comments").value(1));
+
+        mvc.perform(post("/api/admin/comments/2/restore"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("VISIBLE"));
     }
 }
