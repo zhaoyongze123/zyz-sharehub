@@ -1,0 +1,33 @@
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(29, 111, 220, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 0.875rem rgba(29, 111, 220, 0.1);
+  }
+}
+
+.fade-up-enter-active,
+.fade-up-leave-active {
+  transition: all var(--duration-base) var(--easing-standard);
+}
+
+.fade-up-enter-from,
+.fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(1rem);
+}
