@@ -39,12 +39,13 @@ public class RoadmapJdbcRepository {
             connection -> {
               PreparedStatement statement =
                   connection.prepareStatement(
-                      "INSERT INTO roadmaps (title, description, visibility, status) VALUES (?, ?, ?, ?)",
+                      "INSERT INTO roadmaps (title, description, owner_key, visibility, status) VALUES (?, ?, ?, ?, ?)",
                       new String[] {"id"});
               statement.setString(1, dto.title());
               statement.setString(2, dto.description());
-              statement.setString(3, dto.visibility());
-              statement.setString(4, dto.status());
+              statement.setString(3, DEFAULT_USER_KEY);
+              statement.setString(4, dto.visibility());
+              statement.setString(5, dto.status());
               return statement;
             },
         holder);
@@ -150,6 +151,11 @@ public class RoadmapJdbcRepository {
         (ResultSet rs) -> rs.next() ? deserialize(rs.getString("payload")) : null,
         roadmapId,
         DEFAULT_USER_KEY);
+  }
+
+  public long countByOwner(String ownerKey) {
+    Long count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ?", Long.class, ownerKey);
+    return count == null ? 0L : count;
   }
 
   private void requireRoadmap(Long roadmapId) {

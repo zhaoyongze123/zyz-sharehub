@@ -1,6 +1,7 @@
 package com.sharehub.resume;
 
 import com.sharehub.common.NotFoundException;
+import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -13,10 +14,10 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
-public record ResumePage(List<ResumeDto> items, long total, int page, int size) {}
-
 @Repository
 public class ResumeRepository {
+
+    private static final String DEFAULT_OWNER_KEY = "local-dev-user";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -30,14 +31,15 @@ public class ResumeRepository {
             (PreparedStatementCreator) connection -> {
                 PreparedStatement statement = connection.prepareStatement(
                     """
-                        INSERT INTO resumes (template_key, status, file_id, created_at, updated_at)
-                        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        INSERT INTO resumes (template_key, owner_key, status, file_id, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                     new String[] {"id"}
                 );
                 statement.setString(1, templateKey);
-                statement.setString(2, "GENERATED");
-                statement.setObject(3, fileId);
+                statement.setString(2, DEFAULT_OWNER_KEY);
+                statement.setString(3, "GENERATED");
+                statement.setObject(4, fileId);
                 return statement;
             },
             keyHolder
@@ -45,35 +47,45 @@ public class ResumeRepository {
         return find(keyHolder.getKey().longValue());
     }
 
-    public ResumeDto find(Long id) {
-        return findOptional(id).orElseThrow(() -> new NotFoundException("RESUME_NOT_FOUND"));
-    }
-
-    public ResumePage list(int page, int size) {
-        int currentPage = page < 1 ? 1 : page;
-        int limit = size < 1 ? 10 : size;
-        long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM resumes", Long.class);
-        int offset = (currentPage - 1) * limit;
-
+    public PageResponse<ResumeDto> list(String ownerKey, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM resumes WHERE owner_key = ?", Long.class, ownerKey);
+        int offset = (safePage - 1) * safePageSize;
         List<ResumeDto> items = jdbcTemplate.query(
             """
                 SELECT id, template_key, status, file_id
                 FROM resumes
-                ORDER BY created_at DESC
+                WHERE owner_key = ?
+                ORDER BY id DESC
                 LIMIT ? OFFSET ?
                 """,
             (resultSet, rowNum) -> mapResume(resultSet),
-            limit,
+            ownerKey,
+            safePageSize,
             offset
         );
-
-        return new ResumePage(items, total, currentPage, limit);
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
-    public Optional<UUID> delete(Long id) {
-        ResumeDto existing = find(id);
-        jdbcTemplate.update("DELETE FROM resumes WHERE id = ?", id);
-        return Optional.ofNullable(existing.fileId());
+    public ResumeDto find(Long id) {
+        return findOptional(id).orElseThrow(() -> new NotFoundException("RESUME_NOT_FOUND"));
+    }
+
+    public ResumeDto findOwned(Long id, String ownerKey) {
+        return findOptionalOwned(id, ownerKey).orElseThrow(() -> new NotFoundException("RESUME_NOT_FOUND"));
+    }
+
+    public void delete(Long id, String ownerKey) {
+        int affected = jdbcTemplate.update("DELETE FROM resumes WHERE id = ? AND owner_key = ?", id, ownerKey);
+        if (affected == 0) {
+            throw new NotFoundException("RESUME_NOT_FOUND");
+        }
+    }
+
+    public long countByOwner(String ownerKey) {
+        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM resumes WHERE owner_key = ?", Long.class, ownerKey);
+        return count == null ? 0L : count;
     }
 
     private Optional<ResumeDto> findOptional(Long id) {
@@ -85,6 +97,20 @@ public class ResumeRepository {
                 """,
             (resultSet, rowNum) -> mapResume(resultSet),
             id
+        );
+        return results.stream().findFirst();
+    }
+
+    private Optional<ResumeDto> findOptionalOwned(Long id, String ownerKey) {
+        List<ResumeDto> results = jdbcTemplate.query(
+            """
+                SELECT id, template_key, status, file_id
+                FROM resumes
+                WHERE id = ? AND owner_key = ?
+                """,
+            (resultSet, rowNum) -> mapResume(resultSet),
+            id,
+            ownerKey
         );
         return results.stream().findFirst();
     }

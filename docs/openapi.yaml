@@ -209,7 +209,7 @@ paths:
           description: 成功
   /api/resumes:
     get:
-      summary: 简历列表（分页）
+      summary: 获取我的简历分页列表
       parameters:
         - name: page
           in: query
@@ -217,7 +217,7 @@ paths:
             type: integer
             minimum: 1
             default: 1
-        - name: size
+        - name: pageSize
           in: query
           schema:
             type: integer
@@ -235,10 +235,12 @@ paths:
         '404':
           description: 简历不存在
     delete:
-      summary: 删除简历及关联 PDF
+      summary: 删除简历记录
       responses:
         '200':
           description: 成功
+        '404':
+          description: 简历不存在
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF

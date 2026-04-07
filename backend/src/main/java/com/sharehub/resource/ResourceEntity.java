@@ -29,6 +29,9 @@ public class ResourceEntity {
 
     private String objectKey;
 
+    @Column(nullable = false)
+    private String ownerKey = "local-dev-user";
+
     private String visibility;
 
     private String status;
@@ -94,6 +97,14 @@ public class ResourceEntity {
 
     public void setObjectKey(String objectKey) {
         this.objectKey = objectKey;
+    }
+
+    public String getOwnerKey() {
+        return ownerKey;
+    }
+
+    public void setOwnerKey(String ownerKey) {
+        this.ownerKey = ownerKey;
     }
 
     public String getVisibility() {

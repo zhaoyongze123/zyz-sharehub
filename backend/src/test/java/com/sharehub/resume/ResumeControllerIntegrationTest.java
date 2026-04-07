@@ -2,11 +2,13 @@ package com.sharehub.resume;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,6 +29,15 @@ class ResumeControllerIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void cleanUp() {
+        jdbcTemplate.update("DELETE FROM resumes");
+        jdbcTemplate.update("DELETE FROM files");
+    }
 
     @Test
     void shouldGenerateDetailAndDownloadResume() throws Exception {
@@ -70,7 +81,7 @@ class ResumeControllerIntegrationTest {
         mockMvc.perform(get("/api/resumes"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
-            .andExpect(jsonPath("$.data.items[0].id").value(id));
+            .andExpect(jsonPath("$.data.items[0].id").value(id.intValue()));
 
         mockMvc.perform(delete("/api/resumes/" + id))
             .andExpect(status().isOk())

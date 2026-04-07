@@ -14,6 +14,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class NoteRepository {
 
+    private static final String DEFAULT_OWNER_KEY = "local-dev-user";
+
     private final JdbcTemplate jdbcTemplate;
 
     public NoteRepository(JdbcTemplate jdbcTemplate) {
@@ -26,15 +28,16 @@ public class NoteRepository {
             (PreparedStatementCreator) connection -> {
                 PreparedStatement statement = connection.prepareStatement(
                     """
-                        INSERT INTO notes (title, content_md, visibility, status, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        INSERT INTO notes (title, content_md, owner_key, visibility, status, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                     new String[] {"id"}
                 );
                 statement.setString(1, note.title());
                 statement.setString(2, note.contentMd());
-                statement.setString(3, nullable(note.visibility()));
-                statement.setString(4, defaultStatus(note.status()));
+                statement.setString(3, DEFAULT_OWNER_KEY);
+                statement.setString(4, nullable(note.visibility()));
+                statement.setString(5, defaultStatus(note.status()));
                 return statement;
             },
             keyHolder
@@ -93,6 +96,11 @@ public class NoteRepository {
         if (affected == 0) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
+    }
+
+    public long countByOwner(String ownerKey) {
+        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notes WHERE owner_key = ?", Long.class, ownerKey);
+        return count == null ? 0L : count;
     }
 
     private Optional<NoteDto> findOptional(Long id) {

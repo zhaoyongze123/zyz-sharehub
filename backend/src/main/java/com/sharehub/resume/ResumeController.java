@@ -2,10 +2,14 @@ package com.sharehub.resume;
 
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.NotFoundException;
+import com.sharehub.common.PageResponse;
 import com.sharehub.files.FileCategory;
 import com.sharehub.files.FileRecord;
+import com.sharehub.files.FileRepository;
 import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
+import java.util.Map;
+import java.util.Optional;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,30 +21,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-import java.util.Optional;
-
 @RestController
 @RequestMapping("/api/resumes")
 public class ResumeController {
 
     private final ResumeRepository resumeRepository;
     private final FileStorageService fileStorageService;
+    private final FileRepository fileRepository;
 
-    public ResumeController(ResumeRepository resumeRepository, FileStorageService fileStorageService) {
+    public ResumeController(ResumeRepository resumeRepository, FileStorageService fileStorageService, FileRepository fileRepository) {
         this.resumeRepository = resumeRepository;
         this.fileStorageService = fileStorageService;
-    }
-
-    @DeleteMapping("/{id}")
-    public ApiResponse<String> delete(@PathVariable Long id) {
-        resumeRepository.delete(id).ifPresent(fileStorageService::delete);
-        return ApiResponse.ok("DELETED");
-    }
-
-    @GetMapping
-    public ApiResponse<ResumePage> list(@RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.ok(resumeRepository.list(page, size));
+        this.fileRepository = fileRepository;
     }
 
     @PostMapping("/generate")
@@ -56,18 +48,35 @@ public class ResumeController {
             MediaType.APPLICATION_PDF_VALUE,
             pdfBytes
         );
-        ResumeDto saved = resumeRepository.create(templateKey, storedFile.id());
-        return ApiResponse.ok(saved);
+        return ApiResponse.ok(resumeRepository.create(templateKey, storedFile.id()));
+    }
+
+    @GetMapping
+    public ApiResponse<PageResponse<ResumeDto>> list(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int pageSize
+    ) {
+        return ApiResponse.ok(resumeRepository.list("local-dev-user", page, pageSize));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<ResumeDto> detail(@PathVariable Long id) {
-        return ApiResponse.ok(resumeRepository.find(id));
+        return ApiResponse.ok(resumeRepository.findOwned(id, "local-dev-user"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> delete(@PathVariable Long id) {
+        ResumeDto resume = resumeRepository.findOwned(id, "local-dev-user");
+        if (resume.fileId() != null) {
+            fileRepository.deleteById(resume.fileId());
+        }
+        resumeRepository.delete(id, "local-dev-user");
+        return ApiResponse.ok("DELETED");
     }
 
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
-        ResumeDto resume = resumeRepository.find(id);
+        ResumeDto resume = resumeRepository.findOwned(id, "local-dev-user");
         if (resume.fileId() == null) {
             throw new NotFoundException("RESUME_FILE_NOT_FOUND");
         }

@@ -22,6 +22,7 @@ public class SecurityConfig {
                     "/api/auth/**",
                     "/api/comments/**",
                     "/api/files/**",
+                    "/api/me/**",
                     "/api/reports",
                     "/api/resources/**",
                     "/api/roadmaps/**",

@@ -47,6 +47,7 @@ public class ResourceController {
         entity.setTags(req.tags());
         entity.setExternalUrl(req.externalUrl());
         entity.setObjectKey(req.objectKey());
+        entity.setOwnerKey("local-dev-user");
         entity.setVisibility(req.visibility());
         entity.setStatus("DRAFT");
         return ApiResponse.ok(repository.save(entity).toDto());
