@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理台 - ShareBase</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./_common.css">
+</head>
+<body class="app-page">
+  <nav class="app-navbar">
+    <div class="container app-navbar-inner">
+      <a class="app-brand" href="../index.html">ShareBase</a>
+      <div class="app-nav">
+        <a class="app-nav-link" href="resources.html">资源</a>
+        <a class="app-nav-link" href="roadmaps.html">路线</a>
+        <a class="app-nav-link" href="notes.html">笔记</a>
+        <a class="app-nav-link" href="publish.html">发布</a>
+        <a class="app-nav-link" href="resume.html">简历</a>
+        <a class="app-nav-link" href="me.html">我的</a>
+        <a class="app-nav-link is-active" href="admin.html">管理</a>
+      </div>
+      <div class="app-actions">
+        <a class="btn btn-secondary" href="me.html">返回我的</a>
+        <a class="btn btn-primary" href="../login.html">登录</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container app-main animate-fade-in-up">
+    <section class="glass-card app-hero">
+      <span class="app-kicker">Admin</span>
+      <h1 class="app-title">内容审核与权限管理</h1>
+      <p class="app-subtitle">处理发布审核、路由故障和成员权限请求。</p>
+      <div class="app-actions">
+        <button class="btn btn-primary" data-toast="已刷新审核队列">刷新队列</button>
+        <button class="btn btn-secondary" data-toast="已导出审核报告">导出报告</button>
+      </div>
+    </section>
+
+    <section class="app-grid">
+      <article class="app-col-8 glass-card app-panel">
+        <h2 class="app-panel-title">审核列表</h2>
+        <p class="app-panel-subtitle">切换不同队列进行处理</p>
+
+        <div class="app-tabs">
+          <button class="app-tab-btn is-active" data-tab-trigger data-tab-group="admin-tabs" data-tab-key="pending">待审核</button>
+          <button class="app-tab-btn" data-tab-trigger data-tab-group="admin-tabs" data-tab-key="approved">已通过</button>
+          <button class="app-tab-btn" data-tab-trigger data-tab-group="admin-tabs" data-tab-key="rejected">已驳回</button>
+        </div>
+
+        <div class="app-tab-panel is-active" data-tab-panel data-tab-group="admin-tabs" data-tab-key="pending">
+          <table class="app-table">
+            <thead><tr><th>标题</th><th>类型</th><th>作者</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Agent 工程师 30 天路线</td>
+                <td>路线</td>
+                <td>Alex</td>
+                <td>
+                  <button class="btn btn-secondary" data-toast="已通过审核">通过</button>
+                  <button class="btn btn-secondary" data-toast="已驳回该内容" data-toast-type="error">驳回</button>
+                </td>
+              </tr>
+              <tr>
+                <td>MCP 鉴权接入踩坑记录</td>
+                <td>笔记</td>
+                <td>Mina</td>
+                <td>
+                  <button class="btn btn-secondary" data-toast="已通过审核">通过</button>
+                  <button class="btn btn-secondary" data-toast="已驳回该内容" data-toast-type="error">驳回</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="app-tab-panel" data-tab-panel data-tab-group="admin-tabs" data-tab-key="approved">
+          <ul class="app-list">
+            <li class="app-list-item"><span>RAG 评测体系复盘</span><span class="app-pill">已通过</span></li>
+            <li class="app-list-item"><span>多 Agent 调度实践清单</span><span class="app-pill">已通过</span></li>
+          </ul>
+        </div>
+
+        <div class="app-tab-panel" data-tab-panel data-tab-group="admin-tabs" data-tab-key="rejected">
+          <ul class="app-list">
+            <li class="app-list-item"><span>Prompt 入门（外链失效）</span><span class="app-pill">已驳回</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <aside class="app-col-4 glass-card app-panel">
+        <h2 class="app-panel-title">管理状态</h2>
+        <p class="app-panel-subtitle">重点用于无权限状态联调</p>
+        <div class="status-controls">
+          <button class="status-btn" data-status-target="admin-status" data-status-value="loading">加载中</button>
+          <button class="status-btn" data-status-target="admin-status" data-status-value="empty">空队列</button>
+          <button class="status-btn" data-status-target="admin-status" data-status-value="error">错误</button>
+          <button class="status-btn" data-status-target="admin-status" data-status-value="no-access">无权限</button>
+        </div>
+
+        <div id="admin-status" data-status-group data-status-default="no-access">
+          <div class="status-item" data-status="loading">
+            <h3 class="status-title">审核队列加载中</h3>
+            <p class="status-text">正在同步全量内容。</p>
+          </div>
+          <div class="status-item" data-status="empty">
+            <h3 class="status-title">当前无待处理项</h3>
+            <p class="status-text">审核队列已清空。</p>
+          </div>
+          <div class="status-item" data-status="error">
+            <h3 class="status-title">管理接口异常</h3>
+            <p class="status-text">请稍后重试。</p>
+            <div class="status-actions"><button class="btn btn-secondary" data-toast="已重新请求管理接口">重试</button></div>
+          </div>
+          <div class="status-item" data-status="no-access">
+            <h3 class="status-title">你不是管理员</h3>
+            <p class="status-text">当前账号无管理权限。</p>
+            <div class="status-actions"><a class="btn btn-secondary" href="../login.html">切换管理员账号</a></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="app-footer">© 2026 ShareBase · 管理台</footer>
+  </main>
+
+  <script src="../assets/pages.js"></script>
+</body>
+</html>
