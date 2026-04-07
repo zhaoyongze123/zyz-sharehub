@@ -32,16 +32,23 @@ public class AdminController {
     }
 
     @GetMapping("/reports")
-    public ApiResponse<List<InteractionRepository.ReportRecord>> reports() {
-        return ApiResponse.ok(interactionRepository.listReports());
+    public ApiResponse<PageResponse<InteractionRepository.ReportRecord>> reports(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int pageSize,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String targetType
+    ) {
+        return ApiResponse.ok(interactionRepository.findReports(page, pageSize, status, targetType));
     }
 
     @GetMapping("/audit-logs")
     public ApiResponse<PageResponse<AdminAuditLogDto>> auditLogs(
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "20") int pageSize
+        @RequestParam(defaultValue = "20") int pageSize,
+        @RequestParam(required = false) String action,
+        @RequestParam(required = false) String targetType
     ) {
-        return ApiResponse.ok(interactionRepository.listAuditLogs(page, pageSize));
+        return ApiResponse.ok(interactionRepository.listAuditLogs(page, pageSize, action, targetType));
     }
 
     @PostMapping("/reports/{id}/resolve")

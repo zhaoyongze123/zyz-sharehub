@@ -27,6 +27,7 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(get("/api/auth/me"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.code").value("OK"))
             .andExpect(jsonPath("$.data.login").value("local-dev-user"))
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }

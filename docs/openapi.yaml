@@ -574,12 +574,58 @@ paths:
   /api/admin/reports:
     get:
       summary: 举报列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: 页码
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: 分页大小
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: 按举报状态筛选（OPEN / RESOLVED）
+        - name: targetType
+          in: query
+          schema:
+            type: string
+          description: 按目标类型筛选（如 RESOURCE）
       responses:
         '200':
           description: 成功
   /api/admin/audit-logs:
     get:
       summary: 操作审计日志列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: 页码
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: 分页大小
+        - name: action
+          in: query
+          schema:
+            type: string
+          description: 单个操作类型（如 BLOCK_RESOURCE）
+        - name: targetType
+          in: query
+          schema:
+            type: string
+          description: 目标类型筛选（如 RESOURCE / COMMENT）
       responses:
         '200':
           description: 成功
@@ -591,6 +637,10 @@ paths:
           description: 成功
         '404':
           description: 举报不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/resources/{id}/block:
     post:
       summary: 下架资料
@@ -599,6 +649,10 @@ paths:
           description: 成功
         '404':
           description: 资料不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/resources/{id}/restore:
     post:
       summary: 恢复资料
@@ -607,6 +661,10 @@ paths:
           description: 成功
         '404':
           description: 资料不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/users/{id}/ban:
     post:
       summary: 封禁用户
@@ -615,6 +673,10 @@ paths:
           description: 成功
         '404':
           description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/users/{id}/unban:
     post:
       summary: 解封用户
@@ -623,6 +685,10 @@ paths:
           description: 成功
         '404':
           description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/comments/{id}/hide:
     post:
       summary: 隐藏评论
@@ -631,6 +697,10 @@ paths:
           description: 成功
         '404':
           description: 评论不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/comments/{id}/restore:
     post:
       summary: 恢复评论
@@ -639,3 +709,22 @@ paths:
           description: 成功
         '404':
           description: 评论不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        code:
+          type: string
+          description: 业务错误码，便于前端区分类型
+        message:
+          type: string
+          description: 出错提示

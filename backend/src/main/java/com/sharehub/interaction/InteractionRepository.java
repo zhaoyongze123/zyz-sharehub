@@ -265,15 +265,42 @@ public class InteractionRepository {
         return findReport(keyHolder.getKey().longValue());
     }
 
-    public List<ReportRecord> listReports() {
-        return jdbcTemplate.query(
+    public PageResponse<ReportRecord> listReports() {
+        return findReports(1, 20, null, null);
+    }
+
+    public PageResponse<ReportRecord> findReports(int page, int pageSize, String statusFilter, String targetTypeFilter) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, pageSize);
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        if (statusFilter != null && !statusFilter.isBlank()) {
+            where.append(" AND status = ?");
+            params.add(statusFilter);
+        }
+        if (targetTypeFilter != null && !targetTypeFilter.isBlank()) {
+            where.append(" AND target_type = ?");
+            params.add(targetTypeFilter);
+        }
+        String countSql = "SELECT COUNT(*) FROM reports" + where;
+        Long total = jdbcTemplate.queryForObject(countSql, Long.class, params.toArray());
+        int offset = (safePage - 1) * safeSize;
+        StringBuilder query = new StringBuilder(
             """
                 SELECT id, target_type, target_id, reporter_key, reason, status
                 FROM reports
-                ORDER BY id DESC
-                """,
-            (resultSet, rowNum) -> mapReport(resultSet)
+                """
         );
+        query.append(where);
+        query.append(" ORDER BY id DESC LIMIT ? OFFSET ?");
+        params.add(safeSize);
+        params.add(offset);
+        List<ReportRecord> items = jdbcTemplate.query(
+            query.toString(),
+            (resultSet, rowNum) -> mapReport(resultSet),
+            params.toArray()
+        );
+        return PageResponse.of(items, safePage, safeSize, total == null ? 0L : total);
     }
 
     public ReportRecord resolveReport(Long id) {
@@ -310,18 +337,34 @@ public class InteractionRepository {
         );
     }
 
-    public PageResponse<AdminAuditLogDto> listAuditLogs(int page, int pageSize) {
+    public PageResponse<AdminAuditLogDto> listAuditLogs(int page, int pageSize, String actionFilter, String targetTypeFilter) {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM admin_audit_logs", Long.class);
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        if (actionFilter != null && !actionFilter.isBlank()) {
+            where.append(" AND action = ?");
+            params.add(actionFilter);
+        }
+        if (targetTypeFilter != null && !targetTypeFilter.isBlank()) {
+            where.append(" AND target_type = ?");
+            params.add(targetTypeFilter);
+        }
+        String countSql = "SELECT COUNT(*) FROM admin_audit_logs" + where;
+        Long total = jdbcTemplate.queryForObject(countSql, Long.class, params.toArray());
         int offset = (safePage - 1) * safePageSize;
-        List<AdminAuditLogDto> items = jdbcTemplate.query(
+        StringBuilder query = new StringBuilder(
             """
                 SELECT id, action, target_type, target_id, operator_key, details, created_at
                 FROM admin_audit_logs
-                ORDER BY id DESC
-                LIMIT ? OFFSET ?
-                """,
+                """
+        );
+        query.append(where);
+        query.append(" ORDER BY id DESC LIMIT ? OFFSET ?");
+        params.add(safePageSize);
+        params.add(offset);
+        List<AdminAuditLogDto> items = jdbcTemplate.query(
+            query.toString(),
             (resultSet, rowNum) -> new AdminAuditLogDto(
                 resultSet.getLong("id"),
                 resultSet.getString("action"),
@@ -331,8 +374,7 @@ public class InteractionRepository {
                 resultSet.getString("details"),
                 resultSet.getTimestamp("created_at").toInstant()
             ),
-            safePageSize,
-            offset
+            params.toArray()
         );
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
