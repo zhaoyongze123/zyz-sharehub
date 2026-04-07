@@ -138,6 +138,32 @@ export const useLocalNoteStore = defineStore('localNote', {
         if (this.autoSave) this.saveToDb()
       }
     },
+    reorderNote(draggedId: string, targetId: string, targetFolderId: string | null) {
+      if (draggedId === targetId && targetId) return
+      
+      const draggedIndex = this.notes.findIndex(n => n.id === draggedId)
+      if (draggedIndex === -1) return
+      
+      const draggedNote = this.notes[draggedIndex]
+      // 移动到新文件夹
+      if (draggedNote.folderId !== targetFolderId) {
+        draggedNote.folderId = targetFolderId
+      }
+      
+      // 调整顺序
+      this.notes.splice(draggedIndex, 1)
+      let insertIndex = this.notes.length
+      
+      if (targetId) {
+        const tIndex = this.notes.findIndex(n => n.id === targetId)
+        if (tIndex !== -1) {
+          insertIndex = tIndex
+        }
+      }
+      
+      this.notes.splice(insertIndex, 0, draggedNote)
+      if (this.autoSave) this.saveToDb()
+    },
     deleteNote(id: string) {
       this.notes = this.notes.filter(n => n.id !== id)
       if (this.activeNoteId === id) this.activeNoteId = null

@@ -26,18 +26,18 @@
       <nav class="app-ribbon">
         <div class="ribbon-top">
           <button class="ribbon-btn" :class="{active: viewMode === 'files'}" @click="viewMode = 'files'" title="文件树视图">
-            <div class="i-carbon-folder"></div>
+            <div class="i-carbon-folder text-xl inline-block flex-shrink-0"></div>
           </button>
           <button class="ribbon-btn" :class="{active: viewMode === 'search'}" @click="viewMode = 'search'" title="全文搜索">
-            <div class="i-carbon-search"></div>
+            <div class="i-carbon-search text-xl inline-block flex-shrink-0"></div>
           </button>
           <button class="ribbon-btn" :class="{active: viewMode === 'tags'}" @click="viewMode = 'tags'" title="标签筛选">
-            <div class="i-carbon-tag"></div>
+            <div class="i-carbon-tag text-xl inline-block flex-shrink-0"></div>
           </button>
         </div>
         <div class="ribbon-bottom">
           <button class="ribbon-btn" title="本地库设置" @click="$router.push('/notes/settings')">
-            <div class="i-carbon-settings"></div>
+            <div class="i-carbon-settings text-xl inline-block flex-shrink-0"></div>
           </button>
         </div>
       </nav>
@@ -69,7 +69,13 @@
                 class="tree-folder"
               >
                 <!-- 文件夹节点 -->
-                <div class="folder-title" @click="toggleFolder(folder.id)">
+                <div class="folder-title" @click="toggleFolder(folder.id)"
+                  @dragover.prevent
+                  @drop="onDropFolder($event, folder.id)"
+                  :class="{ 'drag-over': dragTargetFolder === folder.id }"
+                  @dragenter.prevent="dragTargetFolder = folder.id"
+                  @dragleave="dragTargetFolder = null"
+                >
                   <div class="i-carbon-chevron-down outline-chevron transition-transform duration-200" :class="{ '-rotate-90': collapsedFolders.includes(folder.id) }"></div>
                   <div class="i-carbon-folder mr-1.5 opacity-70"></div>
                   <span class="name">{{ folder.name }}</span>
@@ -83,8 +89,14 @@
                     v-for="note in getNotesByFolder(folder.id)" 
                     :key="note.id" 
                     class="tree-note"
-                    :class="{ active: store.activeNoteId === note.id }"
+                    :class="{ active: store.activeNoteId === note.id, 'drag-over-note': dragTargetNote === note.id }"
                     @click="openNote(note.id)"
+                    draggable="true"
+                    @dragstart="onDragStart($event, note.id)"
+                    @dragover.prevent
+                    @drop.stop="onDropNote($event, note.id, folder.id)"
+                    @dragenter.prevent="dragTargetNote = note.id"
+                    @dragleave="dragTargetNote = null"
                   >
                     <div class="i-carbon-document text-xs opacity-50"></div>
                     <span class="name">{{ note.title || '未命名笔记' }}</span>
@@ -96,13 +108,25 @@
               </div>
               
               <!-- 根目录下的独立笔记列表 -->
-              <div class="folder-items no-indent pt-1">
+              <div class="folder-items no-indent pt-1"
+                @dragover.prevent
+                @drop="onDropFolder($event, null)"
+                :class="{ 'drag-over': dragTargetFolder === null }"
+                @dragenter.prevent="dragTargetFolder = null"
+                @dragleave="dragTargetFolder = 'leave'"
+              >
                  <div 
                     v-for="note in getNotesByFolder(null)" 
                     :key="note.id" 
                     class="tree-note"
-                    :class="{ active: store.activeNoteId === note.id }"
+                    :class="{ active: store.activeNoteId === note.id, 'drag-over-note': dragTargetNote === note.id }"
                     @click="openNote(note.id)"
+                    draggable="true"
+                    @dragstart="onDragStart($event, note.id)"
+                    @dragover.prevent
+                    @drop.stop="onDropNote($event, note.id, null)"
+                    @dragenter.prevent="dragTargetNote = note.id"
+                    @dragleave="dragTargetNote = null"
                   >
                     <div class="i-carbon-document text-xs opacity-50"></div>
                     <span class="name">{{ note.title || '未命名笔记' }}</span>
@@ -177,8 +201,11 @@
               <div v-else-if="saveStatus === 'saved'" class="status success"><div class="i-carbon-checkmark"></div> 已保存</div>
               <div v-else-if="saveStatus === 'error'" class="status error"><div class="i-carbon-warning"></div> 存储失败</div>
             </div>
+            <button class="toggle-sidebar-btn ml-auto hover:text-red-500 mr-2" @click="deleteNote(activeNote.id)" title="删除当前笔记">
+              <div class="i-carbon-trash-can"></div>
+            </button>
             <!-- 编辑/阅读模式切换 -->
-            <div class="mode-toggle bg-gray-100 p-1 flex rounded-md ml-auto mr-4 text-sm font-medium">
+            <div class="mode-toggle bg-gray-100 p-1 flex rounded-md mr-4 text-sm font-medium">
               <button 
                 class="px-2 py-1 rounded flex items-center transition-colors outline-none"
                 :class="editMode === 'edit' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500 hover:text-gray-700'"
@@ -329,6 +356,39 @@ const notesByTag = computed(() => {
   if (!activeFilterTag.value) return []
   return store.notes.filter(n => n.tags && n.tags.includes(activeFilterTag.value!))
 })
+
+// 拖拽相关状态
+const draggedNoteId = ref<string | null>(null)
+const dragTargetFolder = ref<string | null | 'leave'>(null)
+const dragTargetNote = ref<string | null>(null)
+
+const onDragStart = (e: DragEvent, id: string) => {
+  draggedNoteId.value = id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+}
+
+const onDropFolder = (e: DragEvent, folderId: string | null) => {
+  dragTargetFolder.value = null
+  if (!draggedNoteId.value) return
+  // 如果直接放置在文件夹上，我们把它移到该文件夹的最后
+  store.reorderNote(draggedNoteId.value, '', folderId)
+  draggedNoteId.value = null
+}
+
+const onDropNote = (e: DragEvent, targetNoteId: string, folderId: string | null) => {
+  dragTargetNote.value = null
+  if (!draggedNoteId.value) return
+  
+  if (draggedNoteId.value !== targetNoteId) {
+    store.reorderNote(draggedNoteId.value, targetNoteId, folderId)
+  }
+  
+  draggedNoteId.value = null
+}
+
 
 // 新建按钮
 const createNewNote = () => {
@@ -509,8 +569,11 @@ const outline = computed(() => {
 .tree-folder { display: flex; flex-direction: column; margin-bottom: 2px; }
 .folder-title {
   display: flex; align-items: center; padding: 4px 16px; font-size: 13px; font-weight: 500;
-  color: #4b5563; cursor: pointer; border-radius: 4px; margin: 0 8px;
+  color: #4b5563; cursor: pointer; border-radius: 4px; margin: 0 8px; transition: background 0.2s;
 }
+.folder-title.drag-over { background-color: #e0e7ff; outline: 1px dashed #8b5cf6; }
+.folder-items.no-indent.drag-over { background-color: #f5f3ff; min-height: 20px; }
+.tree-note.drag-over-note { border-top: 2px solid #8b5cf6; }
 .folder-title:hover { background-color: #f3f4f6; color: #111827; }
 .outline-chevron { font-size: 14px; margin-right: 4px; opacity: 0.6; }
 .folder-items { padding-left: 18px; display: flex; flex-direction: column; }
