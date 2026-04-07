@@ -138,6 +138,48 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            templateKey:
+                              type: string
+                            status:
+                              type: string
+                            fileUrl:
+                              type: string
+                            fileName:
+                              type: string
+                            fileSize:
+                              type: integer
+                            fileCreatedAt:
+                              type: string
+                              format: date-time
+                            fileUpdatedAt:
+                              type: string
+                              format: date-time
+                      total:
+                        type: integer
+                      pageNum:
+                        type: integer
+                      pageSize:
+                        type: integer
+                  message:
+                    type: string
   /api/auth/avatar:
     post:
       summary: 上传用户头像
@@ -353,6 +395,41 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            templateKey:
+                              type: string
+                            status:
+                              type: string
+                              description: 当前生成状态，如 PUBLISHED、GENERATED
+                            fileUrl:
+                              type: string
+                              description: 下载链接（当前返回 placeholder）
+                      total:
+                        type: integer
+                        description: 总记录数
+                      pageNum:
+                        type: integer
+                      pageSize:
+                        type: integer
+                  message:
+                    type: string
   /api/resumes/{id}:
     get:
       summary: 获取简历生成记录
@@ -376,6 +453,51 @@ paths:
           description: 成功
         '404':
           description: 简历或文件不存在
+  /api/resumes/workbench:
+    get:
+      summary: 获取我的简历工作台聚合信息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      generatedCount:
+                        type: integer
+                      templateBreakdown:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            templateKey:
+                              type: string
+                            count:
+                              type: integer
+                      recentItems:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            templateKey:
+                              type: string
+                            status:
+                              type: string
+                            fileUrl:
+                              type: string
+                  message:
+                    type: string
   /api/resources/{id}/comments:
     get:
       summary: 获取资源评论树

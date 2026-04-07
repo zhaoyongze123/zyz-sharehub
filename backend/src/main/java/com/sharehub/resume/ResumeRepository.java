@@ -5,6 +5,7 @@ import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,9 @@ public class ResumeRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    private static final String DEFAULT_WORKBENCH_STATUS = "GENERATED";
+    private static final int RECENT_LIMIT = 5;
+
     public ResumeDto create(String templateKey, UUID fileId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
@@ -41,7 +45,7 @@ public class ResumeRepository {
                 statement.setString(1, templateKey);
                 statement.setString(2, DEFAULT_OWNER_KEY);
                 statement.setString(3, "GENERATED");
-                statement.setObject(4, fileId);
+                statement.setObject(4, fileId, Types.OTHER);
                 return statement;
             },
             keyHolder
@@ -102,6 +106,45 @@ public class ResumeRepository {
         return count == null ? 0L : count;
     }
 
+    public ResumeWorkbenchDto workbench(String ownerKey) {
+        long total = countByOwner(ownerKey);
+        long generatedCount = countByOwnerAndStatus(ownerKey, DEFAULT_WORKBENCH_STATUS);
+        List<ResumeTemplateBreakdownDto> templates =
+            jdbcTemplate.query(
+                """
+                    SELECT template_key, COUNT(*) AS total
+                    FROM resumes
+                    WHERE owner_key = ?
+                    GROUP BY template_key
+                    ORDER BY total DESC
+                    """,
+                (rs, rowNum) -> new ResumeTemplateBreakdownDto(rs.getString("template_key"), rs.getLong("total")),
+                ownerKey);
+        List<ResumeDto> recentItems =
+            jdbcTemplate.query(
+                """
+                    SELECT r.id, r.template_key, r.status, r.file_id, f.filename, f.size, f.created_at AS file_created_at, f.updated_at AS file_updated_at
+                    FROM resumes r
+                    LEFT JOIN files f ON r.file_id = f.id
+                    WHERE r.owner_key = ?
+                    ORDER BY r.created_at DESC
+                    LIMIT ?
+                    """,
+                (rs, rowNum) -> mapResume(rs),
+                ownerKey,
+                RECENT_LIMIT);
+        return new ResumeWorkbenchDto(total, generatedCount, templates, recentItems);
+    }
+
+    private long countByOwnerAndStatus(String ownerKey, String status) {
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM resumes WHERE owner_key = ? AND status = ?",
+            Long.class,
+            ownerKey,
+            status);
+        return count == null ? 0L : count;
+    }
+
     private Optional<ResumeDto> findOptional(Long id) {
         List<ResumeDto> results = jdbcTemplate.query(
             """
@@ -143,8 +186,7 @@ public class ResumeRepository {
             resultSet.getString("template_key"),
             resultSet.getString("status"),
             fileId,
-            "/api/resumes/" + id + "/download"
-            ,
+            "/api/resumes/" + id + "/download",
             fileName,
             fileSize == 0 && resultSet.wasNull() ? null : fileSize,
             fileCreatedAt,

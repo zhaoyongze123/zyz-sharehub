@@ -60,6 +60,11 @@ public class ResumeController {
         return ApiResponse.ok(resumeRepository.list("local-dev-user", page, pageSize, status));
     }
 
+    @GetMapping("/workbench")
+    public ApiResponse<ResumeWorkbenchDto> workbench() {
+        return ApiResponse.ok(resumeRepository.workbench("local-dev-user"));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<ResumeDto> detail(@PathVariable Long id) {
         return ApiResponse.ok(resumeRepository.findOwned(id, "local-dev-user"));

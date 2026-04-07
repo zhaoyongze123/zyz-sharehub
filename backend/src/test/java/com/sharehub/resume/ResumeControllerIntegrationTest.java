@@ -99,4 +99,32 @@ class ResumeControllerIntegrationTest {
         mockMvc.perform(get("/api/resumes/" + id + "/download"))
             .andExpect(status().isNotFound());
     }
+
+    @Test
+    void shouldReturnResumeWorkbenchSummary() throws Exception {
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "modern"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/resumes/workbench"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(3))
+            .andExpect(jsonPath("$.data.generatedCount").value(3))
+            .andExpect(jsonPath("$.data.templateBreakdown[0].templateKey").value("classic"))
+            .andExpect(jsonPath("$.data.templateBreakdown[0].count").value(2))
+            .andExpect(jsonPath("$.data.templateBreakdown[1].templateKey").value("modern"))
+            .andExpect(jsonPath("$.data.templateBreakdown[1].count").value(1))
+            .andExpect(jsonPath("$.data.recentItems.length()").value(3));
+    }
 }
