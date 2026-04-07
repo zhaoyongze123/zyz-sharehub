@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>简历工坊 - ShareBase</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./_common.css">
+</head>
+<body class="app-page">
+  <nav class="app-navbar">
+    <div class="container app-navbar-inner">
+      <a class="app-brand" href="../index.html">ShareBase</a>
+      <div class="app-nav">
+        <a class="app-nav-link" href="resources.html">资源</a>
+        <a class="app-nav-link" href="roadmaps.html">路线</a>
+        <a class="app-nav-link" href="notes.html">笔记</a>
+        <a class="app-nav-link" href="publish.html">发布</a>
+        <a class="app-nav-link is-active" href="resume.html">简历</a>
+        <a class="app-nav-link" href="me.html">我的</a>
+        <a class="app-nav-link" href="admin.html">管理</a>
+      </div>
+      <div class="app-actions">
+        <a class="btn btn-secondary" href="me.html">返回我的</a>
+        <a class="btn btn-primary" href="../login.html">登录</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container app-main animate-fade-in-up">
+    <section class="glass-card app-hero">
+      <span class="app-kicker">Resume</span>
+      <h1 class="app-title">从学习资产生成可投递简历</h1>
+      <p class="app-subtitle">自动汇总你的路线完成度、笔记沉淀与高质量资源贡献。</p>
+      <div class="app-actions">
+        <button class="btn btn-primary" data-toast="PDF 导出任务已开始">导出 PDF</button>
+        <button class="btn btn-secondary" data-toast="已复制公开简历链接">复制链接</button>
+      </div>
+    </section>
+
+    <section class="app-grid">
+      <article class="app-col-8 glass-card app-panel">
+        <h2 class="app-panel-title">简历预览</h2>
+        <div class="app-article">
+          <p><strong>候选人：</strong>Alex Chen</p>
+          <p><strong>目标方向：</strong>Agent / RAG 平台工程</p>
+          <p><strong>项目亮点：</strong>主导构建多 Agent 工作流，平均响应时延下降 28%，成功率提升 17%。</p>
+          <p><strong>代表作品：</strong>《RAG 评测体系复盘》、MCP 鉴权模板仓库、Agent 工程路线图。</p>
+        </div>
+
+        <hr class="app-divider">
+
+        <div class="app-stat-grid">
+          <div class="app-stat-card">
+            <span class="app-stat-label">路线完成</span>
+            <span class="app-stat-value">82%</span>
+          </div>
+          <div class="app-stat-card">
+            <span class="app-stat-label">发布笔记</span>
+            <span class="app-stat-value">16</span>
+          </div>
+          <div class="app-stat-card">
+            <span class="app-stat-label">资源收藏</span>
+            <span class="app-stat-value">49</span>
+          </div>
+        </div>
+      </article>
+
+      <aside class="app-col-4 glass-card app-panel">
+        <h2 class="app-panel-title">生成状态</h2>
+        <p class="app-panel-subtitle">联调简历生成与导出流程</p>
+        <div class="status-controls">
+          <button class="status-btn" data-status-target="resume-status" data-status-value="loading">生成中</button>
+          <button class="status-btn" data-status-target="resume-status" data-status-value="empty">无数据</button>
+          <button class="status-btn" data-status-target="resume-status" data-status-value="error">失败</button>
+          <button class="status-btn" data-status-target="resume-status" data-status-value="no-access">无权限</button>
+        </div>
+
+        <div id="resume-status" data-status-group data-status-default="loading">
+          <div class="status-item" data-status="loading">
+            <h3 class="status-title">正在生成简历</h3>
+            <p class="status-text">系统正在整理你的学习资产。</p>
+          </div>
+          <div class="status-item" data-status="empty">
+            <h3 class="status-title">内容不足</h3>
+            <p class="status-text">至少完成 1 条路线和 2 篇笔记后再生成。</p>
+            <div class="status-actions"><a class="btn btn-secondary" href="roadmaps.html">去学习路线</a></div>
+          </div>
+          <div class="status-item" data-status="error">
+            <h3 class="status-title">导出失败</h3>
+            <p class="status-text">请重试或切换模板。</p>
+            <div class="status-actions"><button class="btn btn-secondary" data-toast="已重新导出">重新导出</button></div>
+          </div>
+          <div class="status-item" data-status="no-access">
+            <h3 class="status-title">简历功能未开通</h3>
+            <p class="status-text">当前订阅方案不包含该模块。</p>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="app-footer">© 2026 ShareBase · 简历工坊</footer>
+  </main>
+
+  <script src="../assets/pages.js"></script>
+</body>
+</html>

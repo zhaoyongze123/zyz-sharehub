@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>笔记编辑器 - ShareBase</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./_common.css">
+</head>
+<body class="app-page">
+  <nav class="app-navbar">
+    <div class="container app-navbar-inner">
+      <a class="app-brand" href="../index.html">ShareBase</a>
+      <div class="app-nav">
+        <a class="app-nav-link" href="resources.html">资源</a>
+        <a class="app-nav-link" href="roadmaps.html">路线</a>
+        <a class="app-nav-link is-active" href="notes.html">笔记</a>
+        <a class="app-nav-link" href="publish.html">发布</a>
+        <a class="app-nav-link" href="resume.html">简历</a>
+        <a class="app-nav-link" href="me.html">我的</a>
+        <a class="app-nav-link" href="admin.html">管理</a>
+      </div>
+      <div class="app-actions">
+        <a class="btn btn-secondary" href="notes.html">返回笔记</a>
+        <button class="btn btn-primary" data-toast="笔记已保存">保存</button>
+        <a class="btn btn-secondary" href="../login.html">登录</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container app-main animate-fade-in-up">
+    <section class="glass-card app-hero">
+      <span class="app-kicker">Editor</span>
+      <h1 class="app-title">沉浸式 Markdown 编辑</h1>
+      <p class="app-subtitle">写作与预览可切换，支持草稿与发布动作。</p>
+      <div class="app-actions">
+        <button class="btn btn-primary" data-toast="已提交发布审核">发布笔记</button>
+        <button class="btn btn-secondary" data-toast="已存为草稿">存草稿</button>
+      </div>
+    </section>
+
+    <section class="app-grid">
+      <article class="app-col-8 glass-card app-panel">
+        <h2 class="app-panel-title">编辑内容</h2>
+        <div class="app-toolbar">
+          <input class="app-input" placeholder="标题：例如《Agent 故障排查手册》">
+        </div>
+
+        <div class="app-tabs">
+          <button class="app-tab-btn is-active" data-tab-trigger data-tab-group="editor-tabs" data-tab-key="write">写作</button>
+          <button class="app-tab-btn" data-tab-trigger data-tab-group="editor-tabs" data-tab-key="preview">预览</button>
+        </div>
+
+        <div class="app-tab-panel is-active" data-tab-panel data-tab-group="editor-tabs" data-tab-key="write">
+          <div class="app-toolbar">
+            <textarea class="app-textarea" placeholder="# 本周复盘\n\n- 目标\n- 方案\n- 结果\n- 后续优化"></textarea>
+          </div>
+          <div class="app-actions">
+            <button class="btn btn-secondary" data-toast="目录已生成">生成目录</button>
+            <button class="btn btn-secondary" data-toast="代码块已格式化">格式化代码</button>
+          </div>
+        </div>
+
+        <div class="app-tab-panel" data-tab-panel data-tab-group="editor-tabs" data-tab-key="preview">
+          <div class="app-article">
+            <p><strong>预览：</strong>这里展示渲染后的 Markdown 内容，可用于联调后端渲染接口。</p>
+            <p>建议主代理接入真实 markdown parser 后替换该静态占位。</p>
+          </div>
+        </div>
+      </article>
+
+      <aside class="app-col-4 glass-card app-panel">
+        <h2 class="app-panel-title">自动保存状态</h2>
+        <p class="app-panel-subtitle">调试编辑器保存状态展示</p>
+        <div class="status-controls">
+          <button class="status-btn" data-status-target="editor-status" data-status-value="loading">保存中</button>
+          <button class="status-btn" data-status-target="editor-status" data-status-value="empty">未编辑</button>
+          <button class="status-btn" data-status-target="editor-status" data-status-value="error">失败</button>
+          <button class="status-btn" data-status-target="editor-status" data-status-value="no-access">无权限</button>
+        </div>
+
+        <div id="editor-status" data-status-group data-status-default="loading">
+          <div class="status-item" data-status="loading">
+            <h3 class="status-title">自动保存中</h3>
+            <p class="status-text">最近一次变更正在上传。</p>
+          </div>
+          <div class="status-item" data-status="empty">
+            <h3 class="status-title">还未输入内容</h3>
+            <p class="status-text">开始写作后会自动保存。</p>
+          </div>
+          <div class="status-item" data-status="error">
+            <h3 class="status-title">保存失败</h3>
+            <p class="status-text">网络异常，点击按钮重试。</p>
+            <div class="status-actions"><button class="btn btn-secondary" data-toast="已重试保存">重试保存</button></div>
+          </div>
+          <div class="status-item" data-status="no-access">
+            <h3 class="status-title">该项目只读</h3>
+            <p class="status-text">你只有查看权限。</p>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="app-footer">© 2026 ShareBase · 笔记编辑器</footer>
+  </main>
+
+  <script src="../assets/pages.js"></script>
+</body>
+</html>

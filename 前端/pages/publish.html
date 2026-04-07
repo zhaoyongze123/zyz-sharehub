@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>发布中心 - ShareBase</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./_common.css">
+</head>
+<body class="app-page">
+  <nav class="app-navbar">
+    <div class="container app-navbar-inner">
+      <a class="app-brand" href="../index.html">ShareBase</a>
+      <div class="app-nav">
+        <a class="app-nav-link" href="resources.html">资源</a>
+        <a class="app-nav-link" href="roadmaps.html">路线</a>
+        <a class="app-nav-link" href="notes.html">笔记</a>
+        <a class="app-nav-link is-active" href="publish.html">发布</a>
+        <a class="app-nav-link" href="resume.html">简历</a>
+        <a class="app-nav-link" href="me.html">我的</a>
+        <a class="app-nav-link" href="admin.html">管理</a>
+      </div>
+      <div class="app-actions">
+        <a class="btn btn-secondary" href="resources.html">资源页</a>
+        <a class="btn btn-primary" href="../login.html">登录</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container app-main animate-fade-in-up">
+    <section class="glass-card app-hero">
+      <span class="app-kicker">发布中心</span>
+      <h1 class="app-title">发布资料、路线或笔记</h1>
+      <p class="app-subtitle">统一入口，支持草稿保存、校验提示和发布通知。</p>
+      <div class="app-actions">
+        <button class="btn btn-primary" data-toast="内容已提交审核">提交审核</button>
+        <button class="btn btn-secondary" data-toast="草稿已保存">保存草稿</button>
+      </div>
+    </section>
+
+    <section class="app-grid">
+      <article class="app-col-8 glass-card app-panel">
+        <h2 class="app-panel-title">发布表单</h2>
+        <p class="app-panel-subtitle">根据类型填写不同字段</p>
+
+        <div class="app-tabs">
+          <button class="app-tab-btn is-active" data-tab-trigger data-tab-group="publish-tabs" data-tab-key="resource">资料</button>
+          <button class="app-tab-btn" data-tab-trigger data-tab-group="publish-tabs" data-tab-key="roadmap">路线</button>
+          <button class="app-tab-btn" data-tab-trigger data-tab-group="publish-tabs" data-tab-key="note">笔记</button>
+        </div>
+
+        <div class="app-tab-panel is-active" data-tab-panel data-tab-group="publish-tabs" data-tab-key="resource">
+          <div class="app-toolbar"><input class="app-input" placeholder="资料标题（例如：RAG 评测 checklist）"></div>
+          <div class="app-toolbar"><input class="app-input" placeholder="资源链接 / 仓库地址"></div>
+          <div class="app-toolbar"><textarea class="app-textarea" placeholder="内容简介与适用人群"></textarea></div>
+        </div>
+
+        <div class="app-tab-panel" data-tab-panel data-tab-group="publish-tabs" data-tab-key="roadmap">
+          <div class="app-toolbar"><input class="app-input" placeholder="路线名称（例如：MCP 全栈工程师）"></div>
+          <div class="app-toolbar"><textarea class="app-textarea" placeholder="阶段目标、里程碑、推荐资源"></textarea></div>
+        </div>
+
+        <div class="app-tab-panel" data-tab-panel data-tab-group="publish-tabs" data-tab-key="note">
+          <div class="app-toolbar"><input class="app-input" placeholder="笔记标题"></div>
+          <div class="app-toolbar"><textarea class="app-textarea" placeholder="输入 Markdown 内容"></textarea></div>
+          <div class="app-actions">
+            <a class="btn btn-secondary" href="note-editor.html">进入全屏编辑器</a>
+          </div>
+        </div>
+      </article>
+
+      <aside class="app-col-4 glass-card app-panel">
+        <h2 class="app-panel-title">上传状态</h2>
+        <p class="app-panel-subtitle">模拟发布链路不同阶段</p>
+
+        <div class="status-controls">
+          <button class="status-btn" data-status-target="publish-status" data-status-value="loading">上传中</button>
+          <button class="status-btn" data-status-target="publish-status" data-status-value="empty">待填写</button>
+          <button class="status-btn" data-status-target="publish-status" data-status-value="error">校验失败</button>
+          <button class="status-btn" data-status-target="publish-status" data-status-value="no-access">无权限</button>
+        </div>
+
+        <div id="publish-status" data-status-group data-status-default="loading">
+          <div class="status-item" data-status="loading">
+            <h3 class="status-title">正在上传附件</h3>
+            <p class="status-text">请保持页面开启，上传完成后自动通知。</p>
+          </div>
+          <div class="status-item" data-status="empty">
+            <h3 class="status-title">内容待完善</h3>
+            <p class="status-text">至少填写标题和正文再保存草稿。</p>
+          </div>
+          <div class="status-item" data-status="error">
+            <h3 class="status-title">字段校验失败</h3>
+            <p class="status-text">请检查链接格式与必填项。</p>
+            <div class="status-actions"><button class="btn btn-secondary" data-toast="已定位到错误字段" data-toast-type="error">查看错误</button></div>
+          </div>
+          <div class="status-item" data-status="no-access">
+            <h3 class="status-title">未开通发布权限</h3>
+            <p class="status-text">联系管理员加入内容共建组。</p>
+            <div class="status-actions"><a class="btn btn-secondary" href="admin.html">申请权限</a></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="app-footer">© 2026 ShareBase · 发布中心</footer>
+  </main>
+
+  <script src="../assets/pages.js"></script>
+</body>
+</html>
