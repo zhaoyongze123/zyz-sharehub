@@ -78,6 +78,23 @@ public class FileStorageService {
         repository.deleteById(id);
     }
 
+    public MediaType resolveMediaType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        String normalizedContentType = contentType.trim();
+        if (normalizedContentType.contains(";") && !normalizedContentType.contains("=")) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        try {
+            return MediaType.parseMediaType(normalizedContentType);
+        } catch (InvalidMediaTypeException exception) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+    }
+
     public StoredFileDto toDto(FileRecord record) {
         return new StoredFileDto(
             record.getId(),

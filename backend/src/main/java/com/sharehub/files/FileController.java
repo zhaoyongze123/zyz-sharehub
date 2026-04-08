@@ -1,7 +1,6 @@
 package com.sharehub.files;
 
 import com.sharehub.common.ApiResponse;
-import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,25 +42,8 @@ public class FileController {
         }
 
         FileRecord file = record.get();
-        String contentType = file.getContentType();
-        if (contentType == null || contentType.isBlank()) {
-            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
-        }
-
-        String originalContentType = contentType.trim();
-        // Treat trailing semicolon without parameters as invalid (e.g. "invalid/type;")
-        if (originalContentType.contains(";") && !originalContentType.contains("=")) {
-            originalContentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
-        }
-
-        MediaType mediaType;
-        try {
-            mediaType = MediaType.parseMediaType(originalContentType);
-        } catch (InvalidMediaTypeException exception) {
-            mediaType = MediaType.APPLICATION_OCTET_STREAM;
-        }
         return ResponseEntity.ok()
-            .contentType(mediaType)
+            .contentType(storageService.resolveMediaType(file.getContentType()))
             .header("Content-Disposition", "attachment; filename=\"" + file.getFilename() + "\"")
             .body(file.getData());
     }

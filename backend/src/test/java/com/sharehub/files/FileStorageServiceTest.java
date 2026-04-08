@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -107,6 +108,27 @@ class FileStorageServiceTest {
         );
 
         assertThat(dto.contentType()).isEqualTo("application/octet-stream");
+    }
+
+    @Test
+    void resolveMediaTypeReturnsParsedTypeWhenValid() {
+        MediaType mediaType = service.resolveMediaType("text/plain; charset=UTF-8");
+
+        assertThat(mediaType).isEqualTo(MediaType.parseMediaType("text/plain; charset=UTF-8"));
+    }
+
+    @Test
+    void resolveMediaTypeFallsBackToOctetStreamWhenBlank() {
+        MediaType mediaType = service.resolveMediaType(" ");
+
+        assertThat(mediaType).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    }
+
+    @Test
+    void resolveMediaTypeFallsBackToOctetStreamWhenInvalid() {
+        MediaType mediaType = service.resolveMediaType("invalid/type;");
+
+        assertThat(mediaType).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
     }
 
     @Test
