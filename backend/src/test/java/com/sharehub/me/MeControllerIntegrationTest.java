@@ -365,5 +365,32 @@ class MeControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/me/favorites")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        Integer userCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM users WHERE login = ? AND status = 'ACTIVE'",
+            Integer.class,
+            firstAccessUser
+        );
+        org.assertj.core.api.Assertions.assertThat(userCount).isEqualTo(1);
     }
 }
