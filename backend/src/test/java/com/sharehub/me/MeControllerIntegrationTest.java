@@ -212,6 +212,14 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
 
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", " DRAFT ")
+                .param("visibility", " PRIVATE "))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
+
         mockMvc.perform(get("/api/me/roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .param("page", "1")
@@ -270,6 +278,17 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-b"));
+
+        mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", " GENERATED ")
+                .param("templateKey", " resume-a ")
+                .param("keyword", " RESUME-A ")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-a"));
 
         mockMvc.perform(get("/api/me/resumes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)

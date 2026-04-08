@@ -63,7 +63,7 @@ paths:
   /api/me/resources:
     get:
       summary: 获取我的资料列表
-      description: 当前实现按请求用户返回自己的资料工作台数据，默认不限定发布态；可通过 `status`、`visibility` 过滤草稿或已发布数据。联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`visibility` 传空字符串或仅空白时按未传处理；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回自己的资料工作台数据，默认不限定发布态；可通过 `status`、`visibility` 过滤草稿或已发布数据。联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`visibility` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -107,7 +107,7 @@ paths:
   /api/me/roadmaps:
     get:
       summary: 获取我的路线列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status` 传空字符串或仅空白时按未传处理；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -183,7 +183,7 @@ paths:
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选
       parameters:
         - name: page
           in: query
@@ -223,7 +223,7 @@ paths:
   /api/me/resumes:
     get:
       summary: 获取我的简历分页列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
