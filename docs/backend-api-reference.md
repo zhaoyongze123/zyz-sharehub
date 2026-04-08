@@ -319,6 +319,7 @@
 - `category` 当前真实枚举：`AVATAR`、`RESOURCE_ATTACHMENT`、`RESUME_PDF`
 - 校验文件非空、文件名存在、引用归属存在、大小不超过 `5MB`
 - 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`
+- 返回体中的 `contentType` 始终有值；上传未显式声明时回落为 `application/octet-stream`
 
 失败状态：
 

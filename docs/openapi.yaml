@@ -1119,7 +1119,7 @@ components:
           type: string
         contentType:
           type: string
-          nullable: true
+          description: 入库时的 `contentType`；若上传时缺省则回落到 `application/octet-stream`
         size:
           type: integer
           format: int64

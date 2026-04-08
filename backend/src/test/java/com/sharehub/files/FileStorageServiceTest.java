@@ -64,6 +64,29 @@ class FileStorageServiceTest {
     }
 
     @Test
+    void storeBytesDefaultsBlankContentTypeToOctetStream() {
+        byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+
+        when(repository.save(any(FileRecord.class))).thenAnswer(invocation -> {
+            FileRecord record = invocation.getArgument(0);
+            record.setId(UUID.randomUUID());
+            return record;
+        });
+
+        StoredFileDto dto = service.storeBytes(
+            "user-1",
+            FileCategory.RESUME_PDF,
+            "RESUME",
+            "resume-43",
+            "resume.pdf",
+            " ",
+            data
+        );
+
+        assertThat(dto.contentType()).isEqualTo("application/octet-stream");
+    }
+
+    @Test
     void storeBytesRejectsBlankOwner() {
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
             service.storeBytes("  ", FileCategory.AVATAR, "USER", "1", "avatar.png", "image/png", new byte[]{1})
@@ -98,12 +121,6 @@ class FileStorageServiceTest {
         MultipartFile file = mock(MultipartFile.class);
 
         when(file.getOriginalFilename()).thenReturn(" ");
-        when(file.getContentType()).thenReturn("image/png");
-        try {
-            when(file.getBytes()).thenReturn(new byte[]{1});
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
             service.storeMultipart("user", FileCategory.AVATAR, "USER", "1", file)
