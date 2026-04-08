@@ -42,8 +42,12 @@ public class FileController {
         }
 
         FileRecord file = record.get();
+        String contentType = file.getContentType();
+        if (contentType == null || contentType.isBlank()) {
+            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
         return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(file.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType()))
+            .contentType(MediaType.parseMediaType(contentType))
             .header("Content-Disposition", "attachment; filename=\"" + file.getFilename() + "\"")
             .body(file.getData());
     }
