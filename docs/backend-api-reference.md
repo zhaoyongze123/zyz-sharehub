@@ -162,6 +162,13 @@
 - 草稿笔记数
 - 已生成简历数
 
+真实边界：
+
+- 需要 OAuth 登录态，或本地联调头 `X-User-Key`
+- 首次访问会自动补建一条默认用户档案
+- 未带身份时返回 `401 NOT_LOGGED_IN`
+- 用户已被封禁时返回 `403 USER_BANNED`
+
 ### 4.2 列表化接口
 
 已实现：
@@ -188,12 +195,16 @@
 
 - `GET /api/me/resources` 返回的是当前用户自己的资料工作台列表，不是仅“已发布资料”
 - 默认不额外收窄 `status`，因此会同时返回该用户的草稿 / 已发布资料；如需只看已发布数据，需要显式传 `status=PUBLISHED`
+- 这些列表接口首次访问时都会自动补建默认用户档案
+- 这些列表接口未带身份时统一返回 `401 NOT_LOGGED_IN`
+- 这些列表接口用户被封禁时统一返回 `403 USER_BANNED`
 - 这些列表接口的 `page`、`pageSize` 传入小于 `1` 的值时，都会按 `1` 兜底
 - `GET /api/me/resources` 的 `status`、`visibility` 为空字符串或仅空白时，按未传处理
 - `GET /api/me/resources` 的 `status`、`visibility` 若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/roadmaps` 的 `status` 为空字符串或仅空白时，按未传处理；若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/notes` 的 `status` 为空字符串或仅空白时，按未传处理，不额外收窄结果；若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/resumes` 的 `status`、`templateKey`、`keyword` 为空字符串或仅空白时，按未传处理；若带前后空白，会先裁剪再参与筛选
+- `GET /api/me/resumes` 列表项会带出简历文件元数据，重点字段包括 `fileUrl`、`fileName`、`fileSize`、`fileCreatedAt`、`fileUpdatedAt`
 
 ## 5. 资料模块
 
