@@ -73,7 +73,8 @@ class ResumeControllerIntegrationTest {
         mockMvc.perform(get("/api/resumes/" + id + "/download")
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
-            .andExpect(header().string("Content-Type", MediaType.APPLICATION_PDF_VALUE));
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_PDF_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"resume-classic.pdf\""));
     }
 
     @Test
