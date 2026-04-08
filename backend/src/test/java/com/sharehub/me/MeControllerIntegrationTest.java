@@ -50,6 +50,7 @@ class MeControllerIntegrationTest {
     @Test
     void shouldAggregatePersonalCenterSummary() throws Exception {
         mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"我的资料","type":"PDF","visibility":"PUBLIC"}
@@ -57,6 +58,7 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"我的路线","description":"desc","visibility":"PUBLIC"}
@@ -64,6 +66,7 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"我的笔记","contentMd":"# note","visibility":"PUBLIC","status":"DRAFT"}
@@ -71,11 +74,13 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/resumes/generate")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "me"))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/resources/1/favorite"))
+        mockMvc.perform(post("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
@@ -95,6 +100,7 @@ class MeControllerIntegrationTest {
     @Test
     void shouldListPersonalWorkbenchCollections() throws Exception {
         String firstResourceResponse = mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"我的资料A","type":"PDF","visibility":"PUBLIC"}
@@ -107,6 +113,7 @@ class MeControllerIntegrationTest {
         Long firstResourceId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(firstResourceResponse, Map.class).get("data")).get("id").toString());
 
         mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"我的资料B","type":"DOC","visibility":"PRIVATE"}
@@ -114,6 +121,7 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         String roadmapResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"路线A","description":"desc-a","visibility":"PUBLIC","status":"PUBLISHED"}
@@ -126,6 +134,7 @@ class MeControllerIntegrationTest {
         Long roadmapId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(roadmapResponse, Map.class).get("data")).get("id").toString());
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"节点1","orderNo":1}
@@ -133,6 +142,7 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"节点2","orderNo":2}
@@ -140,6 +150,7 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"percent":50,"completedNodeIds":[1]}
@@ -147,6 +158,7 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"笔记A","contentMd":"# note-a","visibility":"PUBLIC","status":"PUBLISHED"}
@@ -154,16 +166,19 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/resumes/generate")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-a"))))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/resumes/generate")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-b"))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/resources/" + firstResourceId + "/favorite"))
+        mockMvc.perform(post("/api/resources/" + firstResourceId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/me/resources")
@@ -262,6 +277,22 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
 
         mockMvc.perform(get("/api/me/resources"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/me/roadmaps"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/me/favorites"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/me/notes"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/me/resumes"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
     }

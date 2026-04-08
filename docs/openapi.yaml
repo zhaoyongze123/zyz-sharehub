@@ -34,12 +34,12 @@ paths:
   /api/me:
     get:
       summary: 个人中心聚合信息
-      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识
+      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识，未带身份时返回 `401 NOT_LOGGED_IN`
       responses:
         '200':
           description: 成功
         '401':
-          description: 未登录，需先完成 OAuth
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
             application/json:
               schema:
@@ -47,6 +47,7 @@ paths:
   /api/me/resources:
     get:
       summary: 获取我的发布资料列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       parameters:
         - name: page
           in: query
@@ -72,7 +73,7 @@ paths:
         '200':
           description: 成功
         '401':
-          description: 未登录
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
             application/json:
               schema:
@@ -80,6 +81,7 @@ paths:
   /api/me/roadmaps:
     get:
       summary: 获取我的路线列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       parameters:
         - name: page
           in: query
@@ -101,7 +103,7 @@ paths:
         '200':
           description: 成功
         '401':
-          description: 未登录
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
             application/json:
               schema:
@@ -109,6 +111,7 @@ paths:
   /api/me/favorites:
     get:
       summary: 获取我的收藏资料列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       parameters:
         - name: page
           in: query
@@ -126,7 +129,7 @@ paths:
         '200':
           description: 成功
         '401':
-          description: 未登录
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
             application/json:
               schema:
@@ -134,6 +137,7 @@ paths:
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       parameters:
         - name: page
           in: query
@@ -155,7 +159,7 @@ paths:
         '200':
           description: 成功
         '401':
-          description: 未登录
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
             application/json:
               schema:
@@ -163,6 +167,7 @@ paths:
   /api/me/resumes:
     get:
       summary: 获取我的简历工作台列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       parameters:
         - name: page
           in: query
@@ -230,7 +235,7 @@ paths:
                       total:
                         type: integer
         '401':
-          description: 未登录
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
             application/json:
               schema:
