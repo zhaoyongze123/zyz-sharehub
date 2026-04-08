@@ -16,9 +16,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -102,5 +102,56 @@ class FileStorageIntegrationTest {
 
         mockMvc.perform(get("/api/files/{id}", missingId))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldUploadFileDirectlyWithoutLoginAndDownload() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "resume.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            "resume body".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-direct")
+                .param("category", "RESUME_PDF")
+                .param("referenceType", "RESUME")
+                .param("referenceId", "resume-100"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.owner").value("user-direct"))
+            .andExpect(jsonPath("$.data.filename").value("resume.pdf"))
+            .andExpect(jsonPath("$.data.downloadUrl").exists())
+            .andReturn();
+
+        JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
+        String downloadUrl = uploadJson.get("data").get("downloadUrl").asText();
+
+        MvcResult downloadResult = mockMvc.perform(get(downloadUrl))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        assertThat(downloadResult.getResponse().getContentAsByteArray()).isEqualTo("resume body".getBytes());
+    }
+
+    @Test
+    void shouldRejectDirectUploadWhenOwnerMissing() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            MediaType.IMAGE_PNG_VALUE,
+            new byte[]{1}
+        );
+
+        mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", " ")
+                .param("category", "AVATAR")
+                .param("referenceType", "USER")
+                .param("referenceId", "user-1"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_OWNER_REQUIRED"));
     }
 }
