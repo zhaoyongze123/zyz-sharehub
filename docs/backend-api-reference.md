@@ -316,7 +316,7 @@
 - 上述 3 个写接口在请求用户已被封禁时统一返回 `403 USER_BANNED`
 - `POST /api/roadmaps` 创建后的 owner 为当前请求用户
 - `POST /api/roadmaps/{id}/nodes`、`POST /api/roadmaps/{id}/progress` 只允许当前 owner 操作；非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
-- `GET /api/roadmaps/{id}` 的 `progress` 按当前请求用户读取；未登录、未写入进度或切换到其他用户时返回空对象
+- `GET /api/roadmaps/{id}` 的 `progress` 按当前请求用户读取；未登录、未写入进度或切换到其他用户时返回空对象；如果请求里显式带了已封禁用户，则返回 `403 USER_BANNED`
 - `GET /api/roadmaps/{id}` 仅在路线不存在时返回 `404 ROADMAP_NOT_FOUND`
 - 节点树与进度已持久化
 - 列表筛选仍较弱，暂未覆盖前端清单中的标签筛选
