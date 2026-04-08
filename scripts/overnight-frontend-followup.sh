@@ -17,6 +17,7 @@ LAST_MESSAGE_FILE="${FOLLOWUP_DIR}/last-message.md"
 RAW_LOG_FILE="${FOLLOWUP_DIR}/codex-output.log"
 META_FILE="${FOLLOWUP_DIR}/meta.env"
 WORKTREE_ROOT="${PROJECT_ROOT}/output/overnight/frontend-worktrees"
+FRONTEND_WORKDIR=""
 TIMEOUT_SECONDS="${OVERNIGHT_FRONTEND_FOLLOWUP_TIMEOUT_SECONDS:-2400}"
 MODEL="${OVERNIGHT_FRONTEND_FOLLOWUP_MODEL:-gpt-5.1-codex-max}"
 CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
@@ -104,6 +105,67 @@ print((value or "frontend-followup")[:48])
 PY
 }
 
+build_module_context() {
+  python3 - <<'PY' "$1"
+import sys
+
+modules = [item.strip() for item in sys.argv[1].split(",") if item.strip()]
+
+contexts = {
+    "resources": """- 目标模块首批必读文件（只读这些开始，不要先做全仓库扫描）：
+  - frontend/src/views/resource/ResourceListView.vue
+  - frontend/src/views/resource/ResourceDetailView.vue
+  - frontend/src/views/resource/PublishResourceView.vue
+  - frontend/src/components/business/ResourceCard.vue
+  - frontend/src/components/business/ResourceMeta.vue
+  - frontend/src/stores/resource.ts
+  - frontend/src/mock/resources.ts
+  - frontend/src/api/client.ts
+- 接口契约优先来源：
+  - docs/backend-api-reference.md 中 5.1 到 5.9 资源接口段落
+  - docs/openapi.yaml 中 /api/resources 相关路径
+- 严禁为了找接口去大范围扫描 backend 源码；只有文档缺失且被阻塞时，才允许定点读取单个后端文件。""",
+    "profile": """- 目标模块首批必读文件：
+  - frontend/src/views/user/*
+  - frontend/src/stores/auth.ts
+  - frontend/src/api/client.ts
+- 接口契约优先来源：
+  - docs/backend-api-reference.md 中 me / profile 相关段落
+  - docs/openapi.yaml 中 /api/me 相关路径""",
+    "roadmaps": """- 目标模块首批必读文件：
+  - frontend/src/views/roadmap/*
+  - frontend/src/mock/roadmaps.ts
+  - frontend/src/api/client.ts
+- 接口契约优先来源：
+  - docs/backend-api-reference.md 中 roadmap 相关段落
+  - docs/openapi.yaml 中 /api/roadmaps 相关路径""",
+    "notes": """- 目标模块首批必读文件：
+  - frontend/src/views/note/*
+  - frontend/src/mock/notes.ts
+  - frontend/src/api/client.ts
+- 接口契约优先来源：
+  - docs/backend-api-reference.md 中 note 相关段落
+  - docs/openapi.yaml 中 /api/notes 相关路径""",
+    "resumes": """- 目标模块首批必读文件：
+  - frontend/src/views/resume/*
+  - frontend/src/stores/*
+  - frontend/src/api/client.ts
+- 接口契约优先来源：
+  - docs/backend-api-reference.md 中 resume 相关段落
+  - docs/openapi.yaml 中 /api/resumes 与 /api/me/resumes 相关路径""",
+    "admin": """- 目标模块首批必读文件：
+  - frontend/src/views/admin/*
+  - frontend/src/api/client.ts
+- 接口契约优先来源：
+  - docs/backend-api-reference.md 中 admin 治理相关段落
+  - docs/openapi.yaml 中 /api/admin 相关路径""",
+}
+
+parts = [contexts[module] for module in modules if module in contexts]
+print("\n".join(parts))
+PY
+}
+
 MODULES="$(collect_modules)"
 
 {
@@ -123,6 +185,8 @@ fi
 BRANCH_SUFFIX="$(sanitize_branch_suffix "${MODULES}")"
 FRONTEND_BRANCH="feature/frontend-real-api-${BRANCH_SUFFIX}"
 WORKTREE_DIR="${WORKTREE_ROOT}/${FRONTEND_BRANCH//\//-}-${RUN_DIR##*/}"
+FRONTEND_WORKDIR="${WORKTREE_DIR}/frontend"
+MODULE_CONTEXT="$(build_module_context "${MODULES}")"
 
 {
   cat "${PROMPT_TEMPLATE_FILE}"
@@ -136,10 +200,15 @@ WORKTREE_DIR="${WORKTREE_ROOT}/${FRONTEND_BRANCH//\//-}-${RUN_DIR##*/}"
   echo "  - 只修改 frontend/ 下文件"
   echo "  - 完成后提交并 push 到 ${FRONTEND_BRANCH}"
   echo "  - 尽量优先 resources、profile、roadmaps；如果本轮模块不是这三个，也按实际模块处理"
+  if [[ -n "${MODULE_CONTEXT}" ]]; then
+    echo "- 模块直达上下文："
+    printf '%s\n' "${MODULE_CONTEXT}"
+  fi
 } > "${PROMPT_FILE}"
 
 echo "FRONTEND_BRANCH=${FRONTEND_BRANCH}" >> "${META_FILE}"
 echo "WORKTREE_DIR=${WORKTREE_DIR}" >> "${META_FILE}"
+echo "FRONTEND_WORKDIR=${FRONTEND_WORKDIR}" >> "${META_FILE}"
 
 if [[ "${OVERNIGHT_FRONTEND_FOLLOWUP_DRY_RUN:-0}" == "1" ]]; then
   log "前端子代理 dry-run 完成，模块=${MODULES}，分支=${FRONTEND_BRANCH}"
@@ -161,7 +230,7 @@ log "前端子代理工作树已创建，分支=${FRONTEND_BRANCH}"
 set +e
 python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" \
   "${CODEX_BIN}" exec --ephemeral --disable multi_agent -c 'model_reasoning_effort="medium"' \
-  -m "${MODEL}" --dangerously-bypass-approvals-and-sandbox -C "${WORKTREE_DIR}" -o "${LAST_MESSAGE_FILE}" - \
+  -m "${MODEL}" --dangerously-bypass-approvals-and-sandbox -C "${FRONTEND_WORKDIR}" -o "${LAST_MESSAGE_FILE}" - \
   < "${PROMPT_FILE}" 2>&1 | tee -a "${RAW_LOG_FILE}"
 EXIT_CODE=${PIPESTATUS[0]}
 set -e
