@@ -108,7 +108,7 @@ public class NoteRepository {
             note.title(),
             note.contentMd(),
             nullable(note.visibility()),
-            note.status() == null ? existing.status() : note.status(),
+            normalizeForUpdate(note.status(), existing.status()),
             id,
             ownerKey
         );
@@ -160,5 +160,10 @@ public class NoteRepository {
             return null;
         }
         return status;
+    }
+
+    private String normalizeForUpdate(String status, String existingStatus) {
+        String normalized = normalize(status);
+        return normalized == null ? existingStatus : normalized;
     }
 }
