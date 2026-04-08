@@ -55,7 +55,7 @@ public class ResumeController {
         @RequestBody Map<String, Object> req
     ) {
         String ownerKey = requireActiveUser(authentication, request);
-        String templateKey = String.valueOf(req.getOrDefault("templateKey", "default"));
+        String templateKey = normalizeTemplateKey(req == null ? null : req.get("templateKey"));
         byte[] pdfBytes = fileStorageService.buildSimplePdf("ShareHub Resume", "template=" + templateKey);
         StoredFileDto storedFile = fileStorageService.storeBytes(
             ownerKey,
@@ -135,6 +135,14 @@ public class ResumeController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeTemplateKey(Object templateKeyValue) {
+        if (templateKeyValue == null) {
+            return "default";
+        }
+        String normalized = normalize(String.valueOf(templateKeyValue));
+        return normalized == null ? "default" : normalized;
     }
 
     private String requireActiveUser(Authentication authentication, HttpServletRequest request) {

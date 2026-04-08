@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sharehub.auth.UserProfileDto;
 import com.sharehub.auth.UserProfileRepository;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -302,6 +303,28 @@ class ResumeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.templateBreakdown[1].templateKey").value("modern"))
             .andExpect(jsonPath("$.data.templateBreakdown[1].count").value(1))
             .andExpect(jsonPath("$.data.recentItems.length()").value(3));
+    }
+
+    @Test
+    void shouldFallbackBlankOrNullTemplateKeyToDefault() throws Exception {
+        Map<String, Object> nullTemplateRequest = new HashMap<>();
+        nullTemplateRequest.put("templateKey", null);
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "   "))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("default"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(nullTemplateRequest)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("default"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));
     }
 
     @Test
