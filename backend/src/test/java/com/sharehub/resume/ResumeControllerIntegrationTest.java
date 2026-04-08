@@ -556,6 +556,38 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldAutoProvisionUserWhenFirstAccessingResumeEndpoints() throws Exception {
+        String firstAccessUser = "fresh-resume-user";
+
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/resumes/workbench")
+                .header(USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0))
+            .andExpect(jsonPath("$.data.generatedCount").value(0))
+            .andExpect(jsonPath("$.data.templateBreakdown.length()").value(0))
+            .andExpect(jsonPath("$.data.recentItems.length()").value(0));
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, firstAccessUser)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "fresh"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("fresh"));
+
+        Integer userCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM users WHERE login = ? AND status = 'ACTIVE'",
+            Integer.class,
+            firstAccessUser
+        );
+        assertThat(userCount).isEqualTo(1);
+    }
+
+    @Test
     void shouldReturnResumeErrorCodesForMissingResumeAndFile() throws Exception {
         mockMvc.perform(get("/api/resumes/999999")
                 .header(USER_KEY_HEADER, DEFAULT_USER))
