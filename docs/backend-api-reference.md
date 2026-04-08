@@ -182,6 +182,11 @@
 - `my notes`: `status`
 - `my resumes`: `status`、`templateKey`、`keyword`
 
+补充说明：
+
+- `GET /api/me/resources` 返回的是当前用户自己的资料工作台列表，不是仅“已发布资料”
+- 默认不额外收窄 `status`，因此会同时返回该用户的草稿 / 已发布资料；如需只看已发布数据，需要显式传 `status=PUBLISHED`
+
 ## 5. 资料模块
 
 ### 5.1 `GET /api/resources`

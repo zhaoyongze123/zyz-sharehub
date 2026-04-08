@@ -58,8 +58,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/me/resources:
     get:
-      summary: 获取我的发布资料列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      summary: 获取我的资料列表
+      description: 当前实现按请求用户返回自己的资料工作台数据，默认不限定发布态；可通过 `status`、`visibility` 过滤草稿或已发布数据。联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
