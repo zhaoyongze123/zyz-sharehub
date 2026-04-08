@@ -2,22 +2,20 @@ import { apiClient } from '@/api/client'
 
 interface BackendApiResponse<T> {
   success: boolean
-  code?: string
   data: T
   message?: string
-}
-
-export interface UserProfileDto {
-  id: number
-  login: string
-  name?: string | null
-  avatarFileId?: string | null
-  avatarUrl?: string | null
-  status?: string | null
+  code?: string
 }
 
 export interface MeDto {
-  profile: UserProfileDto
+  profile: {
+    id: number
+    login: string
+    name?: string | null
+    avatarFileId?: string | null
+    avatarUrl?: string | null
+    status?: string | null
+  }
   myResourceCount: number
   myFavoriteCount: number
   myRoadmapCount: number
@@ -25,31 +23,24 @@ export interface MeDto {
   myResumeCount: number
   recentResourceCount: number
   publishedResourceCount: number
-  generatedResumeCount?: number
-}
-
-export interface StoredFileDto {
-  id: string
-  fileName?: string
-  downloadUrl?: string
-  contentType?: string
+  draftNoteCount: number
+  generatedResumeCount: number
 }
 
 export async function fetchMe() {
-  const res = await apiClient.get<BackendApiResponse<MeDto>>('/me', {
-    // 避免 401 时弹出全局 toast 和强制登出
-    skipAuthError: true
-  })
-  return res.data.data
+  const response = await apiClient.get<BackendApiResponse<MeDto>>('/me')
+  return response.data.data
 }
 
 export async function uploadAvatar(file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-
-  const res = await apiClient.post<BackendApiResponse<StoredFileDto>>('/auth/avatar', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
-
-  return res.data.data
+  const form = new FormData()
+  form.append('file', file)
+  const response = await apiClient.post<BackendApiResponse<{ file: { downloadUrl: string } }>>(
+    '/auth/avatar',
+    form,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }
+  )
+  return response.data.data?.file
 }

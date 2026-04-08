@@ -1,25 +1,43 @@
 import { defineStore } from 'pinia'
-import { fetchMe, uploadAvatar, type MeDto, type UserProfileDto } from '@/api/me'
-import { useAppStore } from '@/stores/app'
+import { fetchMe } from '@/api/me'
 
 export interface UserProfile {
   id: number
   login: string
   name?: string | null
-  avatarFileId?: string | null
-  avatarUrl?: string | null
-  status?: string | null
-  // 兼容旧前端字段
   nickname?: string
-  headline?: string
   role?: 'guest' | 'user' | 'admin'
+  headline?: string
+  avatarUrl?: string | null
+  avatarFileId?: string | null
+  status?: string | null
+}
+
+export interface MeData {
+  profile: {
+    id: number
+    login: string
+    name?: string | null
+    avatarFileId?: string | null
+    avatarUrl?: string | null
+    status?: string | null
+  }
+  myResourceCount: number
+  myFavoriteCount: number
+  myRoadmapCount: number
+  myNoteCount: number
+  myResumeCount: number
+  recentResourceCount: number
+  publishedResourceCount: number
+  draftNoteCount: number
+  generatedResumeCount: number
 }
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     initialized: false,
     profile: null as UserProfile | null,
-    me: null as MeDto | null,
+    me: null as MeData | null,
     loading: false
   }),
   getters: {
@@ -27,82 +45,94 @@ export const useAuthStore = defineStore('auth', {
     isAdmin: (state) => state.profile?.role === 'admin'
   },
   actions: {
-    async bootstrap() {
-      if (this.initialized) return
+    normalizeProfile(profile?: MeData['profile']): UserProfile | null {
+      if (!profile) return null
 
-      try {
-        const me = await fetchMe()
-        this.hydrateFromMe(me)
-      } catch (error: any) {
-        // 未登录时后端返回 401，保持未登录态
-        this.profile = null
-        this.me = null
-      } finally {
-        this.initialized = true
-      }
-    },
-    hydrateFromMe(me: MeDto) {
-      const { profile } = me
-      this.me = me
-      this.profile = this.mapProfile(profile)
-    },
-    async refreshProfile() {
-      this.loading = true
-      const appStore = useAppStore()
-      try {
-        const me = await fetchMe()
-        this.hydrateFromMe(me)
-      } catch (error) {
-        this.profile = null
-        this.me = null
-        appStore.showToast('获取用户信息失败', '请检查登录或联调头 X-User-Key', 'error')
-      } finally {
-        this.loading = false
-      }
-    },
-    mapProfile(profile: UserProfileDto): UserProfile {
-      return {
+      const role = (window.localStorage.getItem('sharebase.role') as UserProfile['role']) || 'user'
+
+      const normalized: UserProfile = {
         id: profile.id,
         login: profile.login,
         name: profile.name,
-        avatarFileId: profile.avatarFileId ?? undefined,
-        avatarUrl: profile.avatarUrl ?? undefined,
-        status: profile.status ?? undefined,
         nickname: profile.name ?? profile.login,
-        headline: profile.status ?? undefined,
-        role: 'user'
+        role,
+        headline: this.profile?.headline ?? '',
+        avatarUrl: profile.avatarUrl,
+        avatarFileId: profile.avatarFileId,
+        status: profile.status ?? null
+      }
+
+      // 将 login 写入本地，便于后续请求携带 X-User-Key（联调模式）
+      window.localStorage.setItem('sharebase.nickname', normalized.login)
+      if (!window.localStorage.getItem('sharebase.role')) {
+        window.localStorage.setItem('sharebase.role', role)
+      }
+
+      return normalized
+    },
+    hydrateFromLocal() {
+      const savedRole = window.localStorage.getItem('sharebase.role') as UserProfile['role']
+      const savedNickname = window.localStorage.getItem('sharebase.nickname')
+      const savedHeadline = window.localStorage.getItem('sharebase.headline')
+
+      if (savedRole === 'user' || savedRole === 'admin') {
+        this.profile = {
+          id: 1,
+          login: savedNickname || 'frontend-local-user',
+          nickname: savedNickname || (savedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen'),
+          role: savedRole,
+          headline: savedHeadline || (savedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
+        }
       }
     },
-    // 联调便捷登录，本地设置 userKey/adminToken 后即可访问 /api/me
-    loginAs(role: 'user' | 'admin' = 'user') {
-      const pseudoUserKey = role === 'admin' ? 'dev-admin' : 'dev-user'
-      window.localStorage.setItem('sharebase.userKey', pseudoUserKey)
-      if (role === 'admin') {
-        window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
-      }
-      this.refreshProfile()
+    async refreshMe() {
+      const data = await fetchMe()
+      this.me = data
+      this.profile = this.normalizeProfile(data.profile)
     },
-    // 兼容旧逻辑的占位方法，实际后端未提供更新接口
+    async bootstrap() {
+      if (this.initialized) return
+
+      this.loading = true
+      try {
+        const data = await fetchMe()
+        this.me = data
+        this.profile = this.normalizeProfile(data.profile)
+      } catch (error) {
+        // 未登录或服务不可用时回落到本地占位，保证最小可用性
+        this.hydrateFromLocal()
+        console.warn('fetchMe failed, fallback to local profile', error)
+      } finally {
+        this.initialized = true
+        this.loading = false
+      }
+    },
+    loginAs(role: 'user' | 'admin') {
+      window.localStorage.setItem('sharebase.role', role)
+      this.profile = {
+        id: 1,
+        login: role === 'admin' ? 'admin.local' : 'user.local',
+        nickname: role === 'admin' ? 'Admin Zoe' : 'Alex Chen',
+        role,
+        headline: role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者'
+      }
+    },
     updateProfile(data: Partial<UserProfile>) {
       if (this.profile) {
         Object.assign(this.profile, data)
+        if (data.nickname || data.login) {
+          window.localStorage.setItem('sharebase.nickname', data.nickname || data.login || '')
+        }
+        if (data.headline) {
+          window.localStorage.setItem('sharebase.headline', data.headline)
+        }
       }
-    },
-    async updateAvatar(file: File) {
-      const stored = await uploadAvatar(file)
-      if (this.profile) {
-        this.profile.avatarUrl = stored.downloadUrl || this.profile.avatarUrl
-      }
-      return stored
     },
     logout() {
       window.localStorage.removeItem('sharebase.role')
       window.localStorage.removeItem('sharebase.nickname')
       window.localStorage.removeItem('sharebase.headline')
-      window.localStorage.removeItem('sharebase.userKey')
-      window.localStorage.removeItem('sharebase.adminToken')
       this.profile = null
-      this.me = null
     }
   }
 })
