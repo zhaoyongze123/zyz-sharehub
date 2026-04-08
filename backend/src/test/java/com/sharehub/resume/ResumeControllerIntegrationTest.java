@@ -306,7 +306,7 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
-    void shouldFallbackBlankOrNullTemplateKeyToDefault() throws Exception {
+    void shouldFallbackBlankNullOrMissingTemplateKeyToDefault() throws Exception {
         Map<String, Object> nullTemplateRequest = new HashMap<>();
         nullTemplateRequest.put("templateKey", null);
 
@@ -322,6 +322,14 @@ class ResumeControllerIntegrationTest {
                 .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(nullTemplateRequest)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("default"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.templateKey").value("default"))
             .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));

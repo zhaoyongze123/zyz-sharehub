@@ -712,7 +712,7 @@ paths:
   /api/resumes/generate:
     post:
       summary: 生成简历 PDF
-      description: 当前实现按请求用户生成简历，联调可通过 `X-User-Key` 指定用户；`templateKey` 为空、`null` 或仅空白时会回落为 `default`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户生成简历，联调可通过 `X-User-Key` 指定用户；`templateKey` 未传、为空、`null` 或仅空白时会回落为 `default`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
