@@ -281,6 +281,35 @@ class MeControllerIntegrationTest {
     }
 
     @Test
+    void shouldTreatBlankNoteStatusFilterAsUnfiltered() throws Exception {
+        mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"笔记A","contentMd":"# note-a","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"笔记B","contentMd":"# note-b","visibility":"PRIVATE","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", "   ")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].title").value("笔记B"))
+            .andExpect(jsonPath("$.data.items[1].title").value("笔记A"));
+    }
+
+    @Test
     void shouldRejectAnonymousAccessToPersonalCenter() throws Exception {
         mockMvc.perform(get("/api/me"))
             .andExpect(status().isUnauthorized())

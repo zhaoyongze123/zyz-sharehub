@@ -188,6 +188,7 @@
 
 - `GET /api/me/resources` 返回的是当前用户自己的资料工作台列表，不是仅“已发布资料”
 - 默认不额外收窄 `status`，因此会同时返回该用户的草稿 / 已发布资料；如需只看已发布数据，需要显式传 `status=PUBLISHED`
+- `GET /api/me/notes` 的 `status` 为空字符串或仅空白时，按未传处理，不额外收窄结果
 
 ## 5. 资料模块
 
@@ -364,6 +365,7 @@
 - 全部接口统一通过 `RequestAccessService` 解析当前用户
 - 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
 - 列表、详情、更新、删除都只作用于当前用户自己的笔记
+- `GET /api/notes` 支持 `status` 筛选；当 `status` 为空字符串或仅空白时按未传处理
 - 访问他人笔记时当前统一按不存在返回 `404 NOTE_NOT_FOUND`
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - `404` 统一为 `NOTE_NOT_FOUND`

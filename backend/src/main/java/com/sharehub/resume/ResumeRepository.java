@@ -5,6 +5,7 @@ import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -201,8 +202,8 @@ public class ResumeRepository {
         UUID fileId = resultSet.getObject("file_id", UUID.class);
         String fileName = resultSet.getString("filename");
         long fileSize = resultSet.getLong("size");
-        Instant fileCreatedAt = resultSet.getObject("file_created_at", Instant.class);
-        Instant fileUpdatedAt = resultSet.getObject("file_updated_at", Instant.class);
+        Instant fileCreatedAt = toInstant(resultSet, "file_created_at");
+        Instant fileUpdatedAt = toInstant(resultSet, "file_updated_at");
         return new ResumeDto(
             id,
             resultSet.getString("template_key"),
@@ -214,5 +215,10 @@ public class ResumeRepository {
             fileCreatedAt,
             fileUpdatedAt
         );
+    }
+
+    private Instant toInstant(ResultSet resultSet, String column) throws SQLException {
+        Timestamp timestamp = resultSet.getTimestamp(column);
+        return timestamp == null ? null : timestamp.toInstant();
     }
 }

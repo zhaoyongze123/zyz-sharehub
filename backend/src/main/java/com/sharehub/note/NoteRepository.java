@@ -3,6 +3,7 @@ package com.sharehub.note;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -51,23 +52,35 @@ public class NoteRepository {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
         String normalizedStatus = normalize(status);
-        Long total = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM notes WHERE owner_key = ? AND (? IS NULL OR status = ?)",
-            Long.class,
-            ownerKey,
-            normalizedStatus,
-            normalizedStatus
-        );
+        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM notes WHERE owner_key = ?");
+        List<Object> countArgs = new ArrayList<>();
+        countArgs.add(ownerKey);
+        if (normalizedStatus != null) {
+            countSql.append(" AND status = ?");
+            countArgs.add(normalizedStatus);
+        }
+        Long total = jdbcTemplate.queryForObject(countSql.toString(), Long.class, countArgs.toArray());
+
         int offset = (safePage - 1) * safePageSize;
-        List<NoteDto> items = jdbcTemplate.query(
+        StringBuilder listSql = new StringBuilder(
             """
                 SELECT id, title, content_md, visibility, status
                 FROM notes
                 WHERE owner_key = ?
-                  AND (? IS NULL OR status = ?)
-                ORDER BY id DESC
-                LIMIT ? OFFSET ?
-                """,
+                """
+        );
+        List<Object> listArgs = new ArrayList<>();
+        listArgs.add(ownerKey);
+        if (normalizedStatus != null) {
+            listSql.append(" AND status = ?");
+            listArgs.add(normalizedStatus);
+        }
+        listSql.append(" ORDER BY id DESC LIMIT ? OFFSET ?");
+        listArgs.add(safePageSize);
+        listArgs.add(offset);
+
+        List<NoteDto> items = jdbcTemplate.query(
+            listSql.toString(),
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),
                 resultSet.getString("title"),
@@ -75,11 +88,7 @@ public class NoteRepository {
                 resultSet.getString("visibility"),
                 resultSet.getString("status")
             ),
-            ownerKey,
-            normalizedStatus,
-            normalizedStatus,
-            safePageSize,
-            offset
+            listArgs.toArray()
         );
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }

@@ -167,7 +167,7 @@ paths:
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理
       parameters:
         - name: page
           in: query
@@ -643,7 +643,7 @@ paths:
   /api/notes:
     get:
       summary: 笔记分页列表
-      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理
       parameters:
         - in: query
           name: page
@@ -655,6 +655,10 @@ paths:
           schema:
             type: integer
             default: 10
+        - in: query
+          name: status
+          schema:
+            type: string
       responses:
         '200':
           description: 成功
