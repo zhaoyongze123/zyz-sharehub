@@ -574,6 +574,48 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldKeepResumeRecordAccessibleWhenUnderlyingFileMissing() throws Exception {
+        String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> payload = objectMapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        Long id = Long.valueOf(String.valueOf(data.get("id")));
+        String fileId = String.valueOf(data.get("fileId"));
+
+        jdbcTemplate.update("DELETE FROM files WHERE id = ?", UUID.fromString(fileId));
+
+        mockMvc.perform(get("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(id.intValue()))
+            .andExpect(jsonPath("$.data.templateKey").value("classic"))
+            .andExpect(jsonPath("$.data.fileId").value(fileId))
+            .andExpect(jsonPath("$.data.fileUrl").value("/api/resumes/" + id + "/download"))
+            .andExpect(jsonPath("$.data.fileName").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.fileSize").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.fileCreatedAt").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.fileUpdatedAt").value(org.hamcrest.Matchers.nullValue()));
+
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].id").value(id.intValue()))
+            .andExpect(jsonPath("$.data.items[0].fileId").value(fileId))
+            .andExpect(jsonPath("$.data.items[0].fileName").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.items[0].fileSize").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.items[0].fileCreatedAt").value(org.hamcrest.Matchers.nullValue()))
+            .andExpect(jsonPath("$.data.items[0].fileUpdatedAt").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
     void shouldRejectBannedUserForResumeEndpoints() throws Exception {
         UserProfileDto bannedUser = userProfileRepository.upsert("resume-banned-user", "resume-banned-user", null);
         userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
