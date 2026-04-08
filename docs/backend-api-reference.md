@@ -419,6 +419,7 @@
 - `page`
 - `pageSize`
 - `status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理
+- `page`、`pageSize` 传入小于 `1` 的值时都会按 `1` 兜底
 - 用户已被封禁时返回 `403 USER_BANNED`
 
 真实返回字段重点：
