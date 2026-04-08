@@ -262,6 +262,36 @@ public class NoteControllerIntegrationTest {
     }
 
     @Test
+    void shouldFallbackInvalidPaginationParamsToOne() throws Exception {
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"First Note","contentMd":"# first","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Second Note","contentMd":"# second","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mvc.perform(get("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "0")
+                .param("pageSize", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("Second Note"));
+    }
+
+    @Test
     void shouldDefaultStatusToDraftWhenMissing() throws Exception {
         mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
