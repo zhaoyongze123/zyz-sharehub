@@ -469,6 +469,8 @@
 `GET /api/resumes/workbench`
 
 - 按当前用户聚合简历统计
+- `templateBreakdown` 按数量倒序返回；数量相同时按 `templateKey` 升序稳定排序
+- `recentItems` 按创建时间倒序返回；时间相同时按 `id` 倒序稳定排序
 - `recentItems` 元素结构与简历列表项保持一致，包含 `fileUrl`、`fileName`、`fileSize`、`fileCreatedAt`、`fileUpdatedAt`
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 用户已被封禁时返回 `403 USER_BANNED`
