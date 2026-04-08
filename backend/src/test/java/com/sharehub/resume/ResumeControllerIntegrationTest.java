@@ -1,6 +1,8 @@
 package com.sharehub.resume;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,10 +42,14 @@ class ResumeControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private UserProfileRepository userProfileRepository;
+
     @BeforeEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
+        jdbcTemplate.update("DELETE FROM users");
     }
 
     @Test
@@ -392,5 +398,49 @@ class ResumeControllerIntegrationTest {
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound())
             .andExpect(content().string(""));
+    }
+
+    @Test
+    void shouldRejectBannedUserForResumeEndpoints() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert("resume-banned-user", "resume-banned-user", null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, bannedUser.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/resumes/1")
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/resumes/1/download")
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(delete("/api/resumes/1")
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/resumes/workbench")
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
     }
 }

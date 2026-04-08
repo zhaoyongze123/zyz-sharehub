@@ -1,6 +1,7 @@
 package com.sharehub.resume;
 
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
 import com.sharehub.files.FileCategory;
@@ -31,17 +32,20 @@ public class ResumeController {
     private final FileStorageService fileStorageService;
     private final FileRepository fileRepository;
     private final RequestAccessService requestAccessService;
+    private final UserProfileRepository userProfileRepository;
 
     public ResumeController(
         ResumeRepository resumeRepository,
         FileStorageService fileStorageService,
         FileRepository fileRepository,
-        RequestAccessService requestAccessService
+        RequestAccessService requestAccessService,
+        UserProfileRepository userProfileRepository
     ) {
         this.resumeRepository = resumeRepository;
         this.fileStorageService = fileStorageService;
         this.fileRepository = fileRepository;
         this.requestAccessService = requestAccessService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @PostMapping("/generate")
@@ -50,7 +54,7 @@ public class ResumeController {
         HttpServletRequest request,
         @RequestBody Map<String, Object> req
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         String templateKey = String.valueOf(req.getOrDefault("templateKey", "default"));
         byte[] pdfBytes = fileStorageService.buildSimplePdf("ShareHub Resume", "template=" + templateKey);
         StoredFileDto storedFile = fileStorageService.storeBytes(
@@ -75,7 +79,7 @@ public class ResumeController {
         @RequestParam(required = false) String templateKey,
         @RequestParam(required = false) String keyword
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(resumeRepository.list(
             ownerKey,
             page,
@@ -88,19 +92,19 @@ public class ResumeController {
 
     @GetMapping("/workbench")
     public ApiResponse<ResumeWorkbenchDto> workbench(Authentication authentication, HttpServletRequest request) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(resumeRepository.workbench(ownerKey));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<ResumeDto> detail(Authentication authentication, HttpServletRequest request, @PathVariable Long id) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(resumeRepository.findOwned(id, ownerKey));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<String> delete(Authentication authentication, HttpServletRequest request, @PathVariable Long id) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResumeDto resume = resumeRepository.findOwned(id, ownerKey);
         if (resume.fileId() != null) {
             fileRepository.deleteById(resume.fileId());
@@ -111,7 +115,7 @@ public class ResumeController {
 
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(Authentication authentication, HttpServletRequest request, @PathVariable Long id) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResumeDto resume = resumeRepository.findOwned(id, ownerKey);
         Optional<FileRecord> record = fileStorageService.load(resume.fileId());
         if (record.isEmpty()) {
@@ -131,5 +135,12 @@ public class ResumeController {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(ownerKey, ownerKey, null);
+        userProfileRepository.ensureActive(ownerKey);
+        return ownerKey;
     }
 }
