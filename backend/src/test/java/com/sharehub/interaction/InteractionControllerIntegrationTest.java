@@ -300,6 +300,35 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("USER_BANNED"));
     }
 
+    @Test
+    void commentEndpointsShouldRejectBlankContent() throws Exception {
+        long resourceId = createResource("空评论校验资源");
+
+        mvc.perform(post("/api/resources/" + resourceId + "/comments")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("content", " "))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COMMENT_CONTENT_REQUIRED"));
+
+        jdbcTemplate.update(
+            """
+                INSERT INTO comments (resource_id, note_id, parent_id, author_key, content, status, created_at)
+                VALUES (?, NULL, NULL, ?, ?, 'VISIBLE', CURRENT_TIMESTAMP)
+                """,
+            resourceId,
+            USER_KEY,
+            "root"
+        );
+
+        mvc.perform(post("/api/comments/1/reply")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("content", ""))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("COMMENT_CONTENT_REQUIRED"));
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {
         return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }

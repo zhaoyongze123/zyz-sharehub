@@ -477,6 +477,7 @@
 - 举报也主要围绕 `RESOURCE`
 - 还没有真正抽象成多内容类型互动模型
 - 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，用户被封禁时返回 `403/USER_BANNED`，目标资源不存在时返回 `404/RESOURCE_NOT_FOUND`
+- `POST /api/resources/{id}/comments` 和 `POST /api/comments/{id}/reply` 在 `content` 缺失、空字符串或仅空白字符时返回 `400 COMMENT_CONTENT_REQUIRED`
 
 ## 11. 后台治理
 

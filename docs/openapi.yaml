@@ -938,10 +938,12 @@ paths:
           description: 成功
     post:
       summary: 发表评论
-      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；评论内容为空时返回 `400 COMMENT_CONTENT_REQUIRED`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '400':
+          description: 评论内容为空（错误码 `COMMENT_CONTENT_REQUIRED`）
         '404':
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
@@ -951,10 +953,12 @@ paths:
   /api/comments/{id}/reply:
     post:
       summary: 回复评论
-      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；评论内容为空时返回 `400 COMMENT_CONTENT_REQUIRED`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '400':
+          description: 评论内容为空（错误码 `COMMENT_CONTENT_REQUIRED`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
         '403':
