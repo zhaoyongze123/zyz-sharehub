@@ -932,7 +932,7 @@ paths:
   /api/resumes/workbench:
     get:
       summary: 获取我的简历工作台聚合信息
-      description: 当前实现按请求用户聚合数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户聚合数据，联调可通过 `X-User-Key` 指定用户；`templateBreakdown` 按数量倒序返回，`recentItems` 按创建时间倒序且最多返回最近 5 条；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -1371,10 +1371,12 @@ components:
           format: int64
         templateBreakdown:
           type: array
+          description: 按模板聚合后的统计列表，按数量倒序返回
           items:
             $ref: '#/components/schemas/ResumeTemplateBreakdownDto'
         recentItems:
           type: array
+          description: 最近生成的简历记录，按创建时间倒序返回，最多 5 条
           items:
             $ref: '#/components/schemas/ResumeDto'
     ResumeTemplateBreakdownDto:

@@ -333,6 +333,33 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldLimitWorkbenchRecentItemsToLatestFiveForCurrentOwner() throws Exception {
+        for (int i = 1; i <= 6; i++) {
+            mockMvc.perform(post("/api/resumes/generate")
+                    .header(USER_KEY_HEADER, DEFAULT_USER)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("templateKey", "default-" + i))))
+                .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, OTHER_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "other-owner"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/resumes/workbench")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(6))
+            .andExpect(jsonPath("$.data.generatedCount").value(6))
+            .andExpect(jsonPath("$.data.recentItems.length()").value(5))
+            .andExpect(jsonPath("$.data.recentItems[0].templateKey").value("default-6"))
+            .andExpect(jsonPath("$.data.recentItems[4].templateKey").value("default-2"))
+            .andExpect(jsonPath("$.data.templateBreakdown.length()").value(6));
+    }
+
+    @Test
     void shouldFallbackBlankNullOrMissingTemplateKeyToDefault() throws Exception {
         Map<String, Object> nullTemplateRequest = new HashMap<>();
         nullTemplateRequest.put("templateKey", null);
