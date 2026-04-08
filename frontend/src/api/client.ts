@@ -9,18 +9,15 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const savedRole = window.localStorage.getItem('sharebase.role')
-  const savedNickname = window.localStorage.getItem('sharebase.nickname')
   const savedUserKey = window.localStorage.getItem('sharebase.userKey')
+  const savedNickname = window.localStorage.getItem('sharebase.nickname')
 
   if (savedRole === 'admin') {
     config.headers['X-Admin-Token'] = window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token'
   }
 
-  if (savedUserKey) {
-    config.headers['X-User-Key'] = savedUserKey
-  } else if (savedRole === 'user' || savedRole === 'admin') {
-    config.headers['X-User-Key'] = window.localStorage.getItem('sharebase.userKey') || savedNickname || 'frontend-local-user'
-  }
+  const userKey = savedUserKey || savedNickname || 'frontend-local-user'
+  config.headers['X-User-Key'] = userKey
 
   return config
 })
@@ -35,8 +32,7 @@ apiClient.interceptors.response.use(
       authStore.logout()
       appStore.showToast('登录已失效', '请重新登录后继续操作', 'error')
     } else {
-      const message = error.response?.data?.message ?? error.response?.data?.msg ?? '服务暂时不可用，请稍后再试'
-      appStore.showToast('请求失败', message, 'error')
+      appStore.showToast('请求失败', error.response?.data?.msg ?? '服务暂时不可用，请稍后再试', 'error')
     }
 
     return Promise.reject(error)
