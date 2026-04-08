@@ -585,21 +585,6 @@ paths:
                   data:
                     type: object
                     properties:
-                      items:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            id:
-                              type: integer
-                            templateKey:
-                              type: string
-                            status:
-                              type: string
-                              description: 当前生成状态，如 PUBLISHED、GENERATED
-                            fileUrl:
-                              type: string
-                              description: 下载链接（当前返回 placeholder）
                       total:
                         type: integer
                         description: 总记录数
@@ -618,6 +603,7 @@ paths:
                               type: string
                             status:
                               type: string
+                              description: 当前生成状态，如 GENERATED
                             fileUrl:
                               type: string
                               description: 实际返回下载链接 `/api/resumes/{id}/download`
