@@ -137,7 +137,7 @@ public class MeService {
         if (value == null || value.isBlank()) {
             return null;
         }
-        return value;
+        return value.trim();
     }
 
     private long countResourcesByStatus(String ownerKey, String status) {
