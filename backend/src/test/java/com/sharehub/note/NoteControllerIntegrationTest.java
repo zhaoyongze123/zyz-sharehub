@@ -302,6 +302,33 @@ public class NoteControllerIntegrationTest {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Null Status Note","contentMd":"# content","visibility":"PUBLIC","status":null}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Blank Status Note","contentMd":"# content","visibility":"PUBLIC","status":""}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Whitespace Status Note","contentMd":"# content","visibility":"PUBLIC","status":"   "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
     }
 
     @Test
