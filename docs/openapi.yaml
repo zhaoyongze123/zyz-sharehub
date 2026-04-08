@@ -304,6 +304,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredFileUploadResponse'
         '400':
           description: 文件校验失败（错误码可能为 `FILE_OWNER_REQUIRED`、`FILE_REFERENCE_REQUIRED`、`FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
           content:
@@ -324,6 +328,15 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            Content-Type:
+              description: 入库时的 `contentType`；若为空则回落到 `application/octet-stream`
+              schema:
+                type: string
+            Content-Disposition:
+              description: 固定为 `attachment; filename="{原始文件名}"`
+              schema:
+                type: string
           content:
             application/octet-stream:
               schema:
@@ -1070,3 +1083,46 @@ components:
         message:
           type: string
           description: 出错提示
+    StoredFileUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/StoredFileDto'
+    StoredFileDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner:
+          type: string
+        category:
+          type: string
+          enum:
+            - AVATAR
+            - RESOURCE_ATTACHMENT
+            - RESUME_PDF
+        referenceType:
+          type: string
+        referenceId:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+          nullable: true
+        size:
+          type: integer
+          format: int64
+        checksum:
+          type: string
+          description: SHA-256 十六进制摘要
+        downloadUrl:
+          type: string
+          description: 文件下载地址，形如 `/api/files/{uuid}`
+        createdAt:
+          type: string
+          format: date-time
