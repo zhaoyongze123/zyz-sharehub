@@ -401,6 +401,7 @@
 真实行为：
 
 - 根据 `templateKey` 生成简单 PDF
+- `templateKey` 未传、为 `null`、空字符串或仅空白时统一回落为 `default`
 - PDF 入 PostgreSQL 文件表
 - 再创建简历记录
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
@@ -417,6 +418,7 @@
 - `keyword`
 - `page`
 - `pageSize`
+- `status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理
 - 用户已被封禁时返回 `403 USER_BANNED`
 
 真实返回字段重点：

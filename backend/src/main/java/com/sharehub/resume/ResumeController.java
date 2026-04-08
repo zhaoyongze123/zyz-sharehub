@@ -52,7 +52,7 @@ public class ResumeController {
     public ApiResponse<ResumeDto> generate(
         Authentication authentication,
         HttpServletRequest request,
-        @RequestBody Map<String, Object> req
+        @RequestBody(required = false) Map<String, Object> req
     ) {
         String ownerKey = requireActiveUser(authentication, request);
         String templateKey = normalizeTemplateKey(req == null ? null : req.get("templateKey"));
