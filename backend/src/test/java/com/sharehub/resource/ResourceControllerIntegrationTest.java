@@ -2,6 +2,8 @@ package com.sharehub.resource;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +44,9 @@ class ResourceControllerIntegrationTest {
 
     @Autowired
     private ResourceRepository resourceRepository;
+
+    @Autowired
+    private UserProfileRepository userProfileRepository;
 
     @BeforeEach
     void cleanUp() {
@@ -377,6 +382,49 @@ class ResourceControllerIntegrationTest {
                 .file(file))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+    }
+
+    @Test
+    void shouldRejectBannedUserForResourceMutationEndpoints() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert("resource-banned-user", "resource-banned-user", null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+        long resourceId = createResource("封禁态资源", "PDF", "PUBLIC", "java", "封禁校验");
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "guide.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            "pdf-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(post("/api/resources")
+                .header(USER_KEY_HEADER, bannedUser.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resourceBody("封禁创建", "PDF", "PUBLIC", "java", "创建")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(put("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, bannedUser.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resourceBody("封禁更新", "DOC", "PRIVATE", "spring", "更新")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(delete("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(post("/api/resources/{id}/publish", resourceId)
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(file)
+                .header(USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
     }
 
     private long createResource(String title, String category, String visibility, String tags, String summary) throws Exception {

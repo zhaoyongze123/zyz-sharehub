@@ -72,7 +72,7 @@ public class ResourceController {
         HttpServletRequest request,
         @Valid @RequestBody ResourceDto req
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity entity = new ResourceEntity();
         entity.setTitle(req.title());
         entity.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
@@ -185,7 +185,7 @@ public class ResourceController {
         @PathVariable Long id,
         @Valid @RequestBody ResourceDto req
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity existing = requireOwnedResource(id, ownerKey);
         existing.setTitle(req.title());
         existing.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
@@ -204,7 +204,7 @@ public class ResourceController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity entity = requireOwnedResource(id, ownerKey, "RESOURCE_NOT_FOUND");
         repository.delete(entity);
         return ApiResponse.ok("DELETED");
@@ -216,7 +216,7 @@ public class ResourceController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity entity = requireOwnedResource(id, ownerKey);
         entity.setStatus("PUBLISHED");
         return ApiResponse.ok(enrichResource(repository.save(entity)));
@@ -294,7 +294,7 @@ public class ResourceController {
         @PathVariable Long id,
         @RequestPart("file") MultipartFile file
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity entity = requireOwnedResource(id, ownerKey, "RESOURCE_NOT_FOUND");
         StoredFileDto stored = fileStorageService.storeMultipart(
             ownerKey,
@@ -323,5 +323,12 @@ public class ResourceController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "RESOURCE_FORBIDDEN");
         }
         return entity;
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(userKey, userKey, null);
+        userProfileRepository.ensureActive(userKey);
+        return userKey;
     }
 }

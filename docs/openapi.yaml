@@ -407,12 +407,18 @@ paths:
           description: 成功
     post:
       summary: 创建资料
-      description: 需要当前用户身份，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 需要当前用户身份，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
         '401':
           description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
           content:
             application/json:
               schema:
@@ -439,7 +445,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: 更新资料
-      description: 当前实现只允许 owner 更新自己的资料；联调可通过 `X-User-Key` 指定用户，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      description: 当前实现只允许 owner 更新自己的资料；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`
       responses:
         '200':
           description: 成功
@@ -450,14 +456,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 无权操作（错误码 `RESOURCE_FORBIDDEN`）
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: 删除资料
-      description: 当前实现只允许 owner 删除自己的资料；联调可通过 `X-User-Key` 指定用户，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      description: 当前实现只允许 owner 删除自己的资料；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`
       responses:
         '200':
           description: 成功
@@ -468,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 无权操作（错误码 `RESOURCE_FORBIDDEN`）
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
           content:
             application/json:
               schema:
@@ -482,7 +488,7 @@ paths:
   /api/resources/{id}/publish:
     post:
       summary: 发布资料
-      description: 当前实现只允许 owner 发布自己的资料；联调可通过 `X-User-Key` 指定用户，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      description: 当前实现只允许 owner 发布自己的资料；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`
       responses:
         '200':
           description: 成功
@@ -493,7 +499,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 无权操作（错误码 `RESOURCE_FORBIDDEN`）
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
           content:
             application/json:
               schema:
@@ -514,7 +520,7 @@ paths:
   /api/resources/{id}/attachment:
     post:
       summary: 上传资料附件
-      description: 当前实现只允许 owner 上传自己的资料附件；联调可通过 `X-User-Key` 指定用户，非 owner 返回 `403 RESOURCE_FORBIDDEN`；成功后返回 `resourceId` 与文件元数据，其中 `file.contentType` 始终有值，上传缺省或非法时回落为 `application/octet-stream`
+      description: 当前实现只允许 owner 上传自己的资料附件；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`；成功后返回 `resourceId` 与文件元数据，其中 `file.contentType` 始终有值，上传缺省或非法时回落为 `application/octet-stream`
       requestBody:
         required: true
         content:
@@ -545,7 +551,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 无权操作（错误码 `RESOURCE_FORBIDDEN`）
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
           content:
             application/json:
               schema:
