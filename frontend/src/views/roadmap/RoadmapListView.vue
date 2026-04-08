@@ -50,39 +50,55 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
-import { roadmaps } from '@/mock/roadmaps'
+import { fetchRoadmapList, type Roadmap } from '@/api/roadmaps'
 
 const route = useRoute()
 const keyword = ref(String(route.query.keyword || ''))
 const category = ref('全部')
+const roadmaps = ref<Roadmap[]>([])
+const loading = ref(false)
+const error = ref(false)
 
-const categoryOptions = [
-  { label: '全部路线', value: '全部' },
-  { label: '后端架构', value: '后端' },
-  { label: '前端工程', value: '前端' },
-  { label: '基础底座', value: '基础' }
-]
+const categoryOptions = [{ label: '全部路线', value: '全部' }]
 
 const filteredRoadmaps = computed(() => {
-  return roadmaps.filter((item) => {
-    const matchKeyword = !keyword.value || `${item.title}${item.description}`.toLowerCase().includes(keyword.value.toLowerCase())
-    const matchCategory = category.value === '全部' || item.category === category.value
+  return roadmaps.value.filter((item) => {
+    const matchKeyword =
+      !keyword.value ||
+      `${item.title}${item.description ?? ''}`.toLowerCase().includes(keyword.value.toLowerCase())
+    const matchCategory = category.value === '全部'
     return matchKeyword && matchCategory
   })
 })
 
 const status = computed(() => {
-  if (keyword.value === 'error') return 'error'
-  if (keyword.value === 'loading') return 'loading'
+  if (error.value) return 'error'
+  if (loading.value) return 'loading'
   if (!filteredRoadmaps.value.length) return 'empty'
   return 'ready'
 })
+
+async function loadRoadmaps() {
+  loading.value = true
+  error.value = false
+  try {
+    const data = await fetchRoadmapList(1, 50)
+    roadmaps.value = data.items
+  } catch (e) {
+    console.error(e)
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadRoadmaps)
 </script>
 
 <style scoped lang="scss">

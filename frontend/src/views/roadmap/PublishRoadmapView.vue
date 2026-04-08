@@ -18,9 +18,9 @@
         </div>
 
         <div class="form-actions">
-          <BaseButton variant="secondary" @click="addNode">新增节点</BaseButton>
-          <BaseButton variant="secondary" @click="saveDraft">保存草稿</BaseButton>
-          <BaseButton @click="publishRoadmap">发布路线</BaseButton>
+          <BaseButton variant="secondary" @click="addNode" :disabled="publishing">新增节点</BaseButton>
+          <BaseButton variant="secondary" @click="saveDraft" :disabled="publishing">保存草稿</BaseButton>
+          <BaseButton @click="publishRoadmap" :disabled="publishing">发布路线</BaseButton>
         </div>
       </div>
     </section>
@@ -34,15 +34,19 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import { addRoadmapNode, createRoadmap } from '@/api/roadmaps'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
+const router = useRouter()
 const title = ref('')
 const summary = ref('')
+const publishing = ref(false)
 const nodes = reactive([
   { id: 1, title: '阶段 1：协议与接入', summary: '' },
   { id: 2, title: '阶段 2：工作流编排', summary: '' }
@@ -56,12 +60,31 @@ function saveDraft() {
   appStore.showToast('草稿已保存', '路线节点和简介都已临时保留')
 }
 
-function publishRoadmap() {
+async function publishRoadmap() {
   if (!title.value.trim()) {
     appStore.showToast('校验失败', '路线标题不能为空', 'error')
     return
   }
-  appStore.showToast('发布成功', '路线已进入公开展示流程')
+  publishing.value = true
+  try {
+    const roadmap = await createRoadmap({ title: title.value, description: summary.value })
+    await Promise.all(
+      nodes.map((node, index) =>
+        addRoadmapNode(roadmap.id, {
+          title: node.title || `节点 ${index + 1}`,
+          orderNo: index + 1,
+          parentId: null
+        })
+      )
+    )
+    appStore.showToast('发布成功', '路线已进入公开展示流程')
+    router.push({ name: 'roadmap-detail', params: { id: roadmap.id } })
+  } catch (e) {
+    console.error(e)
+    appStore.showToast('发布失败', '请检查登录态或稍后再试', 'error')
+  } finally {
+    publishing.value = false
+  }
 }
 </script>
 

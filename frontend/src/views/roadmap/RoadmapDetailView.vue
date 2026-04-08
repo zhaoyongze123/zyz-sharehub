@@ -1,7 +1,15 @@
 <template>
-  <div class="page-shell detail-grid" v-if="roadmap">
+  <div class="page-shell" v-if="status === 'loading'">
+    <BaseSkeleton height="18rem" />
+    <div class="detail-grid" style="margin-top: var(--space-5);">
+      <BaseSkeleton height="14rem" />
+      <BaseSkeleton height="14rem" />
+    </div>
+  </div>
+
+  <div class="page-shell detail-grid" v-else-if="status === 'ready' && roadmap">
     <section class="detail-main">
-      <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.summary">
+      <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.description || ''">
         <template #actions>
           <BaseButton @click="markComplete">标记本阶段完成</BaseButton>
           <BaseButton variant="secondary" @click="favoriteRoadmap">收藏路线</BaseButton>
@@ -13,7 +21,7 @@
           <h2>节点进度结构</h2>
           <p>点击每个阶段节点，即可查看具体的内容、学习资源与讨论。</p>
         </div>
-        <RoadmapTimeline :items="roadmapTimeline" @node-click="openNodeDetail" />
+        <RoadmapTimeline :items="timelineItems" @node-click="openNodeDetail" />
       </div>
 
       <div class="glass-panel panel">
@@ -36,7 +44,7 @@
     </section>
 
     <aside class="detail-side">
-      <BaseEmpty title="阶段进度" :description="`当前模拟进度 ${progress}%`" />
+      <BaseEmpty title="阶段进度" :description="`当前进度 ${progress}%`" />
       <BaseEmpty title="联动" description="后续可接已完成节点、路线收藏和评论接口。" />
     </aside>
 
@@ -71,7 +79,7 @@
               <div class="i-carbon-document resource-icon"></div>
               <div class="resource-info">
                 <span class="resource-title">{{ resources[selectedNodeIndex].title }}</span>
-                <span class="resource-meta">{{ resources[selectedNodeIndex].type }} · {{ resources[selectedNodeIndex].rating }}分</span>
+                <span class="resource-meta">{{ resources[selectedNodeIndex].fileType }} · {{ resources[selectedNodeIndex].likes }} 赞</span>
               </div>
 <button class="view-btn" @click="goToResource(resources[selectedNodeIndex].id)">查看</button>
             </div>
@@ -92,32 +100,75 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import CommentList from '@/components/business/CommentList.vue'
 import HeroBanner from '@/components/business/HeroBanner.vue'
 import ResourceCard from '@/components/business/ResourceCard.vue'
 import RoadmapTimeline from '@/components/business/RoadmapTimeline.vue'
+import { fetchRoadmapDetail, updateRoadmapProgress, type RoadmapNode } from '@/api/roadmaps'
 import { resourceComments, resources } from '@/mock/resources'
-import { roadmapTimeline, roadmaps } from '@/mock/roadmaps'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
-const roadmap = computed(() => roadmaps.find((item) => String(item.id) === String(route.params.id)))
-const progress = ref(46)
+const roadmap = ref<{ id: number; title: string; description?: string } | null>(null)
+const nodes = ref<RoadmapNode[]>([])
+const progress = ref(0)
+const loading = ref(false)
+const error = ref(false)
 
 // Node modal state
 const selectedNode = ref<any>(null)
 const selectedNodeIndex = ref<number | null>(null)
 
+const timelineItems = computed(() =>
+  flattenNodes(nodes.value).map((node) => ({
+    title: node.title,
+    summary: node.orderNo ? `顺序：${node.orderNo}` : '暂无描述',
+    tasks: []
+  }))
+)
+
+const status = computed(() => {
+  if (error.value) return 'error'
+  if (loading.value) return 'loading'
+  if (roadmap.value) return 'ready'
+  return 'error'
+})
+
+async function loadDetail() {
+  loading.value = true
+  error.value = false
+  try {
+    const data = await fetchRoadmapDetail(route.params.id as string)
+    roadmap.value = data.roadmap
+    nodes.value = data.nodes ?? []
+    progress.value = extractProgressPercent(data.progress)
+  } catch (e) {
+    console.error(e)
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
 function markComplete() {
-  progress.value = Math.min(100, progress.value + 18)
-  appStore.showToast('进度已更新', `当前路线完成度 ${progress.value}%`)
+  if (!roadmap.value) return
+  const next = Math.min(100, progress.value + 18)
+  updateRoadmapProgress(roadmap.value.id, { percent: next })
+    .then(() => {
+      progress.value = next
+      appStore.showToast('进度已更新', `当前路线完成度 ${progress.value}%`)
+    })
+    .catch(() => {
+      appStore.showToast('更新失败', '请稍后重试', 'error')
+    })
 }
 
 function favoriteRoadmap() {
@@ -146,6 +197,28 @@ function goToResource(id: number) {
   router.push({ name: 'resource-detail', params: { id } })
   closeNodeDetail()
 }
+
+function flattenNodes(tree: RoadmapNode[]): RoadmapNode[] {
+  const result: RoadmapNode[] = []
+  tree.forEach((node) => {
+    result.push(node)
+    if (node.children?.length) {
+      result.push(...flattenNodes(node.children))
+    }
+  })
+  return result
+}
+
+function extractProgressPercent(progressPayload: Record<string, any>): number {
+  if (!progressPayload) return 0
+  if (typeof progressPayload.percent === 'number') return progressPayload.percent
+  const completed = Array.isArray(progressPayload.completedNodeIds) ? progressPayload.completedNodeIds.length : 0
+  const total = nodes.value.length
+  if (!total) return 0
+  return Math.round((completed * 100) / total)
+}
+
+onMounted(loadDetail)
 </script>
 
 <style scoped lang="scss">

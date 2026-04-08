@@ -10,3 +10,17 @@ export interface PageResult<T> {
   pageNum: number
   pageSize: number
 }
+
+export interface BackendResponse<T> {
+  success: boolean
+  code: string
+  data: T
+  message: string
+}
+
+export interface PageData<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  total: number
+}
