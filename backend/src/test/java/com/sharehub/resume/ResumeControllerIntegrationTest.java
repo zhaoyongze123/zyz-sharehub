@@ -327,6 +327,36 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldDefaultTemplateKeyWhenGenerateRequestMissingOrBlank() throws Exception {
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("default"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"templateKey":null}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("default"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"templateKey":"   "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("default"))
+            .andExpect(jsonPath("$.data.fileName").value("resume-default.pdf"));
+    }
+
+    @Test
     void shouldReturnResumeWorkbenchSummary() throws Exception {
         mockMvc.perform(post("/api/resumes/generate")
                 .header(USER_KEY_HEADER, DEFAULT_USER)
