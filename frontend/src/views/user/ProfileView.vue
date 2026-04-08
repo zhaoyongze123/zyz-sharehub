@@ -186,6 +186,7 @@ import { uploadAvatar } from '@/api/me'
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const defaultAvatar = 'https://avatars.githubusercontent.com/u/9919?s=64&v=4'
 
 const currentTab = ref('profile')
 
@@ -200,7 +201,7 @@ const currentTabLabel = computed(() => {
   return tabs.find(t => t.id === currentTab.value)?.label || '设置'
 })
 
-const avatarSrc = computed(() => authStore.profile?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4')
+const avatarSrc = computed(() => authStore.profile?.avatarUrl || defaultAvatar)
 
 // 个人资料相关
 const profileForm = reactive({
@@ -219,7 +220,6 @@ watch(
 )
 
 const avatarUploading = ref(false)
-
 const showToast = ref(false)
 const toastMessage = ref('')
 

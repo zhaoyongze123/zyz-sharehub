@@ -22,15 +22,15 @@ export interface MeData {
     avatarUrl?: string | null
     status?: string | null
   }
-  myResourceCount: number
-  myFavoriteCount: number
-  myRoadmapCount: number
-  myNoteCount: number
-  myResumeCount: number
-  recentResourceCount: number
-  publishedResourceCount: number
-  draftNoteCount: number
-  generatedResumeCount: number
+  myResourceCount?: number
+  myFavoriteCount?: number
+  myRoadmapCount?: number
+  myNoteCount?: number
+  myResumeCount?: number
+  recentResourceCount?: number
+  publishedResourceCount?: number
+  draftNoteCount?: number
+  generatedResumeCount?: number
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -53,16 +53,16 @@ export const useAuthStore = defineStore('auth', {
       const normalized: UserProfile = {
         id: profile.id,
         login: profile.login,
-        name: profile.name,
+        name: profile.name ?? null,
         nickname: profile.name ?? profile.login,
         role,
         headline: this.profile?.headline ?? '',
-        avatarUrl: profile.avatarUrl,
-        avatarFileId: profile.avatarFileId,
+        avatarUrl: profile.avatarUrl ?? null,
+        avatarFileId: profile.avatarFileId ?? null,
         status: profile.status ?? null
       }
 
-      window.localStorage.setItem('sharebase.nickname', normalized.login)
+      window.localStorage.setItem('sharebase.nickname', normalized.nickname || normalized.login)
       if (!window.localStorage.getItem('sharebase.role')) {
         window.localStorage.setItem('sharebase.role', role)
       }
@@ -107,6 +107,7 @@ export const useAuthStore = defineStore('auth', {
     },
     loginAs(role: 'user' | 'admin') {
       window.localStorage.setItem('sharebase.role', role)
+      window.localStorage.setItem('sharebase.userKey', role === 'admin' ? 'dev-admin' : 'dev-user')
       this.profile = {
         id: 1,
         login: role === 'admin' ? 'admin.local' : 'user.local',
@@ -130,7 +131,10 @@ export const useAuthStore = defineStore('auth', {
       window.localStorage.removeItem('sharebase.role')
       window.localStorage.removeItem('sharebase.nickname')
       window.localStorage.removeItem('sharebase.headline')
+      window.localStorage.removeItem('sharebase.userKey')
+      window.localStorage.removeItem('sharebase.adminToken')
       this.profile = null
+      this.me = null
     }
   }
 })
