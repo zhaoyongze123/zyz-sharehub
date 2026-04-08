@@ -78,4 +78,15 @@ class FileControllerTest {
             .isEqualTo("attachment; filename=\"resume.pdf\"");
         assertThat(response.getBody()).containsExactly(1, 2);
     }
+
+    @Test
+    void downloadReturnsNotFoundWhenFileMissing() {
+        UUID id = UUID.randomUUID();
+        when(storageService.load(id)).thenReturn(Optional.empty());
+
+        ResponseEntity<byte[]> response = controller.download(id);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getBody()).isNull();
+    }
 }
