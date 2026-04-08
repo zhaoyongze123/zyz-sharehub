@@ -44,6 +44,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
@@ -84,6 +88,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePageResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
@@ -120,6 +128,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoadmapWorkbenchPageResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
@@ -152,6 +164,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePageResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
@@ -188,6 +204,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePageResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
@@ -1402,6 +1422,68 @@ components:
         message:
           type: string
           description: 出错提示
+    UserProfileDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        name:
+          type: string
+          nullable: true
+        avatarFileId:
+          type: string
+          format: uuid
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        status:
+          type: string
+    MeDto:
+      type: object
+      properties:
+        profile:
+          $ref: '#/components/schemas/UserProfileDto'
+        myResourceCount:
+          type: integer
+          format: int64
+        myFavoriteCount:
+          type: integer
+          format: int64
+        myRoadmapCount:
+          type: integer
+          format: int64
+        myNoteCount:
+          type: integer
+          format: int64
+        myResumeCount:
+          type: integer
+          format: int64
+        recentResourceCount:
+          type: integer
+          format: int64
+        publishedResourceCount:
+          type: integer
+          format: int64
+        draftNoteCount:
+          type: integer
+          format: int64
+        generatedResumeCount:
+          type: integer
+          format: int64
+    MeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/MeDto'
+        message:
+          type: string
     StoredFileUploadResponse:
       type: object
       properties:
@@ -1486,6 +1568,78 @@ components:
         fileUpdatedAt:
           type: string
           format: date-time
+    ResourceDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        externalUrl:
+          type: string
+          nullable: true
+        objectKey:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        author:
+          type: string
+          nullable: true
+        likes:
+          type: integer
+          format: int64
+        favorites:
+          type: integer
+          format: int64
+        downloadCount:
+          type: integer
+          format: int64
+    ResourcePageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResourceDto'
+        message:
+          type: string
     NoteDto:
       type: object
       properties:
@@ -1594,6 +1748,51 @@ components:
         count:
           type: integer
           format: int64
+    RoadmapWorkbenchDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        nodeCount:
+          type: integer
+        completedNodeCount:
+          type: integer
+        progressPercent:
+          type: integer
+    RoadmapWorkbenchPageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoadmapWorkbenchDto'
+        message:
+          type: string
     ResourceAttachmentUploadResponse:
       type: object
       properties:
