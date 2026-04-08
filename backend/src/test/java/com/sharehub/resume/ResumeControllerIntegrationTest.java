@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.UUID;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -213,5 +215,50 @@ class ResumeControllerIntegrationTest {
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.templateKey").value("classic"));
+    }
+
+    @Test
+    void shouldRequireUserForResumeEndpoints() throws Exception {
+        mockMvc.perform(get("/api/resumes"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/resumes/workbench"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+    }
+
+    @Test
+    void shouldReturnResumeErrorCodesForMissingResumeAndFile() throws Exception {
+        mockMvc.perform(get("/api/resumes/999999")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESUME_NOT_FOUND"));
+
+        String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> payload = objectMapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        Long id = Long.valueOf(String.valueOf(data.get("id")));
+        String fileId = String.valueOf(data.get("fileId"));
+
+        jdbcTemplate.update("DELETE FROM files WHERE id = ?", UUID.fromString(fileId));
+
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isNotFound());
     }
 }

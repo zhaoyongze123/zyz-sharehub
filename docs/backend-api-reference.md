@@ -337,6 +337,7 @@
 - 根据 `templateKey` 生成简单 PDF
 - PDF 入 PostgreSQL 文件表
 - 再创建简历记录
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 
 ### 8.2 列表接口
 
@@ -357,6 +358,31 @@
 - `fileSize`
 - `fileCreatedAt`
 - `fileUpdatedAt`
+
+### 8.3 详情 / 删除 / 下载
+
+`GET /api/resumes/{id}`
+
+- 只允许访问当前用户拥有的简历
+- 不存在或非 owner 统一返回 `404 RESUME_NOT_FOUND`
+
+`DELETE /api/resumes/{id}`
+
+- 只允许删除当前用户拥有的简历
+- 删除时会同步清理关联文件记录
+- 不存在或非 owner 统一返回 `404 RESUME_NOT_FOUND`
+
+`GET /api/resumes/{id}/download`
+
+- 只允许下载当前用户拥有的简历
+- 简历不存在或非 owner 返回 `404 RESUME_NOT_FOUND`
+- 简历记录存在但未绑定文件时返回 `404 RESUME_FILE_NOT_FOUND`
+- 若文件记录已丢失，当前实现返回空 body 的 `404`
+
+`GET /api/resumes/workbench`
+
+- 按当前用户聚合简历统计
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 
 ## 9. 互动模块
 

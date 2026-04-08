@@ -537,9 +537,12 @@ paths:
   /api/resumes/generate:
     post:
       summary: 生成简历 PDF
+      description: 当前实现按请求用户生成简历，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resumes:
     get:
       summary: 获取我的简历分页列表
@@ -619,6 +622,8 @@ paths:
                               format: date-time
                   message:
                     type: string
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resumes/{id}:
     get:
       summary: 获取简历生成记录
@@ -627,7 +632,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 简历不存在
+          description: 简历不存在或非 owner（错误码 `RESUME_NOT_FOUND`）
     delete:
       summary: 删除简历记录
       description: 当前实现只允许当前用户删除自己的简历，联调可通过 `X-User-Key` 指定用户
@@ -635,7 +640,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 简历不存在
+          description: 简历不存在或非 owner（错误码 `RESUME_NOT_FOUND`）
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF
@@ -644,7 +649,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 简历或文件不存在
+          description: 简历不存在/非 owner（错误码 `RESUME_NOT_FOUND`），或简历未绑定文件（错误码 `RESUME_FILE_NOT_FOUND`），或文件记录缺失
   /api/resumes/workbench:
     get:
       summary: 获取我的简历工作台聚合信息
@@ -691,6 +696,8 @@ paths:
                               type: string
                   message:
                     type: string
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/comments:
     get:
       summary: 获取资源评论树
