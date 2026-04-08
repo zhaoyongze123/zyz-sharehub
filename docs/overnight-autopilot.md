@@ -59,6 +59,7 @@ cd /Users/mac/Documents/New\ project
 - 每轮调用 `codex exec`
 - 默认单轮超时 3000 秒，避免单次卡死整夜
 - `hourly-run` 通过 `output/overnight/state/hourly-run.lock` 保证同一时刻只会有一个轮次执行；重复触发时会直接跳过，不再并发拉起第二轮
+- `hourly-run` 启动时会先把自身脚本复制到 `output/overnight/state/hourly-run.exec.sh` 再执行，避免值守过程中脚本被覆盖后同一轮前后逻辑漂移
 - 每轮代码成功后会自动启动前后端，并执行对应模块的 Playwright 浏览器 smoke；联调失败则本轮失败，不按成功态继续推进
 - 浏览器联调优先走 cloud-dev 后端；若缺少 PostgreSQL/Redis 密码，则自动回落到本机 smoke profile，避免整夜因环境变量缺失直接停摆
 - 浏览器 smoke 在健康检查成功后，还会对前后端分别做一次短时稳定性校验，避免服务刚启动即退出却被误判为可用

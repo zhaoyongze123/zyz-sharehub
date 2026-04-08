@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="${OVERNIGHT_PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
 RUN_LOCK_DIR="${STATE_DIR}/hourly-run.lock"
 RUN_LOCK_META_FILE="${RUN_LOCK_DIR}/owner.env"
+SNAPSHOT_SCRIPT="${STATE_DIR}/hourly-run.exec.sh"
 PROMPT_FILE="${PROJECT_ROOT}/scripts/overnight-manager-prompt.md"
 RUN_ID="$(date '+%Y%m%d-%H%M%S')"
 RUN_DIR="${OUTPUT_DIR}/${RUN_ID}"
@@ -26,6 +28,16 @@ RUN_SOURCE="${OVERNIGHT_RUN_SOURCE:-manual}"
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 mkdir -p "${RUN_DIR}" "${STATE_DIR}"
+
+if [[ "${OVERNIGHT_RUN_SNAPSHOT_ACTIVE:-0}" != "1" ]]; then
+  cp "$0" "${SNAPSHOT_SCRIPT}"
+  chmod +x "${SNAPSHOT_SCRIPT}"
+  exec env \
+    OVERNIGHT_RUN_SNAPSHOT_ACTIVE=1 \
+    OVERNIGHT_PROJECT_ROOT="${PROJECT_ROOT}" \
+    OVERNIGHT_RUN_SOURCE="${RUN_SOURCE}" \
+    bash "${SNAPSHOT_SCRIPT}" "$@"
+fi
 
 write_run_lock() {
   cat > "${RUN_LOCK_META_FILE}" <<EOF
