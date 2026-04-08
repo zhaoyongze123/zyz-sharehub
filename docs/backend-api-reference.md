@@ -463,7 +463,7 @@
 - 评论、收藏、点赞主要围绕 `RESOURCE`
 - 举报也主要围绕 `RESOURCE`
 - 还没有真正抽象成多内容类型互动模型
-- 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，目标资源不存在时返回 `404/RESOURCE_NOT_FOUND`
+- 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，用户被封禁时返回 `403/USER_BANNED`，目标资源不存在时返回 `404/RESOURCE_NOT_FOUND`
 
 ## 11. 后台治理
 

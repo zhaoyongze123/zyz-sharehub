@@ -2,6 +2,8 @@ package com.sharehub.interaction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.config.AdminTokenFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,9 @@ public class InteractionControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private UserProfileRepository userProfileRepository;
+
     @BeforeEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM admin_audit_logs");
@@ -44,6 +49,7 @@ public class InteractionControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM comments");
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM likes");
+        jdbcTemplate.update("DELETE FROM users");
     }
 
     @Test
@@ -243,6 +249,45 @@ public class InteractionControllerIntegrationTest {
                 .content(mapper.writeValueAsString(Map.of("resourceId", "999999", "reason", "spam"))))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void writeEndpointsShouldRejectBannedUser() throws Exception {
+        UserProfileDto banned = userProfileRepository.upsert("banned-user", "banned-user", null);
+        userProfileRepository.updateStatus(banned.id(), "BANNED");
+
+        var payload = mapper.writeValueAsString(Map.of("content", "hello"));
+
+        mvc.perform(post("/api/resources/1/comments")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mvc.perform(post("/api/comments/1/reply")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mvc.perform(post("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mvc.perform(post("/api/resources/1/like")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mvc.perform(post("/api/reports")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("resourceId", "1", "reason", "spam"))))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {

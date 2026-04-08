@@ -1,6 +1,7 @@
 package com.sharehub.interaction;
 
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -14,10 +15,16 @@ public class InteractionController {
 
     private final InteractionRepository repository;
     private final RequestAccessService requestAccessService;
+    private final UserProfileRepository userProfileRepository;
 
-    public InteractionController(InteractionRepository repository, RequestAccessService requestAccessService) {
+    public InteractionController(
+        InteractionRepository repository,
+        RequestAccessService requestAccessService,
+        UserProfileRepository userProfileRepository
+    ) {
         this.repository = repository;
         this.requestAccessService = requestAccessService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @PostMapping("/resources/{id}/comments")
@@ -27,7 +34,7 @@ public class InteractionController {
         @PathVariable Long id,
         @RequestBody Map<String, String> req
     ) {
-        String author = requestAccessService.requireUser(authentication, request);
+        String author = requireActiveUser(authentication, request);
         InteractionRepository.CommentRecord comment = repository.saveComment(id, req.get("content"), null, author);
         return ApiResponse.ok(comment);
     }
@@ -44,7 +51,7 @@ public class InteractionController {
         @PathVariable Long id,
         @RequestBody Map<String, String> req
     ) {
-        String author = requestAccessService.requireUser(authentication, request);
+        String author = requireActiveUser(authentication, request);
         InteractionRepository.CommentRecord reply = repository.saveComment(id, req.get("content"), id, author);
         return ApiResponse.ok(reply);
     }
@@ -55,7 +62,7 @@ public class InteractionController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String userKey = requestAccessService.requireUser(authentication, request);
+        String userKey = requireActiveUser(authentication, request);
         int total = repository.addFavorite(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
     }
@@ -66,7 +73,7 @@ public class InteractionController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String userKey = requestAccessService.requireUser(authentication, request);
+        String userKey = requireActiveUser(authentication, request);
         int total = repository.removeFavorite(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
     }
@@ -77,7 +84,7 @@ public class InteractionController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String userKey = requestAccessService.requireUser(authentication, request);
+        String userKey = requireActiveUser(authentication, request);
         int total = repository.addLike(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
     }
@@ -88,7 +95,7 @@ public class InteractionController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String userKey = requestAccessService.requireUser(authentication, request);
+        String userKey = requireActiveUser(authentication, request);
         int total = repository.removeLike(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
     }
@@ -104,10 +111,17 @@ public class InteractionController {
         HttpServletRequest request,
         @RequestBody Map<String, String> req
     ) {
-        String reporter = requestAccessService.requireUser(authentication, request);
+        String reporter = requireActiveUser(authentication, request);
         long resourceId = Long.parseLong(req.getOrDefault("resourceId", "0"));
         String reason = req.getOrDefault("reason", "无");
         InteractionRepository.ReportRecord report = repository.saveReport(resourceId, reason, reporter);
         return ApiResponse.ok(report);
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(userKey, userKey, null);
+        userProfileRepository.ensureActive(userKey);
+        return userKey;
     }
 }

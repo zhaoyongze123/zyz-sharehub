@@ -861,6 +861,7 @@ paths:
           description: 成功
     post:
       summary: 发表评论
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -868,19 +869,25 @@ paths:
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/comments/{id}/reply:
     post:
       summary: 回复评论
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
           description: 父评论不存在（错误码 `COMMENT_NOT_FOUND`）
   /api/resources/{id}/favorite:
     post:
       summary: 收藏资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -888,8 +895,11 @@ paths:
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
     delete:
       summary: 取消收藏资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -897,9 +907,12 @@ paths:
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/resources/{id}/like:
     post:
       summary: 点赞资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -907,8 +920,11 @@ paths:
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
     delete:
       summary: 取消点赞资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -916,6 +932,8 @@ paths:
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/resources/{id}/interactions:
     get:
       summary: 获取资源互动聚合计数
@@ -925,6 +943,7 @@ paths:
   /api/reports:
     post:
       summary: 举报内容
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -932,6 +951,8 @@ paths:
           description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/admin/reports:
     get:
       summary: 举报列表
