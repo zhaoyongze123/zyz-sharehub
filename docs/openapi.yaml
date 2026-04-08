@@ -748,6 +748,15 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            Content-Type:
+              description: 固定为 `application/pdf`
+              schema:
+                type: string
+            Content-Disposition:
+              description: 固定为 `attachment; filename="{原始文件名}"`
+              schema:
+                type: string
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
