@@ -222,6 +222,26 @@ class FileStorageIntegrationTest {
     }
 
     @Test
+    void shouldRejectDirectUploadWhenFileTooLarge() throws Exception {
+        byte[] payload = new byte[5 * 1024 * 1024 + 1];
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "resume.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            payload
+        );
+
+        mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-1")
+                .param("category", "RESUME_PDF")
+                .param("referenceType", "RESUME")
+                .param("referenceId", "resume-102"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_TOO_LARGE"));
+    }
+
+    @Test
     void shouldRejectDirectUploadWhenFilenameMissing() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",
