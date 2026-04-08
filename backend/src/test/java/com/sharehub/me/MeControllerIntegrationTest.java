@@ -271,6 +271,18 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-b"));
 
+        mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", " ")
+                .param("templateKey", "   ")
+                .param("keyword", "\t")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-b"))
+            .andExpect(jsonPath("$.data.items[1].templateKey").value("resume-a"));
+
         mockMvc.perform(get("/api/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.myResourceCount").value(2))
