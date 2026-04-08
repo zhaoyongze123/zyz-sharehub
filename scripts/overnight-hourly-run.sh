@@ -9,6 +9,8 @@ RUN_ID="$(date '+%Y%m%d-%H%M%S')"
 RUN_DIR="${OUTPUT_DIR}/${RUN_ID}"
 TIMEOUT_SECONDS="${OVERNIGHT_TIMEOUT_SECONDS:-3000}"
 MAX_RETRIES="${OVERNIGHT_MAX_RETRIES:-3}"
+PRIMARY_MODEL="${OVERNIGHT_PRIMARY_MODEL:-gpt-5.4}"
+FALLBACK_MODELS="${OVERNIGHT_FALLBACK_MODELS:-gpt-5.1-codex-max,gpt-5.1-codex-mini}"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
 META_FILE="${RUN_DIR}/meta.env"
@@ -39,12 +41,41 @@ prepare_autopilot_codex_home() {
 prepare_autopilot_codex_home
 export CODEX_HOME="${AUTOPILOT_CODEX_HOME}"
 
+build_model_sequence() {
+  python3 - "${PRIMARY_MODEL}" "${FALLBACK_MODELS}" <<'PY'
+import sys
+
+primary = sys.argv[1].strip()
+fallbacks = [item.strip() for item in sys.argv[2].split(",") if item.strip()]
+seen = set()
+ordered = []
+for model in [primary, *fallbacks]:
+    if model and model not in seen:
+        ordered.append(model)
+        seen.add(model)
+print("\n".join(ordered))
+PY
+}
+
+mapfile -t MODEL_SEQUENCE < <(build_model_sequence)
+
+model_for_attempt() {
+  local index=$(( $1 - 1 ))
+  local last_index=$(( ${#MODEL_SEQUENCE[@]} - 1 ))
+  if (( index > last_index )); then
+    index=${last_index}
+  fi
+  printf '%s\n' "${MODEL_SEQUENCE[index]}"
+}
+
 {
   echo "RUN_ID=${RUN_ID}"
   echo "START_AT=$(date '+%F %T %z')"
   echo "PROJECT_ROOT=${PROJECT_ROOT}"
   echo "TIMEOUT_SECONDS=${TIMEOUT_SECONDS}"
   echo "MAX_RETRIES=${MAX_RETRIES}"
+  echo "PRIMARY_MODEL=${PRIMARY_MODEL}"
+  echo "FALLBACK_MODELS=${FALLBACK_MODELS}"
   echo "CODEX_HOME=${CODEX_HOME}"
 } > "${META_FILE}"
 
@@ -65,20 +96,6 @@ export CODEX_HOME="${AUTOPILOT_CODEX_HOME}"
   cat "${PROMPT_FILE}"
 } > "${RUN_DIR}/prompt.txt"
 
-CODEX_BASE_CMD=(
-  codex
-  exec
-  --ephemeral
-  --disable multi_agent
-  -c 'model_reasoning_effort="low"'
-  -m gpt-5.2
-  --dangerously-bypass-approvals-and-sandbox
-  -C "${PROJECT_ROOT}"
-  -o "${LAST_MESSAGE_FILE}"
-)
-
-CODEX_CMD=("${CODEX_BASE_CMD[@]}")
-
 echo "[$(date '+%F %T')] 开始执行第 ${RUN_ID} 轮，日志目录: ${RUN_DIR}" | tee -a "${RAW_LOG_FILE}"
 
 TRANSIENT_ERROR_HINT=""
@@ -86,8 +103,20 @@ ATTEMPT=1
 EXIT_CODE=1
 
 while (( ATTEMPT <= MAX_RETRIES )); do
+  CURRENT_MODEL="$(model_for_attempt "${ATTEMPT}")"
+  CODEX_CMD=(
+    codex
+    exec
+    --ephemeral
+    --disable multi_agent
+    -c 'model_reasoning_effort="low"'
+    -m "${CURRENT_MODEL}"
+    --dangerously-bypass-approvals-and-sandbox
+    -C "${PROJECT_ROOT}"
+    -o "${LAST_MESSAGE_FILE}"
+  )
   rm -f "${LAST_MESSAGE_FILE}"
-  echo "[$(date '+%F %T')] 执行尝试 ${ATTEMPT}/${MAX_RETRIES}" | tee -a "${RAW_LOG_FILE}"
+  echo "[$(date '+%F %T')] 执行尝试 ${ATTEMPT}/${MAX_RETRIES}，模型=${CURRENT_MODEL}" | tee -a "${RAW_LOG_FILE}"
 
   set +e
   python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${CODEX_CMD[@]}" - \
@@ -115,6 +144,7 @@ done
   echo "END_AT=$(date '+%F %T %z')"
   echo "EXIT_CODE=${EXIT_CODE}"
   echo "ATTEMPTS=${ATTEMPT}"
+  echo "LAST_MODEL=$(model_for_attempt "${ATTEMPT}")"
 } >> "${META_FILE}"
 
 git -C "${PROJECT_ROOT}" status --short --branch > "${RUN_DIR}/git-status.txt" || true
