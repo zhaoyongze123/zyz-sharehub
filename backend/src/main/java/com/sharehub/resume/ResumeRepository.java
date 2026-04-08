@@ -95,7 +95,7 @@ public class ResumeRepository {
             SELECT r.id, r.template_key, r.status, r.file_id, f.filename, f.size, f.created_at AS file_created_at, f.updated_at AS file_updated_at
             FROM resumes r
             LEFT JOIN files f ON r.file_id = f.id
-            """ + baseFilter + " ORDER BY r.created_at DESC LIMIT ? OFFSET ?";
+            """ + baseFilter + " ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?";
         List<ResumeDto> items = jdbcTemplate.query(
             sql,
             (resultSet, rowNum) -> mapResume(resultSet),
@@ -137,7 +137,7 @@ public class ResumeRepository {
                 FROM resumes
                 WHERE owner_key = ?
                 GROUP BY template_key
-                ORDER BY total DESC
+                ORDER BY total DESC, template_key ASC
                 """,
             (rs, rowNum) -> new ResumeTemplateBreakdownDto(rs.getString("template_key"), rs.getLong("total")),
             ownerKey
@@ -148,7 +148,7 @@ public class ResumeRepository {
                 FROM resumes r
                 LEFT JOIN files f ON r.file_id = f.id
                 WHERE r.owner_key = ?
-                ORDER BY r.created_at DESC
+                ORDER BY r.created_at DESC, r.id DESC
                 LIMIT ?
                 """,
             (rs, rowNum) -> mapResume(rs),

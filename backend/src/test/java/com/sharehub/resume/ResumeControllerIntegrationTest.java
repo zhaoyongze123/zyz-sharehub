@@ -389,6 +389,31 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldReturnDeterministicResumeWorkbenchOrderingWhenCountsTie() throws Exception {
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "beta"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "alpha"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/resumes/workbench")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateBreakdown[0].templateKey").value("alpha"))
+            .andExpect(jsonPath("$.data.templateBreakdown[0].count").value(1))
+            .andExpect(jsonPath("$.data.templateBreakdown[1].templateKey").value("beta"))
+            .andExpect(jsonPath("$.data.templateBreakdown[1].count").value(1))
+            .andExpect(jsonPath("$.data.recentItems[0].templateKey").value("alpha"))
+            .andExpect(jsonPath("$.data.recentItems[1].templateKey").value("beta"));
+    }
+
+    @Test
     void shouldLimitWorkbenchRecentItemsToLatestFiveForCurrentOwner() throws Exception {
         for (int i = 1; i <= 6; i++) {
             mockMvc.perform(post("/api/resumes/generate")
