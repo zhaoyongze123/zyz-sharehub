@@ -10,13 +10,16 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const savedRole = window.localStorage.getItem('sharebase.role')
   const savedNickname = window.localStorage.getItem('sharebase.nickname')
+  const savedUserKey = window.localStorage.getItem('sharebase.userKey')
 
   if (savedRole === 'admin') {
     config.headers['X-Admin-Token'] = window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token'
   }
 
-  if (savedRole === 'user' || savedRole === 'admin') {
-    config.headers['X-User-Key'] = window.localStorage.getItem('sharebase.userKey') || savedNickname || 'frontend-local-user'
+  if (savedUserKey) {
+    config.headers['X-User-Key'] = savedUserKey
+  } else if (savedRole === 'user' || savedRole === 'admin') {
+    config.headers['X-User-Key'] = savedNickname || 'frontend-local-user'
   }
 
   return config
