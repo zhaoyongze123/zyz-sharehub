@@ -354,7 +354,11 @@
 
 真实状态：
 
+- 全部接口统一通过 `RequestAccessService` 解析当前用户
+- 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - `404` 统一为 `NOTE_NOT_FOUND`
+- 用户已被封禁时返回 `403 USER_BANNED`
 
 当前重要实现边界：
 

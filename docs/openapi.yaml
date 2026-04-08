@@ -643,6 +643,7 @@ paths:
   /api/notes:
     get:
       summary: 笔记分页列表
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - in: query
           name: page
@@ -657,31 +658,55 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
     post:
       summary: 创建笔记
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/notes/{id}:
     get:
       summary: 获取笔记详情
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
     put:
       summary: 更新笔记
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
     delete:
       summary: 删除笔记
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
   /api/resumes/generate:
