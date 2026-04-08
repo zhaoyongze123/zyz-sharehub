@@ -19,7 +19,7 @@ apiClient.interceptors.request.use((config) => {
   if (savedUserKey) {
     config.headers['X-User-Key'] = savedUserKey
   } else if (savedRole === 'user' || savedRole === 'admin') {
-    config.headers['X-User-Key'] = savedNickname || 'frontend-local-user'
+    config.headers['X-User-Key'] = window.localStorage.getItem('sharebase.userKey') || savedNickname || 'frontend-local-user'
   }
 
   return config
@@ -35,7 +35,8 @@ apiClient.interceptors.response.use(
       authStore.logout()
       appStore.showToast('登录已失效', '请重新登录后继续操作', 'error')
     } else {
-      appStore.showToast('请求失败', error.response?.data?.msg ?? '服务暂时不可用，请稍后再试', 'error')
+      const message = error.response?.data?.message ?? error.response?.data?.msg ?? '服务暂时不可用，请稍后再试'
+      appStore.showToast('请求失败', message, 'error')
     }
 
     return Promise.reject(error)

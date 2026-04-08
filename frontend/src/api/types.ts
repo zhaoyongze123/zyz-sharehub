@@ -1,7 +1,8 @@
 export interface ApiResponse<T> {
-  code: number
-  msg: string
+  success: boolean
+  code: string
   data: T
+  message: string
 }
 
 export interface PageResult<T> {
@@ -9,4 +10,40 @@ export interface PageResult<T> {
   total: number
   pageNum: number
   pageSize: number
+}
+
+export interface UserProfileDto {
+  id: number
+  login: string
+  name: string
+  avatarFileId?: string | null
+  avatarUrl?: string | null
+  status: string
+}
+
+export interface MeDto {
+  profile: UserProfileDto
+  myResourceCount: number
+  myFavoriteCount: number
+  myRoadmapCount: number
+  myNoteCount: number
+  myResumeCount: number
+  recentResourceCount: number
+  publishedResourceCount: number
+  draftNoteCount: number
+  generatedResumeCount: number
+}
+
+export interface StoredFileDto {
+  id: string
+  owner: string
+  category: 'AVATAR' | 'RESOURCE_ATTACHMENT' | 'RESUME_PDF'
+  referenceType: string
+  referenceId: string
+  filename: string
+  contentType: string
+  size: number
+  checksum: string
+  downloadUrl: string
+  createdAt: string
 }
