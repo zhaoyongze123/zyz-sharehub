@@ -271,6 +271,17 @@ class ResumeControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].templateKey").value("beta"));
+
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .param("status", " GENERATED ")
+                .param("templateKey", " alpha ")
+                .param("keyword", " ALPHA ")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("alpha"));
     }
 
     @Test
