@@ -134,7 +134,8 @@
 - 必填参数：`file`
 - 当前复用文件存储能力，文件 `owner` 取当前登录用户，`category=AVATAR`，`referenceType=USER_AVATAR`，`referenceId` 为当前用户标识
 - 校验文件非空、文件名存在、大小不超过 `5MB`
-- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，并把头像文件 `id` 回写到用户资料
+- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，返回体中的 `contentType` 始终有值；上传未显式声明时回落为 `application/octet-stream`
+- 成功后把头像文件 `id` 回写到用户资料
 
 失败状态：
 

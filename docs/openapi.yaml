@@ -243,7 +243,7 @@ paths:
   /api/auth/avatar:
     post:
       summary: 上传用户头像
-      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；当前复用文件存储能力，`owner` 取当前登录用户，`category=AVATAR`，`referenceType=USER_AVATAR`，`referenceId` 为当前用户标识；真实实现校验文件非空、文件名存在且大小不超过 5MB
+      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；当前复用文件存储能力，`owner` 取当前登录用户，`category=AVATAR`，`referenceType=USER_AVATAR`，`referenceId` 为当前用户标识；真实实现校验文件非空、文件名存在且大小不超过 5MB；成功后返回文件元数据，其中 `contentType` 始终有值，上传未显式声明时回落为 `application/octet-stream`
       requestBody:
         required: true
         content:

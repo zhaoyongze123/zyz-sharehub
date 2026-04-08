@@ -80,6 +80,34 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldFallbackAvatarContentTypeWhenUploadContentTypeMissing() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.bin",
+            null,
+            "avatar-binary".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/auth/avatar")
+                .file(file)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.category").value("AVATAR"))
+            .andExpect(jsonPath("$.data.filename").value("avatar.bin"))
+            .andExpect(jsonPath("$.data.contentType").value(MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(jsonPath("$.data.downloadUrl").exists())
+            .andReturn();
+
+        JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
+        String downloadUrl = uploadJson.get("data").get("downloadUrl").asText();
+
+        mockMvc.perform(get(downloadUrl))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"avatar.bin\""));
+    }
+
+    @Test
     void shouldRejectAnonymousRequestsForCurrentUserEndpoints() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",
