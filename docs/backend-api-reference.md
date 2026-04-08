@@ -390,6 +390,7 @@
 - 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
 - 列表、详情、更新、删除都只作用于当前用户自己的笔记
 - `GET /api/notes` 支持 `status` 筛选；当 `status` 为空字符串或仅空白时按未传处理
+- `GET /api/notes` 的 `status` 若带前后空白，会先裁剪再参与筛选
 - `POST /api/notes` 未传 `status`、传 `null`、空字符串或仅空白时默认存为 `DRAFT`
 - `POST /api/notes`、`PUT /api/notes/{id}` 的 `visibility` 传空字符串或仅空白时按未传处理，最终存为 `null`
 - `PUT /api/notes/{id}` 传空字符串或仅空白 `status` 时按未传处理，保留原状态
