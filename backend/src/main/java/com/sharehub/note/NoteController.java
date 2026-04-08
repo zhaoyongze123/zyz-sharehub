@@ -33,9 +33,9 @@ public class NoteController {
         HttpServletRequest request,
         @Valid @RequestBody NoteDto req
     ) {
-        requireActiveUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         NoteDto toSave = new NoteDto(null, req.title(), req.contentMd(), req.visibility(), req.status());
-        NoteDto saved = repository.save(toSave);
+        NoteDto saved = repository.save(ownerKey, toSave);
         return ApiResponse.ok(saved);
     }
 
@@ -45,8 +45,8 @@ public class NoteController {
         HttpServletRequest request,
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int pageSize) {
-        requireActiveUser(authentication, request);
-        return ApiResponse.ok(repository.list(page, pageSize));
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(repository.list(ownerKey, page, pageSize));
     }
 
     @GetMapping("/{id}")
@@ -55,8 +55,8 @@ public class NoteController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        requireActiveUser(authentication, request);
-        return ApiResponse.ok(repository.find(id));
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(repository.findOwned(id, ownerKey));
     }
 
     @PutMapping("/{id}")
@@ -66,8 +66,8 @@ public class NoteController {
         @PathVariable Long id,
         @Valid @RequestBody NoteDto req
     ) {
-        requireActiveUser(authentication, request);
-        NoteDto updated = repository.upsert(id, req);
+        String ownerKey = requireActiveUser(authentication, request);
+        NoteDto updated = repository.upsertOwned(id, ownerKey, req);
         return ApiResponse.ok(updated);
     }
 
@@ -77,8 +77,8 @@ public class NoteController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        requireActiveUser(authentication, request);
-        repository.delete(id);
+        String ownerKey = requireActiveUser(authentication, request);
+        repository.deleteOwned(id, ownerKey);
         return ApiResponse.ok("DELETED");
     }
 

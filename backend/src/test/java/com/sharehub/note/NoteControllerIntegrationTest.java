@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class NoteControllerIntegrationTest {
 
     private static final String USER_KEY = "note-user";
+    private static final String OTHER_USER_KEY = "note-other-user";
 
     @Autowired
     private MockMvc mvc;
@@ -157,5 +158,48 @@ public class NoteControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"));
+    }
+
+    @Test
+    void shouldRestrictNotesToOwner() throws Exception {
+        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT");
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(payload)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> created = mapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) created.get("data");
+        Long id = Long.valueOf(data.get("id").toString());
+
+        mvc.perform(get("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mvc.perform(get("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+
+        mvc.perform(put("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Updated","contentMd":"# new","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+
+        mvc.perform(delete("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
     }
 }
