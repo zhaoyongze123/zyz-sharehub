@@ -643,7 +643,7 @@ paths:
   /api/notes:
     get:
       summary: 笔记分页列表
-      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理
+      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理，不额外收窄结果
       parameters:
         - in: query
           name: page
@@ -670,7 +670,7 @@ paths:
           description: 用户被封禁（错误码 `USER_BANNED`）
     post:
       summary: 创建笔记
-      description: 需要当前用户身份；创建后笔记归属当前请求用户；未传 `status` 时默认保存为 `DRAFT`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；创建后笔记归属当前请求用户；`status` 未传、为 `null`、空字符串或仅空白时默认保存为 `DRAFT`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -693,7 +693,7 @@ paths:
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
     put:
       summary: 更新笔记
-      description: 需要当前用户身份；当前实现只允许更新自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理
+      description: 需要当前用户身份；当前实现只允许更新自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理；`status` 传空字符串或仅空白时按未传处理，保留原状态
       responses:
         '200':
           description: 成功
