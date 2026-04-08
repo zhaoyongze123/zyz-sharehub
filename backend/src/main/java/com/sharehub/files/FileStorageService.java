@@ -1,6 +1,8 @@
 package com.sharehub.files;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -134,7 +136,20 @@ public class FileStorageService {
     }
 
     private String defaultContentType(String contentType) {
-        return (contentType == null || contentType.isBlank()) ? "application/octet-stream" : contentType;
+        if (contentType == null || contentType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+
+        String normalizedContentType = contentType.trim();
+        if (normalizedContentType.contains(";") && !normalizedContentType.contains("=")) {
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+
+        try {
+            return MediaType.parseMediaType(normalizedContentType).toString();
+        } catch (InvalidMediaTypeException exception) {
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
     }
 
     private String sha256(byte[] data) {

@@ -87,6 +87,29 @@ class FileStorageServiceTest {
     }
 
     @Test
+    void storeBytesDefaultsInvalidContentTypeToOctetStream() {
+        byte[] data = "hello".getBytes(StandardCharsets.UTF_8);
+
+        when(repository.save(any(FileRecord.class))).thenAnswer(invocation -> {
+            FileRecord record = invocation.getArgument(0);
+            record.setId(UUID.randomUUID());
+            return record;
+        });
+
+        StoredFileDto dto = service.storeBytes(
+            "user-1",
+            FileCategory.RESUME_PDF,
+            "RESUME",
+            "resume-44",
+            "resume.pdf",
+            "invalid/type;",
+            data
+        );
+
+        assertThat(dto.contentType()).isEqualTo("application/octet-stream");
+    }
+
+    @Test
     void storeBytesRejectsBlankOwner() {
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
             service.storeBytes("  ", FileCategory.AVATAR, "USER", "1", "avatar.png", "image/png", new byte[]{1})

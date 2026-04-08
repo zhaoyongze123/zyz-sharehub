@@ -284,6 +284,22 @@ class ResourceControllerIntegrationTest {
             .andExpect(jsonPath("$.data.file.contentType").value(MediaType.APPLICATION_OCTET_STREAM_VALUE))
             .andExpect(jsonPath("$.data.file.downloadUrl").exists());
 
+        MockMultipartFile invalidContentTypeFile = new MockMultipartFile(
+            "file",
+            "guide-invalid-type.pdf",
+            "invalid/type;",
+            "pdf-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(invalidContentTypeFile)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.resourceId").value(resourceId))
+            .andExpect(jsonPath("$.data.file.filename").value("guide-invalid-type.pdf"))
+            .andExpect(jsonPath("$.data.file.contentType").value(MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(jsonPath("$.data.file.downloadUrl").exists());
+
         mockMvc.perform(get("/api/resources/{id}", resourceId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.objectKey").isNotEmpty())

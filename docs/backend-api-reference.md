@@ -134,7 +134,7 @@
 - 必填参数：`file`
 - 当前复用文件存储能力，文件 `owner` 取当前登录用户，`category=AVATAR`，`referenceType=USER_AVATAR`，`referenceId` 为当前用户标识
 - 校验文件非空、文件名存在、大小不超过 `5MB`
-- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，返回体中的 `contentType` 始终有值；上传未显式声明时回落为 `application/octet-stream`
+- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，返回体中的 `contentType` 始终有值；上传缺省或非法时回落为 `application/octet-stream`
 - 成功后把头像文件 `id` 回写到用户资料
 
 失败状态：
@@ -275,7 +275,7 @@
 - 文件进入 PostgreSQL 文件表
 - 成功后把 `objectKey` 更新为文件 `id`
 - 返回体包含 `resourceId` 和 `file` 两部分，其中 `file.downloadUrl` 形如 `/api/files/{uuid}`
-- 返回体中的 `file.contentType` 始终有值；上传未显式声明时回落为 `application/octet-stream`
+- 返回体中的 `file.contentType` 始终有值；上传缺省或非法时回落为 `application/octet-stream`
 
 ### 5.9 `GET /api/resources/{id}/related`
 
@@ -322,7 +322,7 @@
 - 必填参数：`owner`、`category`、`referenceType`、`referenceId`、`file`
 - `category` 当前真实枚举：`AVATAR`、`RESOURCE_ATTACHMENT`、`RESUME_PDF`
 - 校验文件非空、文件名存在、引用归属存在、大小不超过 `5MB`
-- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，返回体中的 `contentType` 始终有值；上传未显式声明时回落为 `application/octet-stream`
+- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，返回体中的 `contentType` 始终有值；上传缺省或非法时回落为 `application/octet-stream`
 
 失败状态：
 
