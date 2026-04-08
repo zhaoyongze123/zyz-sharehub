@@ -374,4 +374,26 @@ class FileStorageIntegrationTest {
             .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
             .andExpect(header().string("Content-Disposition", "attachment; filename=\"broken.bin\""));
     }
+
+    @Test
+    void shouldFallbackToOctetStreamWhenStoredContentTypeNull() throws Exception {
+        var stored = fileStorageService.storeBytes(
+            "user-null",
+            FileCategory.RESOURCE_ATTACHMENT,
+            "RESOURCE",
+            "resource-null",
+            "null.bin",
+            MediaType.APPLICATION_JSON_VALUE,
+            "null-body".getBytes()
+        );
+
+        var record = fileRepository.findById(stored.id()).orElseThrow();
+        record.setContentType(null);
+        fileRepository.save(record);
+
+        mockMvc.perform(get(stored.downloadUrl()))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"null.bin\""));
+    }
 }

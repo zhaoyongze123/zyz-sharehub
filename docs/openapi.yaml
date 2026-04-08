@@ -371,7 +371,7 @@ paths:
   /api/files/{id}:
     get:
       summary: 下载文件
-      description: 当前为匿名可访问下载接口，按文件 `id` 直接返回二进制内容；`Content-Type` 优先使用入库时的 `contentType`，若为空或非法则回落到 `application/octet-stream`；`Content-Disposition` 固定为附件下载；文件不存在时返回空 body 的 `404`
+      description: 当前为匿名可访问下载接口，按文件 `id` 直接返回二进制内容；`Content-Type` 优先使用入库时的 `contentType`，若为空、`NULL` 或非法则回落到 `application/octet-stream`；`Content-Disposition` 固定为附件下载；文件不存在时返回空 body 的 `404`
       parameters:
         - in: path
           name: id
@@ -384,7 +384,7 @@ paths:
           description: 成功
           headers:
             Content-Type:
-              description: 入库时的 `contentType`；若为空或非法则回落到 `application/octet-stream`
+              description: 入库时的 `contentType`；若为空、`NULL` 或非法则回落到 `application/octet-stream`
               schema:
                 type: string
             Content-Disposition:
