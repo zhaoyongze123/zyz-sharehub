@@ -701,7 +701,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: 创建笔记
-      description: 需要当前用户身份；创建后笔记归属当前请求用户；`status` 未传、为 `null`、空字符串或仅空白时默认保存为 `DRAFT`；`visibility` 传空字符串或仅空白时按未传处理，最终存为 `null`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；创建后笔记归属当前请求用户；`status` 未传、为 `null`、空字符串或仅空白时默认保存为 `DRAFT`；`visibility` 为 `null`、空字符串或仅空白时按未传处理，最终存为 `null`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       requestBody:
         required: true
         content:
@@ -765,7 +765,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: 更新笔记
-      description: 需要当前用户身份；当前实现只允许更新自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理；`status` 传空字符串或仅空白时按未传处理，保留原状态；`visibility` 传空字符串或仅空白时按未传处理，最终存为 `null`
+      description: 需要当前用户身份；当前实现只允许更新自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理；`status` 传 `null`、空字符串或仅空白时按未传处理，保留原状态；`visibility` 传 `null`、空字符串或仅空白时按未传处理，最终存为 `null`
       parameters:
         - in: path
           name: id
