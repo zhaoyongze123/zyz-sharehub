@@ -9,12 +9,11 @@
 
         <div class="user-profile-header">
           <div class="user-avatar-wrapper">
-            <img v-if="avatarUrl" :src="avatarUrl" alt="avatar" class="user-avatar-img" />
-            <div v-else class="i-carbon-logo-github user-avatar-icon"></div>
+            <div class="i-carbon-logo-github user-avatar-icon"></div>
           </div>
           <div class="user-info">
-            <div class="user-name">{{ userDisplayName }}</div>
-            <div class="user-type">{{ userTypeLabel }}</div>
+            <div class="user-name">{{ authStore.profile?.nickname }}</div>
+            <div class="user-type">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</div>
           </div>
         </div>
 
@@ -44,11 +43,8 @@
               <div class="setting-item avatar-item">
                 <div class="item-info">头像</div>
                 <div class="item-control row-control">
-                  <img v-if="avatarUrl" :src="avatarUrl" class="avatar-preview" />
-                  <div v-else class="avatar-fallback i-carbon-user-avatar-filled"></div>
-                  <button class="btn-outline" :disabled="avatarUploading" @click="handleAvatarChange">
-                    {{ avatarUploading ? '上传中...' : '更换头像' }}
-                  </button>
+                  <img :src="profileAvatar" class="avatar-preview" />
+                  <button class="btn-outline" @click="handleAvatarChange">更换头像</button>
                 </div>
               </div>
               <div class="setting-item">
@@ -57,7 +53,7 @@
                   <p class="item-desc">用于社区显示和个人主页URL（sharehub.com/@{{ profileForm.username }}）</p>
                 </div>
                 <div class="item-control">
-                  <input type="text" class="control-input" v-model="profileForm.username" readonly />
+                  <input type="text" class="control-input" v-model="profileForm.username" />
                 </div>
               </div>
               <div class="setting-item">
@@ -66,19 +62,18 @@
                   <p class="item-desc">展示在你的帖子和个人主页的信息</p>
                 </div>
                 <div class="item-control" style="flex: 1; margin-left: 40px; justify-content: flex-end;">
-                  <textarea class="control-textarea" placeholder="当前版本暂未开放编辑" v-model="profileForm.bio" readonly></textarea>
+                  <textarea class="control-textarea" placeholder="分享你的技术栈与目标..." v-model="profileForm.bio"></textarea>
                 </div>
               </div>
               <div class="setting-item border-none">
                 <div class="item-info">个人网站</div>
                 <div class="item-control">
-                  <input type="url" class="control-input" placeholder="https://" v-model="profileForm.website" readonly />
+                  <input type="url" class="control-input" placeholder="https://" v-model="profileForm.website" />
                 </div>
               </div>
             </div>
             <div class="save-actions">
-              <button class="btn-primary" @click="handleSaveProfile" :disabled="loadingProfile">保存修改</button>
-              <span class="readonly-hint">当前后端暂未开放资料文本编辑，已展示最新资料</span>
+              <button class="btn-primary" @click="handleSaveProfile">保存修改</button>
             </div>
           </template>
 
@@ -124,7 +119,7 @@
                   <div class="i-carbon-logo-github" style="font-size: 24px;"></div>
                   <div class="item-info">
                     GitHub
-                    <p class="item-desc">已连接至 {{ userDisplayName }}</p>
+                    <p class="item-desc">已连接至 {{ authStore.profile?.nickname }}</p>
                   </div>
                 </div>
                 <div class="item-control"><button class="btn-outline text-danger" @click="handleUnbind">解除绑定</button></div>
@@ -179,9 +174,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+
 import { useAppStore } from '@/stores/app'
 import { apiClient } from '@/api/client'
 
@@ -203,19 +199,16 @@ const currentTabLabel = computed(() => {
 })
 
 // 个人资料相关
-const loadingProfile = ref(false)
-const avatarUploading = ref(false)
-const defaultAvatar = 'https://avatars.githubusercontent.com/u/9919?s=128&v=4'
-
 const profileForm = reactive({
   username: '',
   bio: '',
-  website: ''
+  website: '',
+  avatarUrl: ''
 })
 
-const userDisplayName = computed(() => authStore.profile?.nickname || authStore.profile?.name || authStore.profile?.login || '当前用户')
-const userTypeLabel = computed(() => authStore.profile?.role === 'admin' ? '管理员' : (authStore.profile?.status === 'BANNED' ? '已封禁' : '个人帐户'))
-const avatarUrl = computed(() => authStore.profile?.avatarUrl || defaultAvatar)
+const loadingProfile = ref(false)
+
+const profileAvatar = computed(() => profileForm.avatarUrl || authStore.profile?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4')
 
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -228,34 +221,6 @@ const triggerToast = (msg: string) => {
   }, 3000)
 }
 
-const syncProfileForm = () => {
-  profileForm.username = authStore.profile?.nickname || authStore.profile?.login || ''
-  profileForm.bio = authStore.profile?.headline || authStore.profile?.bio || ''
-  profileForm.website = authStore.profile?.website || ''
-}
-
-const loadProfile = async () => {
-  loadingProfile.value = true
-  try {
-    await authStore.fetchMe()
-    syncProfileForm()
-  } catch (e) {
-    appStore.showToast('加载用户资料失败', '请检查登录或接口状态', 'error')
-  } finally {
-    loadingProfile.value = false
-  }
-}
-
-watch(
-  () => authStore.profile,
-  () => syncProfileForm()
-)
-
-onMounted(() => {
-  syncProfileForm()
-  loadProfile()
-})
-
 const handleAvatarChange = () => {
   const input = document.createElement('input')
   input.type = 'file'
@@ -263,28 +228,47 @@ const handleAvatarChange = () => {
   input.onchange = async () => {
     const file = input.files?.[0]
     if (!file) return
-
     const formData = new FormData()
     formData.append('file', file)
-    avatarUploading.value = true
     try {
-      await apiClient.post('/auth/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-      await authStore.fetchMe()
-      syncProfileForm()
+      const resp = await apiClient.post('/auth/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      const url = resp.data?.data?.downloadUrl || resp.data?.data?.url || resp.data?.data?.path || ''
+      if (url) {
+        profileForm.avatarUrl = url
+        await authStore.updateProfile({ avatarUrl: url })
+      }
       triggerToast('头像已更新')
     } catch (e) {
-      triggerToast('头像上传失败，请稍后重试')
-    } finally {
-      avatarUploading.value = false
+      triggerToast('头像更新失败，请稍后再试')
     }
   }
   input.click()
 }
 
-const handleSaveProfile = () => {
-  triggerToast('当前版本暂未开放昵称/简介编辑，已保持后端数据')
-  syncProfileForm()
+const handleSaveProfile = async () => {
+  await authStore.updateProfile({
+    nickname: profileForm.username,
+    headline: profileForm.bio,
+    website: profileForm.website
+  })
+  triggerToast('个人资料保存成功！')
 }
+
+const loadProfile = async () => {
+  loadingProfile.value = true
+  const data = await authStore.refreshProfile()
+  profileForm.username = data?.nickname || ''
+  profileForm.bio = data?.headline || ''
+  profileForm.website = data?.website || ''
+  profileForm.avatarUrl = data?.avatarUrl || ''
+  loadingProfile.value = false
+}
+
+onMounted(() => {
+  loadProfile()
+})
 
 // 偏好设置相关
 const prefForm = reactive({
@@ -428,12 +412,6 @@ function handleDeleteAccount() {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-}
-
-.user-avatar-img {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
 }
 
 .user-avatar-icon {
@@ -636,18 +614,6 @@ function handleDeleteAccount() {
   object-fit: cover;
 }
 
-.avatar-fallback {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 1px dashed var(--app-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: var(--app-text-muted);
-}
-
 .setting-item.border-none {
   border-bottom: none;
 }
@@ -732,7 +698,6 @@ function handleDeleteAccount() {
   border-top: 1px solid var(--app-border);
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
 }
 
 .btn-text {
@@ -798,12 +763,6 @@ function handleDeleteAccount() {
 
 .toggle-switch:checked::after {
   transform: translateX(20px);
-}
-
-.readonly-hint {
-  align-self: center;
-  font-size: 13px;
-  color: var(--app-text-muted);
 }
 
 /* Provider Integrations specific styles */
