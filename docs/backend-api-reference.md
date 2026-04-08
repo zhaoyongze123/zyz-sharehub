@@ -188,7 +188,11 @@
 
 - `GET /api/me/resources` 返回的是当前用户自己的资料工作台列表，不是仅“已发布资料”
 - 默认不额外收窄 `status`，因此会同时返回该用户的草稿 / 已发布资料；如需只看已发布数据，需要显式传 `status=PUBLISHED`
+- 这些列表接口的 `page`、`pageSize` 传入小于 `1` 的值时，都会按 `1` 兜底
+- `GET /api/me/resources` 的 `status`、`visibility` 为空字符串或仅空白时，按未传处理
+- `GET /api/me/roadmaps` 的 `status` 为空字符串或仅空白时，按未传处理
 - `GET /api/me/notes` 的 `status` 为空字符串或仅空白时，按未传处理，不额外收窄结果
+- `GET /api/me/resumes` 的 `status`、`templateKey`、`keyword` 为空字符串或仅空白时，按未传处理
 
 ## 5. 资料模块
 

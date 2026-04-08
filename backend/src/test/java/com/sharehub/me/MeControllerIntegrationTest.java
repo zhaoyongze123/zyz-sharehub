@@ -348,6 +348,117 @@ class MeControllerIntegrationTest {
     }
 
     @Test
+    void shouldTreatBlankResourceFiltersAsUnfilteredAndClampInvalidPagination() throws Exception {
+        mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"资料A","type":"PDF","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"资料B","type":"DOC","visibility":"PRIVATE","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", "   ")
+                .param("visibility", "\t")
+                .param("page", "0")
+                .param("pageSize", "-2"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("资料B"));
+    }
+
+    @Test
+    void shouldTreatBlankRoadmapStatusAsUnfilteredAndClampInvalidPagination() throws Exception {
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc-a","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线B","description":"desc-b","visibility":"PRIVATE","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", " ")
+                .param("page", "-1")
+                .param("pageSize", "0"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线B"));
+    }
+
+    @Test
+    void shouldClampInvalidFavoritePaginationToMinimumValues() throws Exception {
+        String firstResourceResponse = mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"收藏资料A","type":"PDF","visibility":"PUBLIC"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long firstResourceId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(firstResourceResponse, Map.class).get("data")).get("id").toString());
+
+        String secondResourceResponse = mockMvc.perform(post("/api/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"收藏资料B","type":"DOC","visibility":"PRIVATE"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long secondResourceId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(secondResourceResponse, Map.class).get("data")).get("id").toString());
+
+        mockMvc.perform(post("/api/resources/" + firstResourceId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resources/" + secondResourceId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/favorites")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "0")
+                .param("pageSize", "-5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("收藏资料B"));
+    }
+
+    @Test
     void shouldRejectAnonymousAccessToPersonalCenter() throws Exception {
         mockMvc.perform(get("/api/me"))
             .andExpect(status().isUnauthorized())
