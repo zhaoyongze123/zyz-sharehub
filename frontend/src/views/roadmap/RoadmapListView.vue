@@ -1,3 +1,4 @@
+
 <template>
   <div class="roadmap-paths">
     <header class="paths-hero">
@@ -56,49 +57,51 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
-import { fetchRoadmapList, type Roadmap } from '@/api/roadmaps'
+import { fetchRoadmaps, type Roadmap } from '@/api/roadmaps'
+import { useAppStore } from '@/stores/app'
 
+const appStore = useAppStore()
 const route = useRoute()
 const keyword = ref(String(route.query.keyword || ''))
 const category = ref('全部')
-const roadmaps = ref<Roadmap[]>([])
 const loading = ref(false)
-const error = ref(false)
+const loadError = ref(false)
+const roadmaps = ref<Roadmap[]>([])
 
 const categoryOptions = [{ label: '全部路线', value: '全部' }]
 
-const filteredRoadmaps = computed(() => {
-  return roadmaps.value.filter((item) => {
-    const matchKeyword =
-      !keyword.value ||
-      `${item.title}${item.description ?? ''}`.toLowerCase().includes(keyword.value.toLowerCase())
-    const matchCategory = category.value === '全部'
-    return matchKeyword && matchCategory
-  })
-})
-
-const status = computed(() => {
-  if (error.value) return 'error'
-  if (loading.value) return 'loading'
-  if (!filteredRoadmaps.value.length) return 'empty'
-  return 'ready'
-})
-
 async function loadRoadmaps() {
   loading.value = true
-  error.value = false
+  loadError.value = false
   try {
-    const data = await fetchRoadmapList(1, 50)
-    roadmaps.value = data.items
-  } catch (e) {
-    console.error(e)
-    error.value = true
+    const data = await fetchRoadmaps({ page: 1, pageSize: 50 })
+    roadmaps.value = data?.items || []
+  } catch (error: any) {
+    loadError.value = true
+    appStore.showToast('路线加载失败', error?.response?.data?.message || '请稍后再试', 'error')
   } finally {
     loading.value = false
   }
 }
 
 onMounted(loadRoadmaps)
+
+const filteredRoadmaps = computed(() => {
+  return roadmaps.value.filter((item) => {
+    const summary = item.description || ''
+    const matchKeyword = !keyword.value || `${item.title}${summary}`.toLowerCase().includes(keyword.value.toLowerCase())
+    const itemCategory = item.category || '全部'
+    const matchCategory = category.value === '全部' || itemCategory === category.value
+    return matchKeyword && matchCategory
+  })
+})
+
+const status = computed(() => {
+  if (loadError.value) return 'error'
+  if (loading.value) return 'loading'
+  if (!filteredRoadmaps.value.length) return 'empty'
+  return 'ready'
+})
 </script>
 
 <style scoped lang="scss">

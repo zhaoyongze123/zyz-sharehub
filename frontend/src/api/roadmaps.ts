@@ -4,19 +4,27 @@ import type { BackendResponse, PageData } from './types'
 export interface Roadmap {
   id: number
   title: string
-  description?: string
-  visibility?: string
-  status?: string
+  description?: string | null
+  visibility?: string | null
+  status?: string | null
+  owner?: string | null
+  stageCount?: number | null
+  followers?: number | null
+  category?: string | null
+  tags?: string[]
 }
 
 export interface RoadmapNode {
   id: number
-  parentId: number | null
   title: string
+  parentId?: number | null
   orderNo?: number | null
   resourceId?: number | null
   noteId?: number | null
   children?: RoadmapNode[]
+  summary?: string | null
+  description?: string | null
+  tasks?: string[]
 }
 
 export interface RoadmapDetailResponse {
@@ -25,9 +33,9 @@ export interface RoadmapDetailResponse {
   progress: Record<string, any>
 }
 
-export async function fetchRoadmapList(page = 1, pageSize = 20): Promise<PageData<Roadmap>> {
+export async function fetchRoadmaps(params: { page?: number; pageSize?: number } = {}): Promise<PageData<Roadmap>> {
   const { data } = await apiClient.get<BackendResponse<PageData<Roadmap>>>('/roadmaps', {
-    params: { page, pageSize }
+    params: { page: params.page ?? 1, pageSize: params.pageSize ?? 20 }
   })
   return data.data
 }
@@ -37,20 +45,20 @@ export async function fetchRoadmapDetail(id: string | number): Promise<RoadmapDe
   return data.data
 }
 
-export async function createRoadmap(payload: { title: string; description?: string; visibility?: string; status?: string }) {
+export async function createRoadmap(payload: { title: string; description?: string | null; visibility?: string | null; status?: string | null }) {
   const { data } = await apiClient.post<BackendResponse<Roadmap>>('/roadmaps', payload)
   return data.data
 }
 
 export async function addRoadmapNode(
-  roadmapId: number,
-  payload: { title: string; parentId?: number | null; orderNo?: number | null; resourceId?: number | null; noteId?: number | null }
+  roadmapId: number | string,
+  payload: { title: string; parentId?: number | null; orderNo?: number | null; resourceId?: number | null; noteId?: number | null; description?: string | null }
 ) {
   const { data } = await apiClient.post<BackendResponse<RoadmapNode[]>>(`/roadmaps/${roadmapId}/nodes`, payload)
   return data.data
 }
 
-export async function updateRoadmapProgress(roadmapId: number, payload: Record<string, any>) {
-  const { data } = await apiClient.post<BackendResponse<Record<string, any>>>(`/roadmaps/${roadmapId}/progress`, payload)
+export async function updateRoadmapProgress(roadmapId: number | string, progress: number) {
+  const { data } = await apiClient.post<BackendResponse<Record<string, any>>>(`/roadmaps/${roadmapId}/progress`, { progress })
   return data.data
 }

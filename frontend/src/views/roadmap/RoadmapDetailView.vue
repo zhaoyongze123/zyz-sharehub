@@ -1,3 +1,4 @@
+
 <template>
   <div class="page-shell" v-if="status === 'loading'">
     <BaseSkeleton height="18rem" />
@@ -11,7 +12,7 @@
     <section class="detail-main">
       <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.description || ''">
         <template #actions>
-          <BaseButton @click="markComplete">标记本阶段完成</BaseButton>
+          <BaseButton :loading="updating" @click="markComplete">标记本阶段完成</BaseButton>
           <BaseButton variant="secondary" @click="favoriteRoadmap">收藏路线</BaseButton>
         </template>
       </HeroBanner>
@@ -79,9 +80,9 @@
               <div class="i-carbon-document resource-icon"></div>
               <div class="resource-info">
                 <span class="resource-title">{{ resources[selectedNodeIndex].title }}</span>
-                <span class="resource-meta">{{ resources[selectedNodeIndex].fileType }} · {{ resources[selectedNodeIndex].likes }} 赞</span>
+                <span class="resource-meta">{{ resources[selectedNodeIndex].fileType }} · {{ resources[selectedNodeIndex].downloadCount }} 次下载</span>
               </div>
-<button class="view-btn" @click="goToResource(resources[selectedNodeIndex].id)">查看</button>
+              <button class="view-btn" @click="goToResource(resources[selectedNodeIndex].id)">查看</button>
             </div>
             <p v-else class="text-muted text-sm">暂无专属资料关联</p>
           </div>
@@ -95,10 +96,11 @@
   </div>
 
   <div v-else class="page-shell">
-    <BaseErrorState title="路线不存在" description="请返回路线广场重新选择。" />
+    <BaseErrorState v-if="loadError" title="加载失败" description="请稍后重试或检查网络。" />
+    <BaseErrorState v-else title="路线不存在" description="请返回路线广场重新选择。" />
   </div>
 </template>
-
+ 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -117,57 +119,64 @@ import { useAppStore } from '@/stores/app'
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
-const roadmap = ref<{ id: number; title: string; description?: string } | null>(null)
+const roadmap = ref<{ id: number; title: string; description?: string | null } | null>(null)
 const nodes = ref<RoadmapNode[]>([])
 const progress = ref(0)
 const loading = ref(false)
-const error = ref(false)
-
-// Node modal state
-const selectedNode = ref<any>(null)
-const selectedNodeIndex = ref<number | null>(null)
+const loadError = ref(false)
+const updating = ref(false)
 
 const timelineItems = computed(() =>
-  flattenNodes(nodes.value).map((node) => ({
-    title: node.title,
-    summary: node.orderNo ? `顺序：${node.orderNo}` : '暂无描述',
-    tasks: []
+  nodes.value.map((item) => ({
+    title: item.title,
+    summary: item.summary || item.description || '该阶段待补充说明',
+    tasks: item.tasks || []
   }))
 )
 
 const status = computed(() => {
-  if (error.value) return 'error'
+  if (loadError.value) return 'error'
   if (loading.value) return 'loading'
   if (roadmap.value) return 'ready'
   return 'error'
 })
 
+// Node modal state
+const selectedNode = ref<any>(null)
+const selectedNodeIndex = ref<number | null>(null)
+
 async function loadDetail() {
   loading.value = true
-  error.value = false
+  loadError.value = false
   try {
     const data = await fetchRoadmapDetail(route.params.id as string)
-    roadmap.value = data.roadmap
-    nodes.value = data.nodes ?? []
-    progress.value = extractProgressPercent(data.progress)
-  } catch (e) {
-    console.error(e)
-    error.value = true
+    roadmap.value = data?.roadmap || null
+    nodes.value = data?.nodes || []
+    progress.value = Number(data?.progress?.value ?? data?.progress?.progress ?? 0)
+  } catch (error: any) {
+    loadError.value = true
+    appStore.showToast('路线详情加载失败', error?.response?.data?.message || '请稍后再试', 'error')
   } finally {
     loading.value = false
   }
 }
 
+onMounted(loadDetail)
+
 function markComplete() {
   if (!roadmap.value) return
   const next = Math.min(100, progress.value + 18)
-  updateRoadmapProgress(roadmap.value.id, { percent: next })
+  updating.value = true
+  updateRoadmapProgress(roadmap.value.id, next)
     .then(() => {
       progress.value = next
       appStore.showToast('进度已更新', `当前路线完成度 ${progress.value}%`)
     })
-    .catch(() => {
-      appStore.showToast('更新失败', '请稍后重试', 'error')
+    .catch((error: any) => {
+      appStore.showToast('进度更新失败', error?.response?.data?.message || '请稍后重试', 'error')
+    })
+    .finally(() => {
+      updating.value = false
     })
 }
 
@@ -197,28 +206,6 @@ function goToResource(id: number) {
   router.push({ name: 'resource-detail', params: { id } })
   closeNodeDetail()
 }
-
-function flattenNodes(tree: RoadmapNode[]): RoadmapNode[] {
-  const result: RoadmapNode[] = []
-  tree.forEach((node) => {
-    result.push(node)
-    if (node.children?.length) {
-      result.push(...flattenNodes(node.children))
-    }
-  })
-  return result
-}
-
-function extractProgressPercent(progressPayload: Record<string, any>): number {
-  if (!progressPayload) return 0
-  if (typeof progressPayload.percent === 'number') return progressPayload.percent
-  const completed = Array.isArray(progressPayload.completedNodeIds) ? progressPayload.completedNodeIds.length : 0
-  const total = nodes.value.length
-  if (!total) return 0
-  return Math.round((completed * 100) / total)
-}
-
-onMounted(loadDetail)
 </script>
 
 <style scoped lang="scss">
