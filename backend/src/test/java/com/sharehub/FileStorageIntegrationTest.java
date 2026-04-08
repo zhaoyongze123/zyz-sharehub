@@ -153,6 +153,7 @@ class FileStorageIntegrationTest {
                 .param("referenceType", "RESUME")
                 .param("referenceId", "resume-101"))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.contentType").value(MediaType.APPLICATION_OCTET_STREAM_VALUE))
             .andReturn();
 
         JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
@@ -276,6 +277,7 @@ class FileStorageIntegrationTest {
                 .param("referenceType", "RESOURCE")
                 .param("referenceId", "resource-plain"))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.contentType").value(MediaType.TEXT_PLAIN_VALUE))
             .andReturn();
 
         JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
