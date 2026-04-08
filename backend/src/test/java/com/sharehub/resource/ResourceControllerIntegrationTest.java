@@ -119,6 +119,23 @@ class ResourceControllerIntegrationTest {
     }
 
     @Test
+    void shouldTreatBlankFilterParamsAsUnset() throws Exception {
+        long publishedSpring = createResource("Spring 指南", "PDF", "PUBLIC", "spring,java", "最热资料");
+        createResource("私有草稿", "DOC", "PRIVATE", "draft", "草稿资料");
+        publishResource(publishedSpring);
+
+        mockMvc.perform(get("/api/resources")
+                .param("keyword", " ")
+                .param("category", "")
+                .param("tag", " ")
+                .param("visibility", ""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].id").value(publishedSpring))
+            .andExpect(jsonPath("$.data.items[0].title").value("Spring 指南"));
+    }
+
+    @Test
     void shouldDifferentiateDetailStates() throws Exception {
         long normalId = createResource("正常资料", "PDF", "PUBLIC", "java", "正常");
         long removedId = createResource("下架资料", "PDF", "PUBLIC", "java", "下架");

@@ -21,6 +21,7 @@ public class ResourceEntity {
     @Column(columnDefinition = "TEXT")
     private String summary;
 
+    @Column(columnDefinition = "TEXT")
     private String tags;
 
     private String externalUrl;

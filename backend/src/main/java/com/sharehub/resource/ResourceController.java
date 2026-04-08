@@ -100,10 +100,10 @@ public class ResourceController {
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, pageSize);
         List<String> statuses = parseStatuses(status);
-        String normalizedKeyword = normalize(keyword);
-        String normalizedCategory = normalize(category);
-        String normalizedTag = normalize(tag);
-        String normalizedVisibility = normalize(visibility);
+        String normalizedKeyword = blankIfNull(normalize(keyword));
+        String normalizedCategory = blankIfNull(normalize(category));
+        String normalizedTag = blankIfNull(normalize(tag));
+        String normalizedVisibility = blankIfNull(normalize(visibility));
 
         if ("hot".equalsIgnoreCase(sortBy)) {
             Page<ResourceEntity> allCandidates = repository.findVisibleByFiltersOrderByUpdatedAtDesc(
@@ -285,6 +285,10 @@ public class ResourceController {
             return null;
         }
         return value.trim();
+    }
+
+    private String blankIfNull(String value) {
+        return value == null ? "" : value;
     }
 
     @PostMapping(path = "/{id}/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

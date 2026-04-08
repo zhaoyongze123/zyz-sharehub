@@ -38,10 +38,14 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status in (:statuses)
-          and (:keyword is null or lower(r.title) like lower(concat('%', :keyword, '%')) or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%')))
-          and (:type is null or r.type = :type)
-          and (:tag is null or lower(coalesce(r.tags, '')) like lower(concat('%', :tag, '%')))
-          and (:visibility is null or r.visibility = :visibility)
+          and (
+            :keyword = ''
+            or lower(r.title) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%'))
+          )
+          and (:type = '' or r.type = :type)
+          and (:tag = '' or (r.tags is not null and lower(r.tags) like lower(concat('%', :tag, '%'))))
+          and (:visibility = '' or r.visibility = :visibility)
         order by r.updatedAt desc
         """)
     Page<ResourceEntity> findVisibleByFiltersOrderByUpdatedAtDesc(
@@ -56,10 +60,14 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select count(r)
         from ResourceEntity r
         where r.status in (:statuses)
-          and (:keyword is null or lower(r.title) like lower(concat('%', :keyword, '%')) or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%')))
-          and (:type is null or r.type = :type)
-          and (:tag is null or lower(coalesce(r.tags, '')) like lower(concat('%', :tag, '%')))
-          and (:visibility is null or r.visibility = :visibility)
+          and (
+            :keyword = ''
+            or lower(r.title) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%'))
+          )
+          and (:type = '' or r.type = :type)
+          and (:tag = '' or (r.tags is not null and lower(r.tags) like lower(concat('%', :tag, '%'))))
+          and (:visibility = '' or r.visibility = :visibility)
         """)
     long countByVisibleFilters(
         @Param("statuses") List<String> statuses,
