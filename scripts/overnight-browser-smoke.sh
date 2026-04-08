@@ -64,6 +64,33 @@ wait_for_url() {
   return 1
 }
 
+wait_for_stable_url() {
+  local url="$1"
+  local pid="$2"
+  local label="$3"
+  local checks="${4:-3}"
+  local delay="${5:-1}"
+  local success_count=0
+
+  while (( success_count < checks )); do
+    if [[ -n "${pid}" ]] && ! kill -0 "${pid}" >/dev/null 2>&1; then
+      log "${label}进程已退出，稳定性校验失败 ${url}"
+      return 1
+    fi
+
+    if curl -fsS "${url}" >/dev/null 2>&1; then
+      success_count=$(( success_count + 1 ))
+      sleep "${delay}"
+      continue
+    fi
+
+    success_count=0
+    sleep "${delay}"
+  done
+
+  return 0
+}
+
 kill_port_process() {
   local port="$1"
   local pids
@@ -183,6 +210,11 @@ if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health" "${BACKEND_PID}" "后端
   exit 1
 fi
 
+if ! wait_for_stable_url "${BACKEND_BASE_URL}/actuator/health" "${BACKEND_PID}" "后端" 2 1; then
+  log "后端稳定性校验失败，请查看 ${BACKEND_LOG}"
+  exit 1
+fi
+
 export VITE_API_PROXY_TARGET="${BACKEND_BASE_URL}"
 nohup bash -lc "cd '${FRONTEND_DIR}' && npm run dev -- --host 127.0.0.1 --port ${FRONTEND_PORT} --strictPort" > "${FRONTEND_LOG}" 2>&1 &
 FRONTEND_PID=$!
@@ -190,6 +222,11 @@ log "前端已启动，PID=${FRONTEND_PID}"
 
 if ! wait_for_url "${FRONTEND_BASE_URL}" "${FRONTEND_PID}" "前端" 90 2; then
   log "前端健康检查失败，请查看 ${FRONTEND_LOG}"
+  exit 1
+fi
+
+if ! wait_for_stable_url "${FRONTEND_BASE_URL}" "${FRONTEND_PID}" "前端" 3 1; then
+  log "前端稳定性校验失败，请查看 ${FRONTEND_LOG}"
   exit 1
 fi
 
