@@ -32,12 +32,15 @@ cd /Users/mac/Documents/New\ project
 ./scripts/stop-overnight-autopilot.sh
 ```
 
+停止脚本会同时结束 `supervisor`、当前持锁轮次与保活进程，并清理 `output/overnight/state/hourly-run.lock`，避免残留锁阻塞下一次启动。
+
 ## 输出位置
 
 - supervisor 日志：`output/overnight/supervisor.log`
 - 最近一轮日志：`output/overnight/latest.log`
 - 最近一轮总结：`output/overnight/latest-message.md`
 - 运行状态：`output/overnight/latest-meta.env`
+- 单轮执行锁：`output/overnight/state/hourly-run.lock/owner.env`
 - 诊断脚本：`scripts/overnight-monitor.sh`
 - 浏览器 smoke 日志：`output/overnight/<RUN_ID>/browser-smoke/smoke.log`
 - 后端联调日志：`output/overnight/<RUN_ID>/browser-smoke/backend.log`
@@ -55,8 +58,10 @@ cd /Users/mac/Documents/New\ project
 - 到 09:00 后 supervisor 自动退出
 - 每轮调用 `codex exec`
 - 默认单轮超时 3000 秒，避免单次卡死整夜
+- `hourly-run` 通过 `output/overnight/state/hourly-run.lock` 保证同一时刻只会有一个轮次执行；重复触发时会直接跳过，不再并发拉起第二轮
 - 每轮代码成功后会自动启动前后端，并执行对应模块的 Playwright 浏览器 smoke；联调失败则本轮失败，不按成功态继续推进
 - 浏览器联调优先走 cloud-dev 后端；若缺少 PostgreSQL/Redis 密码，则自动回落到本机 smoke profile，避免整夜因环境变量缺失直接停摆
+- 浏览器 smoke 在健康检查成功后，还会对前后端分别做一次短时稳定性校验，避免服务刚启动即退出却被误判为可用
 - 使用 `caffeinate -dimsu -t` 保持机器不休眠直到截止时间
 - 每轮结束会自动 push 当前分支并发飞书总结
 - 如果自动化或业务阻塞导致无法继续推进，会发飞书异常通知

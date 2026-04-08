@@ -4,6 +4,8 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
+RUN_LOCK_DIR="${STATE_DIR}/hourly-run.lock"
+RUN_LOCK_META_FILE="${RUN_LOCK_DIR}/owner.env"
 PROMPT_FILE="${PROJECT_ROOT}/scripts/overnight-manager-prompt.md"
 RUN_ID="$(date '+%Y%m%d-%H%M%S')"
 RUN_DIR="${OUTPUT_DIR}/${RUN_ID}"
@@ -19,10 +21,56 @@ NOTIFY_SCRIPT="${PROJECT_ROOT}/scripts/feishu_notify.py"
 DEFAULT_CODEX_HOME="${HOME}/.codex"
 AUTOPILOT_CODEX_HOME="${OUTPUT_DIR}/codex-home"
 START_HEAD="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
+RUN_SOURCE="${OVERNIGHT_RUN_SOURCE:-manual}"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 mkdir -p "${RUN_DIR}" "${STATE_DIR}"
+
+write_run_lock() {
+  cat > "${RUN_LOCK_META_FILE}" <<EOF
+PID=$$
+RUN_ID=${RUN_ID}
+SOURCE=${RUN_SOURCE}
+START_AT=$(date '+%F %T %z')
+EOF
+}
+
+release_run_lock() {
+  if [[ ! -f "${RUN_LOCK_META_FILE}" ]]; then
+    return
+  fi
+
+  local owner_pid
+  owner_pid="$(awk -F'=' '$1=="PID"{print $2; exit}' "${RUN_LOCK_META_FILE}" 2>/dev/null || true)"
+  if [[ "${owner_pid}" == "$$" ]]; then
+    rm -rf "${RUN_LOCK_DIR}"
+  fi
+}
+
+acquire_run_lock() {
+  if mkdir "${RUN_LOCK_DIR}" 2>/dev/null; then
+    write_run_lock
+    return 0
+  fi
+
+  local owner_pid owner_run_id owner_source
+  owner_pid="$(awk -F'=' '$1=="PID"{print $2; exit}' "${RUN_LOCK_META_FILE}" 2>/dev/null || true)"
+  owner_run_id="$(awk -F'=' '$1=="RUN_ID"{print $2; exit}' "${RUN_LOCK_META_FILE}" 2>/dev/null || true)"
+  owner_source="$(awk -F'=' '$1=="SOURCE"{print $2; exit}' "${RUN_LOCK_META_FILE}" 2>/dev/null || true)"
+
+  if [[ -n "${owner_pid}" ]] && kill -0 "${owner_pid}" >/dev/null 2>&1; then
+    echo "[$(date '+%F %T')] 检测到已有轮次在运行，PID=${owner_pid}，RUN_ID=${owner_run_id:-unknown}，SOURCE=${owner_source:-unknown}，跳过本次启动"
+    exit 0
+  fi
+
+  rm -rf "${RUN_LOCK_DIR}"
+  mkdir "${RUN_LOCK_DIR}"
+  write_run_lock
+}
+
+trap release_run_lock EXIT
+acquire_run_lock
 
 prepare_autopilot_codex_home() {
   mkdir -p "${AUTOPILOT_CODEX_HOME}"

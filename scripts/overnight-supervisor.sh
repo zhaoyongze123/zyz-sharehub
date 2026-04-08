@@ -4,6 +4,8 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
+RUN_LOCK_DIR="${STATE_DIR}/hourly-run.lock"
+RUN_LOCK_META_FILE="${RUN_LOCK_DIR}/owner.env"
 LOG_FILE="${OUTPUT_DIR}/supervisor.log"
 DEADLINE_HOUR="${OVERNIGHT_DEADLINE_HOUR:-9}"
 CHECK_INTERVAL_SECONDS="${OVERNIGHT_CHECK_INTERVAL_SECONDS:-20}"
@@ -115,7 +117,7 @@ ensure_deadline() {
 
 start_run() {
   local reason="$1"
-  nohup bash "${RUN_SCRIPT}" >> "${LOG_FILE}" 2>&1 &
+  nohup env OVERNIGHT_RUN_SOURCE=supervisor bash "${RUN_SCRIPT}" >> "${LOG_FILE}" 2>&1 &
   local run_pid=$!
   printf 'RUN_PID=%s\nSTART_EPOCH=%s\nREASON=%s\n' "${run_pid}" "$(date '+%s')" "${reason}" > "${RUN_META_FILE}"
   echo "${run_pid}" > "${RUN_PID_FILE}"
@@ -147,6 +149,23 @@ current_run_start_epoch() {
   awk -F'=' '$1=="START_EPOCH"{print $2; exit}' "${RUN_META_FILE}" 2>/dev/null || true
 }
 
+active_locked_run_pid() {
+  if [[ ! -f "${RUN_LOCK_META_FILE}" ]]; then
+    echo ""
+    return
+  fi
+
+  local lock_pid
+  lock_pid="$(awk -F'=' '$1=="PID"{print $2; exit}' "${RUN_LOCK_META_FILE}" 2>/dev/null || true)"
+  if [[ -n "${lock_pid}" ]] && kill -0 "${lock_pid}" >/dev/null 2>&1; then
+    echo "${lock_pid}"
+    return
+  fi
+
+  rm -rf "${RUN_LOCK_DIR}"
+  echo ""
+}
+
 handle_stale_run() {
   local run_pid start_epoch now_epoch
   run_pid="$(current_run_pid)"
@@ -175,6 +194,14 @@ handle_stale_run() {
 ensure_run_alive() {
   local run_pid
   run_pid="$(current_run_pid)"
+  local lock_pid
+  lock_pid="$(active_locked_run_pid)"
+  if [[ -n "${lock_pid}" ]]; then
+    if [[ -z "${run_pid}" ]] || [[ "${run_pid}" != "${lock_pid}" ]]; then
+      log "检测到已有轮次锁，PID=${lock_pid}，本次不重复拉起新轮次"
+    fi
+    return
+  fi
   if [[ -z "${run_pid}" ]]; then
     start_run "启动立即执行"
     return
