@@ -9,12 +9,12 @@
 
         <div class="user-profile-header">
           <div class="user-avatar-wrapper">
-            <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" class="user-avatar-img" alt="avatar" />
+            <img v-if="avatarPreview" :src="avatarPreview" alt="avatar" class="avatar-preview small" />
             <div v-else class="i-carbon-logo-github user-avatar-icon"></div>
           </div>
           <div class="user-info">
-            <div class="user-name">{{ authStore.profile?.nickname || authStore.profile?.login || '未登录' }}</div>
-            <div class="user-type">{{ authStore.profile ? '个人帐户' : '未登录' }}</div>
+            <div class="user-name">{{ displayName }}</div>
+            <div class="user-type">{{ displayRole }}</div>
           </div>
         </div>
 
@@ -44,7 +44,7 @@
               <div class="setting-item avatar-item">
                 <div class="item-info">头像</div>
                 <div class="item-control row-control">
-                  <img :src="authStore.profile?.avatarUrl || defaultAvatar" class="avatar-preview" />
+                  <img :src="avatarPreview || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4'" class="avatar-preview" />
                   <button class="btn-outline" @click="handleAvatarChange">更换头像</button>
                 </div>
               </div>
@@ -178,7 +178,6 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-
 import { useAppStore } from '@/stores/app'
 
 const router = useRouter()
@@ -198,8 +197,8 @@ const currentTabLabel = computed(() => {
   return tabs.find(t => t.id === currentTab.value)?.label || '设置'
 })
 
-// 个人资料相关
-const defaultAvatar = 'https://avatars.githubusercontent.com/u/9919?s=64&v=4'
+const displayName = computed(() => authStore.profile?.nickname || authStore.profile?.login || '未登录')
+const displayRole = computed(() => (authStore.profile?.role === 'admin' ? '管理员' : '个人帐户'))
 
 const profileForm = reactive({
   username: authStore.profile?.nickname || authStore.profile?.login || '',
@@ -207,13 +206,18 @@ const profileForm = reactive({
   website: ''
 })
 
+const avatarUrl = ref(authStore.profile?.avatarUrl || '')
+const avatarPreview = computed(() => avatarUrl.value)
+
 onMounted(async () => {
-  if (!authStore.initialized) {
-    await authStore.bootstrap()
+  if (!authStore.initialized || !authStore.profile) {
+    await authStore.refreshProfile()
   }
-  if (!authStore.profile) return
-  profileForm.username = authStore.profile.nickname || authStore.profile.login || ''
-  profileForm.bio = authStore.profile.headline || ''
+  if (authStore.profile) {
+    profileForm.username = authStore.profile.nickname || authStore.profile.login || ''
+    profileForm.bio = authStore.profile.headline || ''
+    avatarUrl.value = authStore.profile.avatarUrl || ''
+  }
 })
 
 const showToast = ref(false)
@@ -232,23 +236,26 @@ const handleAvatarChange = () => {
   input.type = 'file'
   input.accept = 'image/*'
   input.onchange = async () => {
-    if (!input.files?.length) return
-    const file = input.files[0]
+    const file = input.files?.[0]
+    if (!file) return
     try {
-      await authStore.updateAvatar(file)
+      triggerToast('上传中...')
+      const stored = await authStore.updateAvatar(file)
+      avatarUrl.value = stored.downloadUrl || avatarUrl.value
+      await authStore.refreshProfile()
       triggerToast('头像已更新')
     } catch (error) {
-      triggerToast('头像更新失败')
+      triggerToast('上传失败，请重试')
     }
   }
   input.click()
 }
 
-const handleSaveProfile = async () => {
-  await authStore.updateProfile({
+const handleSaveProfile = () => {
+  authStore.updateProfile({
     headline: profileForm.bio
   })
-  triggerToast('个人资料保存成功！')
+  triggerToast('后端暂未开放更新接口，已读取最新资料')
 }
 
 // 偏好设置相关
@@ -593,6 +600,11 @@ function handleDeleteAccount() {
   border-radius: 50%;
   border: 1px solid var(--app-border);
   object-fit: cover;
+}
+.avatar-preview.small {
+  width: 40px;
+  height: 40px;
+  border: none;
 }
 
 .setting-item.border-none {

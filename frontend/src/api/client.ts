@@ -2,33 +2,25 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 
-declare module 'axios' {
-  // 允许在单个请求上控制是否静默处理 401
-  export interface AxiosRequestConfig {
-    skipAuthError?: boolean
-  }
-}
-
 export const apiClient = axios.create({
   baseURL: '/api',
   timeout: 15000
 })
 
 apiClient.interceptors.request.use((config) => {
-  const adminToken = window.localStorage.getItem('sharebase.adminToken')
-  const userKey = window.localStorage.getItem('sharebase.userKey') || window.localStorage.getItem('sharehub.userKey')
+  const savedRole = window.localStorage.getItem('sharebase.role')
+  const savedNickname = window.localStorage.getItem('sharebase.nickname')
+  const userKey = window.localStorage.getItem('sharebase.userKey')
 
-  config.headers = config.headers || {}
-
-  if (adminToken) {
-    config.headers['X-Admin-Token'] = adminToken
+  if (savedRole === 'admin') {
+    config.headers['X-Admin-Token'] = window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token'
   }
 
   if (userKey) {
     config.headers['X-User-Key'] = userKey
+  } else if (savedRole === 'user' || savedRole === 'admin') {
+    config.headers['X-User-Key'] = savedNickname || 'frontend-local-user'
   }
-
-  // 其余身份依赖 OAuth Session Cookie
 
   return config
 })
@@ -36,22 +28,15 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const { response, config } = error
     const authStore = useAuthStore()
     const appStore = useAppStore()
+    const skipAuthError = (error.config as any)?.skipAuthError
 
-    const skipAuthError = (config as typeof config & { skipAuthError?: boolean })?.skipAuthError
-
-    if (response?.status === 401) {
-      if (!skipAuthError) {
-        authStore.logout()
-        appStore.showToast('登录已失效', '请重新登录后继续操作', 'error')
-      }
-    } else if (response) {
-      const message = (response.data as any)?.message || (response.data as any)?.msg || '服务暂时不可用，请稍后再试'
-      appStore.showToast('请求失败', message, 'error')
-    } else {
-      appStore.showToast('网络异常', '请检查网络后重试', 'error')
+    if (error.response?.status === 401 && !skipAuthError) {
+      authStore.logout()
+      appStore.showToast('登录已失效', '请重新登录后继续操作', 'error')
+    } else if (!skipAuthError) {
+      appStore.showToast('请求失败', error.response?.data?.msg ?? '服务暂时不可用，请稍后再试', 'error')
     }
 
     return Promise.reject(error)

@@ -1,19 +1,26 @@
 import { defineStore } from 'pinia'
-import { fetchMe, uploadAvatar, type MeDto } from '@/api/me'
+import { fetchMe, uploadAvatar, type MeDto, type UserProfileDto } from '@/api/me'
+import { useAppStore } from '@/stores/app'
 
 export interface UserProfile {
   id: number
-  nickname: string
-  role: 'guest' | 'user' | 'admin'
-  headline: string
-  login?: string
+  login: string
+  name?: string | null
+  avatarFileId?: string | null
   avatarUrl?: string | null
+  status?: string | null
+  // 兼容旧前端字段
+  nickname?: string
+  headline?: string
+  role?: 'guest' | 'user' | 'admin'
 }
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     initialized: false,
-    profile: null as UserProfile | null
+    profile: null as UserProfile | null,
+    me: null as MeDto | null,
+    loading: false
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.profile),
@@ -29,45 +36,57 @@ export const useAuthStore = defineStore('auth', {
       } catch (error: any) {
         // 未登录时后端返回 401，保持未登录态
         this.profile = null
+        this.me = null
       } finally {
         this.initialized = true
       }
     },
     hydrateFromMe(me: MeDto) {
       const { profile } = me
-      this.profile = {
-        id: profile.id,
-        nickname: profile.name || profile.login,
-        role: 'user',
-        headline: '',
-        login: profile.login,
-        avatarUrl: profile.avatarUrl
+      this.me = me
+      this.profile = this.mapProfile(profile)
+    },
+    async refreshProfile() {
+      this.loading = true
+      const appStore = useAppStore()
+      try {
+        const me = await fetchMe()
+        this.hydrateFromMe(me)
+      } catch (error) {
+        this.profile = null
+        this.me = null
+        appStore.showToast('获取用户信息失败', '请检查登录或联调头 X-User-Key', 'error')
+      } finally {
+        this.loading = false
       }
     },
-    async refreshMe() {
-      const me = await fetchMe()
-      this.hydrateFromMe(me)
+    mapProfile(profile: UserProfileDto): UserProfile {
+      return {
+        id: profile.id,
+        login: profile.login,
+        name: profile.name,
+        avatarFileId: profile.avatarFileId ?? undefined,
+        avatarUrl: profile.avatarUrl ?? undefined,
+        status: profile.status ?? undefined,
+        nickname: profile.name ?? profile.login,
+        headline: profile.status ?? undefined,
+        role: 'user'
+      }
     },
+    // 联调便捷登录，本地设置 userKey/adminToken 后即可访问 /api/me
     loginAs(role: 'user' | 'admin' = 'user') {
-      // 保留本地联调入口：写入 userKey/adminToken，方便后端用 header 识别
       const pseudoUserKey = role === 'admin' ? 'dev-admin' : 'dev-user'
       window.localStorage.setItem('sharebase.userKey', pseudoUserKey)
       if (role === 'admin') {
         window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
       }
-      this.profile = {
-        id: 0,
-        nickname: role === 'admin' ? 'Admin Zoe' : 'Alex Chen',
-        role,
-        headline: role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者',
-        login: pseudoUserKey,
-        avatarUrl: null
-      }
+      this.refreshProfile()
     },
-    async updateProfile(data: Partial<UserProfile>) {
-      if (!this.profile) return
-      // 前端暂未有更新接口，先本地更新
-      Object.assign(this.profile, data)
+    // 兼容旧逻辑的占位方法，实际后端未提供更新接口
+    updateProfile(data: Partial<UserProfile>) {
+      if (this.profile) {
+        Object.assign(this.profile, data)
+      }
     },
     async updateAvatar(file: File) {
       const stored = await uploadAvatar(file)
@@ -83,6 +102,7 @@ export const useAuthStore = defineStore('auth', {
       window.localStorage.removeItem('sharebase.userKey')
       window.localStorage.removeItem('sharebase.adminToken')
       this.profile = null
+      this.me = null
     }
   }
 })
