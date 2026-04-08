@@ -374,6 +374,38 @@ public class NoteControllerIntegrationTest {
     }
 
     @Test
+    void shouldTreatNullVisibilityAsNullOnUpdate() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Null Visibility Note","contentMd":"# content","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> created = mapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) created.get("data");
+        Long id = Long.valueOf(data.get("id").toString());
+
+        mvc.perform(put("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Null Visibility Note","contentMd":"# content","visibility":null,"status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.visibility").value(nullValue()));
+
+        mvc.perform(get("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.visibility").value(nullValue()));
+    }
+
+    @Test
     void shouldKeepExistingStatusWhenUpdatingWithBlankStatus() throws Exception {
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
@@ -395,6 +427,38 @@ public class NoteControllerIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"Updated Note","contentMd":"# updated","visibility":"PUBLIC","status":"   "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mvc.perform(get("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+    }
+
+    @Test
+    void shouldKeepExistingStatusWhenUpdatingWithNullStatus() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Original Note","contentMd":"# content","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> created = mapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) created.get("data");
+        Long id = Long.valueOf(data.get("id").toString());
+
+        mvc.perform(put("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Updated Note","contentMd":"# updated","visibility":"PUBLIC","status":null}
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
