@@ -78,6 +78,7 @@
             </div>
             <div class="save-actions">
               <button class="btn-primary" @click="handleSaveProfile" :disabled="loadingProfile">保存修改</button>
+              <span class="readonly-hint">当前后端暂未开放资料文本编辑，已展示最新资料</span>
             </div>
           </template>
 
@@ -178,10 +179,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-
 import { useAppStore } from '@/stores/app'
 import { apiClient } from '@/api/client'
 
@@ -217,6 +217,17 @@ const userDisplayName = computed(() => authStore.profile?.nickname || authStore.
 const userTypeLabel = computed(() => authStore.profile?.role === 'admin' ? '管理员' : (authStore.profile?.status === 'BANNED' ? '已封禁' : '个人帐户'))
 const avatarUrl = computed(() => authStore.profile?.avatarUrl || defaultAvatar)
 
+const showToast = ref(false)
+const toastMessage = ref('')
+
+const triggerToast = (msg: string) => {
+  toastMessage.value = msg
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 3000)
+}
+
 const syncProfileForm = () => {
   profileForm.username = authStore.profile?.nickname || authStore.profile?.login || ''
   profileForm.bio = authStore.profile?.headline || authStore.profile?.bio || ''
@@ -235,21 +246,15 @@ const loadProfile = async () => {
   }
 }
 
+watch(
+  () => authStore.profile,
+  () => syncProfileForm()
+)
+
 onMounted(() => {
   syncProfileForm()
   loadProfile()
 })
-
-const showToast = ref(false)
-const toastMessage = ref('')
-
-const triggerToast = (msg: string) => {
-  toastMessage.value = msg
-  showToast.value = true
-  setTimeout(() => {
-    showToast.value = false
-  }, 3000)
-}
 
 const handleAvatarChange = () => {
   const input = document.createElement('input')
@@ -727,6 +732,7 @@ function handleDeleteAccount() {
   border-top: 1px solid var(--app-border);
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .btn-text {
@@ -792,6 +798,12 @@ function handleDeleteAccount() {
 
 .toggle-switch:checked::after {
   transform: translateX(20px);
+}
+
+.readonly-hint {
+  align-self: center;
+  font-size: 13px;
+  color: var(--app-text-muted);
 }
 
 /* Provider Integrations specific styles */
