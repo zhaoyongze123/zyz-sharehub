@@ -12,6 +12,8 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,9 +29,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerIntegrationTest {
 
     private static final String USER_KEY = "local-dev-user";
+    private static final String BANNED_USER_KEY = "banned-user";
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private UserProfileRepository userProfileRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -179,5 +185,38 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(multipart("/api/auth/avatar").file(file))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+    }
+
+    @Test
+    void shouldRejectBannedUserWhenFetchingProfile() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert(BANNED_USER_KEY, BANNED_USER_KEY, null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+
+        mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+    }
+
+    @Test
+    void shouldRejectAvatarUploadForBannedUser() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert(BANNED_USER_KEY + "-avatar", BANNED_USER_KEY, null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "png".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/auth/avatar")
+                .file(file)
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
     }
 }
