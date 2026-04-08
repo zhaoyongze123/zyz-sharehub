@@ -17,7 +17,7 @@ paths:
       description: 实际 OAuth 回调由 Spring Security 处理，当前接口仅返回联调提示信息
       responses:
         '200':
-          description: 成功
+          description: 成功；响应体为 JSON 提示信息
   /api/auth/me:
     get:
       summary: 获取当前用户
@@ -759,6 +759,10 @@ paths:
                 type: string
           content:
             application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
               schema:
                 type: string
                 format: binary
