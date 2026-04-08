@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
+import static org.hamcrest.Matchers.nullValue;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -301,6 +302,48 @@ public class NoteControllerIntegrationTest {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("DRAFT"));
+    }
+
+    @Test
+    void shouldTreatBlankVisibilityAsNullOnCreateAndUpdate() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Blank Visibility Note","contentMd":"# content","visibility":"   ","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.visibility").value(nullValue()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> created = mapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) created.get("data");
+        Long id = Long.valueOf(data.get("id").toString());
+
+        mvc.perform(put("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Blank Visibility Note","contentMd":"# content","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+
+        mvc.perform(put("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Blank Visibility Note","contentMd":"# content","visibility":"    ","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.visibility").value(nullValue()));
+
+        mvc.perform(get("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.visibility").value(nullValue()));
     }
 
     @Test
