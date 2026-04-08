@@ -650,7 +650,7 @@ paths:
   /api/notes:
     get:
       summary: 笔记分页列表
-      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理，不额外收窄结果
+      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理，不额外收窄结果；带前后空白时会先裁剪再参与筛选
       parameters:
         - in: query
           name: page

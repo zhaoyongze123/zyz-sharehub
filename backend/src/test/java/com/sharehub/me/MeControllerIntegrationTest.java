@@ -372,6 +372,35 @@ class MeControllerIntegrationTest {
     }
 
     @Test
+    void shouldTrimPersonalCenterNoteStatusFilterBeforeApplying() throws Exception {
+        mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"笔记A","contentMd":"# note-a","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"笔记B","contentMd":"# note-b","visibility":"PRIVATE","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", " PUBLISHED ")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("笔记B"))
+            .andExpect(jsonPath("$.data.items[0].status").value("PUBLISHED"));
+    }
+
+    @Test
     void shouldClampInvalidResumePaginationToMinimumValues() throws Exception {
         mockMvc.perform(post("/api/resumes/generate")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)

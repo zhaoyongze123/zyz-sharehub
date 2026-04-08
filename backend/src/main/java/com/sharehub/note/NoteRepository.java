@@ -152,14 +152,15 @@ public class NoteRepository {
     }
 
     private String defaultStatus(String status) {
-        return status == null || status.isBlank() ? "DRAFT" : status;
+        String normalized = normalize(status);
+        return normalized == null ? "DRAFT" : normalized;
     }
 
     private String normalize(String status) {
         if (status == null || status.isBlank()) {
             return null;
         }
-        return status;
+        return status.trim();
     }
 
     private String normalizeForUpdate(String status, String existingStatus) {
