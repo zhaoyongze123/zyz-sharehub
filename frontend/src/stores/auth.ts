@@ -62,7 +62,6 @@ export const useAuthStore = defineStore('auth', {
         status: profile.status ?? null
       }
 
-      // 将 login 写入本地，便于后续请求携带 X-User-Key（联调模式）
       window.localStorage.setItem('sharebase.nickname', normalized.login)
       if (!window.localStorage.getItem('sharebase.role')) {
         window.localStorage.setItem('sharebase.role', role)
@@ -88,7 +87,7 @@ export const useAuthStore = defineStore('auth', {
     async refreshMe() {
       const data = await fetchMe()
       this.me = data
-      this.profile = this.normalizeProfile(data.profile)
+      this.profile = this.normalizeProfile(data?.profile)
     },
     async bootstrap() {
       if (this.initialized) return
@@ -99,7 +98,6 @@ export const useAuthStore = defineStore('auth', {
         this.me = data
         this.profile = this.normalizeProfile(data.profile)
       } catch (error) {
-        // 未登录或服务不可用时回落到本地占位，保证最小可用性
         this.hydrateFromLocal()
         console.warn('fetchMe failed, fallback to local profile', error)
       } finally {

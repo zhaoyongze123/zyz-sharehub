@@ -9,8 +9,7 @@
 
         <div class="user-profile-header">
           <div class="user-avatar-wrapper">
-            <img v-if="avatarUrl" :src="avatarUrl" class="avatar-preview" alt="avatar" />
-            <div v-else class="i-carbon-logo-github user-avatar-icon"></div>
+            <img :src="avatarSrc" alt="avatar" class="user-avatar-img" />
           </div>
           <div class="user-info">
             <div class="user-name">{{ authStore.profile?.nickname || authStore.profile?.login }}</div>
@@ -44,7 +43,7 @@
               <div class="setting-item avatar-item">
                 <div class="item-info">头像</div>
                 <div class="item-control row-control">
-                  <img :src="avatarUrl || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4'" class="avatar-preview" />
+                  <img :src="avatarSrc" class="avatar-preview" />
                   <button class="btn-outline" :disabled="avatarUploading" @click="handleAvatarChange">
                     {{ avatarUploading ? '上传中...' : '更换头像' }}
                   </button>
@@ -177,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, watch } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -201,6 +200,8 @@ const currentTabLabel = computed(() => {
   return tabs.find(t => t.id === currentTab.value)?.label || '设置'
 })
 
+const avatarSrc = computed(() => authStore.profile?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4')
+
 // 个人资料相关
 const profileForm = reactive({
   username: authStore.profile?.nickname || authStore.profile?.login || '',
@@ -217,7 +218,6 @@ watch(
   { immediate: true }
 )
 
-const avatarUrl = computed(() => authStore.profile?.avatarUrl || authStore.profile?.avatarFileId || '')
 const avatarUploading = ref(false)
 
 const showToast = ref(false)
@@ -245,8 +245,7 @@ const handleAvatarChange = () => {
       await authStore.refreshMe()
       triggerToast('头像已更新')
     } catch (error) {
-      appStore.showToast('头像上传失败', '请稍后再试', 'error')
-      console.error(error)
+      triggerToast('头像更新失败，请稍后重试')
     } finally {
       avatarUploading.value = false
     }
@@ -255,11 +254,7 @@ const handleAvatarChange = () => {
 }
 
 const handleSaveProfile = () => {
-  authStore.updateProfile({
-    nickname: profileForm.username,
-    headline: profileForm.bio
-  })
-  triggerToast('个人资料保存成功！')
+  triggerToast('当前仅支持更新头像；其他字段请稍后在后端开放后修改')
 }
 
 // 偏好设置相关
@@ -304,6 +299,14 @@ function handleDeleteAccount() {
     router.push('/login')
   }
 }
+
+onMounted(async () => {
+  if (!authStore.initialized) {
+    await authStore.bootstrap()
+  } else {
+    await authStore.refreshMe().catch(() => {})
+  }
+})
 </script>
 
 <style scoped lang="scss">
@@ -406,9 +409,10 @@ function handleDeleteAccount() {
   overflow: hidden;
 }
 
-.user-avatar-icon {
-  font-size: 48px;
-  color: var(--app-text-main);
+.user-avatar-img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
 }
 
 .user-info {
