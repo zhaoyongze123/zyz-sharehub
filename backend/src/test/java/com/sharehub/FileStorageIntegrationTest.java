@@ -154,4 +154,23 @@ class FileStorageIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("FILE_OWNER_REQUIRED"));
     }
+
+    @Test
+    void shouldRejectDirectUploadWhenReferenceMissing() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            MediaType.IMAGE_PNG_VALUE,
+            new byte[]{1}
+        );
+
+        mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-1")
+                .param("category", "AVATAR")
+                .param("referenceType", " ")
+                .param("referenceId", " "))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_REFERENCE_REQUIRED"));
+    }
 }
