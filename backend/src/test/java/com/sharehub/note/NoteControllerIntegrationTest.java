@@ -260,4 +260,16 @@ public class NoteControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].title").value("Published Note"))
             .andExpect(jsonPath("$.data.items[1].title").value("Draft Note"));
     }
+
+    @Test
+    void shouldDefaultStatusToDraftWhenMissing() throws Exception {
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"No Status Note","contentMd":"# content","visibility":"PUBLIC"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+    }
 }

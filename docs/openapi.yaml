@@ -670,7 +670,7 @@ paths:
           description: 用户被封禁（错误码 `USER_BANNED`）
     post:
       summary: 创建笔记
-      description: 需要当前用户身份；创建后笔记归属当前请求用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；创建后笔记归属当前请求用户；未传 `status` 时默认保存为 `DRAFT`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
