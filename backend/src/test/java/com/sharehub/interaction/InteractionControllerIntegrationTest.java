@@ -329,6 +329,19 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("COMMENT_CONTENT_REQUIRED"));
     }
 
+    @Test
+    void reportEndpointShouldFallbackBlankReasonToDefault() throws Exception {
+        long resourceId = createResource("空举报原因资源");
+
+        mvc.perform(post("/api/reports")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("resourceId", String.valueOf(resourceId), "reason", "   "))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.targetId").value(resourceId))
+            .andExpect(jsonPath("$.data.reason").value("无"));
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {
         return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
