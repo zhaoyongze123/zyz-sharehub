@@ -430,9 +430,8 @@
 
 1. `docs/backend-api-reference.md` 此次补齐前原本不存在。
 2. `resumes` 已切到按请求用户隔离，但仍依赖 `X-User-Key` / OAuth 上下文，不是完整业务登录流。
-3. `admin` 文档曾声明 `401`，但真实实现只有 `403`。
-4. `resources` 写接口已经切到按请求用户隔离，联调依赖 `X-User-Key` / OAuth 上下文，不是完整业务登录流。
-5. `auth/avatar` 旧文档承诺了图片类型白名单，但当前实现并没有该校验。
+3. `resources` 写接口已经切到按请求用户隔离，联调依赖 `X-User-Key` / OAuth 上下文，不是完整业务登录流。
+4. `auth/avatar` 旧文档承诺了图片类型白名单，但当前实现并没有该校验。
 
 ## 12. 推荐联调顺序
 

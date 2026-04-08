@@ -905,14 +905,8 @@ paths:
       responses:
         '200':
           description: 成功
-        '401':
-          description: 未登录或无权限
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: 需要管理员角色
+          description: 缺失或错误的 X-Admin-Token
           content:
             application/json:
               schema:

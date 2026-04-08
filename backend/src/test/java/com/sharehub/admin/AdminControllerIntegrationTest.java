@@ -52,8 +52,10 @@ public class AdminControllerIntegrationTest {
 
     @Test
     void reportsSupportsPaginationAndFilters() throws Exception {
-        interactionRepository.saveReport(1L, "spam", "alice");
-        interactionRepository.saveReport(2L, "abuse", "bob");
+        long firstResourceId = insertResource("举报资源-1");
+        long secondResourceId = insertResource("举报资源-2");
+        interactionRepository.saveReport(firstResourceId, "spam", "alice");
+        interactionRepository.saveReport(secondResourceId, "abuse", "bob");
 
         mvc.perform(adminGet("/api/admin/reports")
                 .param("page", "1")
