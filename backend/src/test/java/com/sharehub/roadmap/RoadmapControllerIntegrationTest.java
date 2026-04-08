@@ -240,4 +240,34 @@ class RoadmapControllerIntegrationTest {
             .andExpect(jsonPath("$.data.progress").isMap())
             .andExpect(jsonPath("$.data.progress.percent").doesNotExist());
     }
+
+    @Test
+    void shouldClampInvalidPublicRoadmapPaginationAndDefaultStatusOnCreate() throws Exception {
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc-a","visibility":"PUBLIC"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线B","description":"desc-b","visibility":"PRIVATE","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/roadmaps")
+                .param("page", "0")
+                .param("pageSize", "-2"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线B"));
+    }
 }
