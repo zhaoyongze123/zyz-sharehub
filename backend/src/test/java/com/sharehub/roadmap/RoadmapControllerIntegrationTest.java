@@ -211,4 +211,33 @@ class RoadmapControllerIntegrationTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"));
     }
+
+    @Test
+    void shouldRejectBannedUserAccessToRoadmapDetailWhenIdentityProvided() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert("roadmap-banned-user", "roadmap-banned-user", null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.progress").isMap())
+            .andExpect(jsonPath("$.data.progress.percent").doesNotExist());
+    }
 }

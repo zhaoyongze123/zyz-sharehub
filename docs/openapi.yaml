@@ -625,10 +625,12 @@ paths:
   /api/roadmaps/{id}:
     get:
       summary: 获取路线详情
-      description: 路线详情当前不做 owner 限制；返回体中的 `progress` 按当前请求用户读取，联调可通过 `X-User-Key` 指定用户；同一路线切换到其他用户或未写入进度时返回空对象
+      description: 路线详情当前不做 owner 限制；返回体中的 `progress` 按当前请求用户读取，联调可通过 `X-User-Key` 指定用户；同一路线切换到其他用户或未写入进度时返回空对象；如果请求里显式带了已封禁用户，则返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
           description: 路线不存在（错误码 `ROADMAP_NOT_FOUND`）
   /api/roadmaps/{id}/nodes:
