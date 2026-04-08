@@ -1,54 +1,47 @@
 import { apiClient } from './client'
-import type { ApiResponse, PageResult } from './types'
 
-export interface NoteItemDto {
-  id: number | string
+export interface NoteDto {
+  id: number
   title: string
-  summary?: string
-  content?: string
-  status?: string
-  tags?: string[]
-  outline?: string[]
-  updatedAt?: string
-  updated_at?: string
-  createdAt?: string
-  created_at?: string
+  contentMd: string
+  visibility?: string | null
+  status?: string | null
 }
 
-export interface NoteListParams {
-  page?: number
-  pageSize?: number
-  status?: string
+export interface PageData<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  total: number
 }
 
-function unwrap<T>(resp: any): T {
-  if (resp?.data?.data !== undefined) return resp.data.data as T
-  return resp?.data as T
+export interface ApiEnvelope<T> {
+  success: boolean
+  code: string
+  data: T
+  message: string
 }
 
-export const fetchNoteList = (params: NoteListParams = {}) =>
-  apiClient.get<ApiResponse<PageResult<NoteItemDto>>>('/notes', {
-    params
-  })
-
-export async function fetchNotes(params: NoteListParams = {}) {
-  const resp = await fetchNoteList(params)
-  return unwrap<PageResult<NoteItemDto>>(resp)
+export async function fetchNotes(params: { page?: number; pageSize?: number; status?: string }) {
+  const { data } = await apiClient.get<ApiEnvelope<PageData<NoteDto>>>('/notes', { params })
+  if (!data.success) {
+    throw new Error(data.message || data.code || '加载笔记列表失败')
+  }
+  return data.data
 }
 
-export const fetchNoteDetail = (id: string | number) => apiClient.get<ApiResponse<NoteItemDto>>(`/notes/${id}`)
-export async function fetchNote(id: string | number) {
-  const resp = await fetchNoteDetail(id)
-  return unwrap<NoteItemDto>(resp)
+export async function fetchNoteDetail(id: number | string) {
+  const { data } = await apiClient.get<ApiEnvelope<NoteDto>>(`/notes/${id}`)
+  if (!data.success) {
+    throw new Error(data.message || data.code || '加载笔记详情失败')
+  }
+  return data.data
 }
 
-export const createNote = (payload: Partial<NoteItemDto>) => apiClient.post<ApiResponse<NoteItemDto>>('/notes', payload)
-export async function createNoteAndUnwrap(payload: Partial<NoteItemDto>) {
-  const resp = await createNote(payload)
-  return unwrap<NoteItemDto>(resp)
+export async function createNote(payload: { title: string; contentMd: string; visibility?: string | null; status?: string | null }) {
+  const { data } = await apiClient.post<ApiEnvelope<NoteDto>>('/notes', payload)
+  if (!data.success) {
+    throw new Error(data.message || data.code || '创建笔记失败')
+  }
+  return data.data
 }
-
-export const updateNote = (id: string | number, payload: Partial<NoteItemDto>) =>
-  apiClient.put<ApiResponse<NoteItemDto>>(`/notes/${id}`, payload)
-
-export const deleteNote = (id: string | number) => apiClient.delete<ApiResponse<void>>(`/notes/${id}`)

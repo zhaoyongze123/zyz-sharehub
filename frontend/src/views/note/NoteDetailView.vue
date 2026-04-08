@@ -1,10 +1,11 @@
 <template>
-  <div class="page-shell" v-if="isLoading">
-    <BaseEmpty title="加载中" description="正在拉取笔记详情..." />
+  <div class="page-shell" v-if="loading">
+    <BaseEmpty title="加载中" description="正在获取笔记详情，请稍候..." />
   </div>
+
   <div class="page-shell detail-grid" v-else-if="note">
     <section class="detail-main">
-      <HeroBanner kicker="笔记详情" :title="note.title" :description="note.summary || ''">
+      <HeroBanner kicker="笔记详情" :title="note.title" :description="summary">
         <template #actions>
           <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
           <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
@@ -27,15 +28,11 @@
     </section>
 
     <aside class="detail-side">
-      <NoteOutline :items="note?.outline || []" />
+      <NoteOutline :items="outline" />
       <BaseEmpty title="关联资料" description="联调后可展示引用资料与路线的精确关系。" />
     </aside>
 
     <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
-  </div>
-
-  <div v-else-if="loadError" class="page-shell">
-    <BaseErrorState title="笔记加载失败" :description="loadError" />
   </div>
 
   <div v-else class="page-shell">
@@ -46,8 +43,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
@@ -56,10 +51,10 @@ import InteractionBar from '@/components/business/InteractionBar.vue'
 import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
 import ReportDialog from '@/components/business/ReportDialog.vue'
-import { fetchNote, fetchNotes, type NoteItemDto } from '@/api/notes'
 import { useAppStore } from '@/stores/app'
+import { fetchNoteDetail, type NoteDto } from '@/api/notes'
 
-type NoteCardItem = {
+type RelatedNote = {
   id: number
   title: string
   summary: string
@@ -72,60 +67,50 @@ const route = useRoute()
 const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
-const likes = ref(0)
-const favorites = ref(0)
-const detail = ref<NoteItemDto | null>(null)
-const relatedNotes = ref<NoteCardItem[]>([])
-const isLoading = ref(false)
-const loadError = ref('')
+const likes = ref(86)
+const favorites = ref(112)
 
-const note = computed(() => {
-  if (!detail.value) return null
-  return {
-    ...detail.value,
-    id: Number(detail.value.id),
-    title: detail.value.title ?? '',
-    summary: detail.value.summary ?? '',
-    content: detail.value.content ?? '',
-    status: detail.value.status ?? '',
-    tags: detail.value.tags ?? [],
-    outline: (detail.value as any).outline || [],
-    updatedAt: (detail.value as any).updatedAt || (detail.value as any).updated_at || ''
-  }
+const loading = ref(true)
+const note = ref<NoteDto | null>(null)
+const relatedNotes = ref<RelatedNote[]>([])
+const summary = computed(() => {
+  if (!note.value) return ''
+  const text = note.value.contentMd.replace(/[#>*`]/g, '').trim()
+  return text.slice(0, 120) || '暂无摘要'
 })
-
+const outline = computed(() => {
+  if (!note.value) return []
+  return note.value.contentMd
+    .split('\n')
+    .filter((line) => line.startsWith('#'))
+    .map((line) => line.replace(/^#+\s*/, '').trim())
+})
 const renderedHtml = computed(() => {
-  if (!note.value?.content) return ''
-  const html = marked(note.value.content || note.value.summary || '')
-  return DOMPurify.sanitize(html as string)
+  if (!note.value) return ''
+  return note.value.contentMd
+    .split('\n')
+    .map((line) => {
+      if (line.startsWith('# ')) return `<h1>${line.slice(2)}</h1>`
+      if (line.startsWith('## ')) return `<h2>${line.slice(3)}</h2>`
+      if (!line.trim()) return '<br />'
+      return `<p>${line}</p>`
+    })
+    .join('')
 })
 
-async function loadDetail() {
-  isLoading.value = true
-  loadError.value = ''
+async function loadNote() {
+  loading.value = true
   try {
-    const res = await fetchNote(route.params.id as string)
-    detail.value = res
-    likes.value = (res as any).likes ?? 0
-    favorites.value = (res as any).favorites ?? 0
+    note.value = await fetchNoteDetail(route.params.id as string)
   } catch (err: any) {
-    loadError.value = err?.response?.data?.msg || err?.message || '加载失败'
+    note.value = null
+    appStore.showToast('加载笔记失败', err?.message || '服务暂时不可用，请稍后再试', 'error')
   } finally {
-    isLoading.value = false
+    loading.value = false
   }
 }
 
-async function loadRelated() {
-  try {
-    const { list } = await fetchNotes({ page: 1, pageSize: 3 })
-    relatedNotes.value = (list || [])
-      .filter((item) => String(item.id) !== String(route.params.id))
-      .slice(0, 2)
-      .map(mapToCardItem)
-  } catch (err) {
-    console.warn('load related failed', err)
-  }
-}
+onMounted(loadNote)
 
 function likeNote() {
   likes.value += 1
@@ -141,22 +126,6 @@ function submitReport() {
   reportVisible.value = false
   appStore.showToast('举报已提交', reportReason.value || '已进入处理队列')
   reportReason.value = ''
-}
-
-onMounted(() => {
-  loadDetail()
-  loadRelated()
-})
-
-function mapToCardItem(item: NoteItemDto): NoteCardItem {
-  return {
-    id: Number(item.id),
-    title: item.title ?? '未命名笔记',
-    summary: item.summary ?? '',
-    updatedAt: (item as any).updatedAt || (item as any).updated_at || '',
-    status: item.status ?? 'DRAFT',
-    tags: item.tags ?? []
-  }
 }
 </script>
 
