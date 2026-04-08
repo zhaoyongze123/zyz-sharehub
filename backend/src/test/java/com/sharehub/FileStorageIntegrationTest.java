@@ -259,4 +259,30 @@ class FileStorageIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("FILE_NAME_REQUIRED"));
     }
+
+    @Test
+    void shouldPreserveExplicitContentTypeOnDownload() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "notes.txt",
+            MediaType.TEXT_PLAIN_VALUE,
+            "hello text".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-plain")
+                .param("category", "RESOURCE_ATTACHMENT")
+                .param("referenceType", "RESOURCE")
+                .param("referenceId", "resource-plain"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
+        String downloadUrl = uploadJson.get("data").get("downloadUrl").asText();
+
+        mockMvc.perform(get(downloadUrl))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.TEXT_PLAIN_VALUE));
+    }
 }
