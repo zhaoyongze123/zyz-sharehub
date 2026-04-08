@@ -765,7 +765,7 @@ paths:
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
-          description: 简历不存在/非 owner（错误码 `RESUME_NOT_FOUND`），或简历未绑定文件（错误码 `RESUME_FILE_NOT_FOUND`），或文件记录缺失
+          description: 简历不存在/非 owner 时返回错误码 `RESUME_NOT_FOUND`；简历未绑定文件时返回错误码 `RESUME_FILE_NOT_FOUND`；若底层文件记录已丢失则返回空 body 的 `404`
   /api/resumes/workbench:
     get:
       summary: 获取我的简历工作台聚合信息
