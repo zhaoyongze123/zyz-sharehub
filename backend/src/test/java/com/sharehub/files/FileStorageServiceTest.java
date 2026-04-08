@@ -81,6 +81,26 @@ class FileStorageServiceTest {
     }
 
     @Test
+    void storeBytesRejectsBlankFilename() {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+            service.storeBytes("user", FileCategory.AVATAR, "USER", "1", " ", "image/png", new byte[]{1})
+        );
+
+        assertThat(exception.getStatusCode().value()).isEqualTo(400);
+        assertThat(exception.getReason()).isEqualTo("FILE_NAME_REQUIRED");
+    }
+
+    @Test
+    void storeBytesRejectsEmptyData() {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+            service.storeBytes("user", FileCategory.AVATAR, "USER", "1", "avatar.png", "image/png", new byte[0])
+        );
+
+        assertThat(exception.getStatusCode().value()).isEqualTo(400);
+        assertThat(exception.getReason()).isEqualTo("FILE_EMPTY");
+    }
+
+    @Test
     void storeBytesRejectsOversizedFile() {
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
             service.storeBytes("user", FileCategory.AVATAR, "USER", "1", "avatar.png", "image/png", new byte[]{1, 2, 3, 4, 5, 6})

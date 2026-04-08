@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -137,6 +138,33 @@ class FileStorageIntegrationTest {
     }
 
     @Test
+    void shouldDownloadDirectUploadWithAttachmentHeaderAndDefaultContentType() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "resume.bin",
+            null,
+            "resume body".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-direct")
+                .param("category", "RESUME_PDF")
+                .param("referenceType", "RESUME")
+                .param("referenceId", "resume-101"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
+        String downloadUrl = uploadJson.get("data").get("downloadUrl").asText();
+
+        mockMvc.perform(get(downloadUrl))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"resume.bin\""));
+    }
+
+    @Test
     void shouldRejectDirectUploadWhenOwnerMissing() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",
@@ -172,5 +200,24 @@ class FileStorageIntegrationTest {
                 .param("referenceId", " "))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("FILE_REFERENCE_REQUIRED"));
+    }
+
+    @Test
+    void shouldRejectDirectUploadWhenFileEmpty() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            MediaType.IMAGE_PNG_VALUE,
+            new byte[0]
+        );
+
+        mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-1")
+                .param("category", "AVATAR")
+                .param("referenceType", "USER")
+                .param("referenceId", "user-1"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_EMPTY"));
     }
 }
