@@ -291,7 +291,48 @@
 - 节点树与进度已持久化
 - 列表筛选仍较弱，暂未覆盖前端清单中的标签筛选
 
-## 7. 笔记模块
+## 7. 文件存储模块
+
+已实现：
+
+- `POST /api/files/upload`
+- `GET /api/files/{id}`
+
+当前真实边界：
+
+- 文件内容直接写入 `PostgreSQL`
+- 这组接口当前不走登录鉴权
+- 业务侧通常通过头像上传、资料附件上传、简历生成间接写入，不建议前端业务直接依赖直传接口
+
+### 7.1 `POST /api/files/upload`
+
+真实行为：
+
+- 使用 `multipart/form-data`
+- 必填参数：`owner`、`category`、`referenceType`、`referenceId`、`file`
+- `category` 当前真实枚举：`AVATAR`、`RESOURCE_ATTACHMENT`、`RESUME_PDF`
+- 校验文件非空、文件名存在、引用归属存在、大小不超过 `5MB`
+- 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`
+
+失败状态：
+
+- `400 FILE_OWNER_REQUIRED`
+- `400 FILE_REFERENCE_REQUIRED`
+- `400 FILE_NAME_REQUIRED`
+- `400 FILE_EMPTY`
+- `400 FILE_TOO_LARGE`
+- `400 FILE_READ_ERROR`
+
+### 7.2 `GET /api/files/{id}`
+
+真实行为：
+
+- 按文件 `id` 直接返回二进制内容
+- `Content-Type` 优先使用入库时的 `contentType`，缺省回落到 `application/octet-stream`
+- `Content-Disposition` 固定为附件下载
+- 文件不存在时返回空 body 的 `404`
+
+## 8. 笔记模块
 
 已实现：
 
@@ -311,7 +352,7 @@
 - 这与“正文只保存在用户本地”的产品目标不一致
 - 该模块后续仍需要专项重构
 
-## 8. 简历模块
+## 9. 简历模块
 
 已实现：
 
@@ -328,7 +369,7 @@
 - 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 
-### 8.1 生成接口
+### 9.1 生成接口
 
 `POST /api/resumes/generate`
 
@@ -339,7 +380,7 @@
 - 再创建简历记录
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 
-### 8.2 列表接口
+### 9.2 列表接口
 
 `GET /api/resumes`
 
@@ -359,7 +400,7 @@
 - `fileCreatedAt`
 - `fileUpdatedAt`
 
-### 8.3 详情 / 删除 / 下载
+### 9.3 详情 / 删除 / 下载
 
 `GET /api/resumes/{id}`
 
@@ -384,7 +425,7 @@
 - 按当前用户聚合简历统计
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 
-## 9. 互动模块
+## 10. 互动模块
 
 已实现：
 
@@ -405,7 +446,7 @@
 - 还没有真正抽象成多内容类型互动模型
 - 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，目标资源不存在时返回 `404/RESOURCE_NOT_FOUND`
 
-## 10. 后台治理
+## 11. 后台治理
 
 已实现：
 
@@ -424,7 +465,7 @@
 - 统一依赖 `X-Admin-Token`
 - 当前失败统一返回 `403`
 
-## 11. 当前已知偏差
+## 12. 当前已知偏差
 
 以下内容已经由代码证实，后续需要继续收口：
 
@@ -433,7 +474,7 @@
 3. `resources` 写接口已经切到按请求用户隔离，联调依赖 `X-User-Key` / OAuth 上下文，不是完整业务登录流。
 4. `auth/avatar` 旧文档承诺了图片类型白名单，但当前实现并没有该校验。
 
-## 12. 推荐联调顺序
+## 13. 推荐联调顺序
 
 1. 先使用 `X-User-Key` 打通 `auth/me` 和 `me`
 2. 再接 `roadmaps`

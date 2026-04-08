@@ -269,6 +269,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/files/upload:
+    post:
+      summary: 直传文件到文件存储
+      description: 当前为底层文件存储接口，不走登录鉴权；调用方需自行传入 `owner`、`category`、`referenceType`、`referenceId`，真实实现仅校验文件非空、文件名存在、引用归属存在且大小不超过 5MB
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - owner
+                - category
+                - referenceType
+                - referenceId
+                - file
+              properties:
+                owner:
+                  type: string
+                category:
+                  type: string
+                  enum:
+                    - AVATAR
+                    - RESOURCE_ATTACHMENT
+                    - RESUME_PDF
+                referenceType:
+                  type: string
+                referenceId:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 文件校验失败（错误码可能为 `FILE_OWNER_REQUIRED`、`FILE_REFERENCE_REQUIRED`、`FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/files/{id}:
+    get:
+      summary: 下载文件
+      description: 当前为匿名可访问下载接口，按文件 `id` 直接返回二进制内容；文件不存在时返回空 body 的 `404`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 文件不存在
   /api/resources:
     get:
       summary: 资料分页列表
