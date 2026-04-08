@@ -103,6 +103,7 @@ public class MeController {
 
     private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
         String ownerKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(ownerKey, ownerKey, null);
         userProfileRepository.ensureActive(ownerKey);
         return ownerKey;
     }

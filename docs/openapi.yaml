@@ -40,7 +40,7 @@ paths:
   /api/me:
     get:
       summary: 个人中心聚合信息
-      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -59,7 +59,7 @@ paths:
   /api/me/resources:
     get:
       summary: 获取我的资料列表
-      description: 当前实现按请求用户返回自己的资料工作台数据，默认不限定发布态；可通过 `status`、`visibility` 过滤草稿或已发布数据。联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回自己的资料工作台数据，默认不限定发布态；可通过 `status`、`visibility` 过滤草稿或已发布数据。联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -99,7 +99,7 @@ paths:
   /api/me/roadmaps:
     get:
       summary: 获取我的路线列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -135,7 +135,7 @@ paths:
   /api/me/favorites:
     get:
       summary: 获取我的收藏资料列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -167,7 +167,7 @@ paths:
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -203,7 +203,7 @@ paths:
   /api/me/resumes:
     get:
       summary: 获取我的简历工作台列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query

@@ -348,4 +348,22 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("USER_BANNED"))
             .andExpect(jsonPath("$.message").value("USER_BANNED"));
     }
+
+    @Test
+    void shouldAutoProvisionUserWhenFirstAccessingPersonalCenter() throws Exception {
+        String firstAccessUser = "fresh-me-user";
+
+        mockMvc.perform(get("/api/me")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.profile.login").value(firstAccessUser))
+            .andExpect(jsonPath("$.data.profile.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.myResourceCount").value(0))
+            .andExpect(jsonPath("$.data.myResumeCount").value(0));
+
+        mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+    }
 }
