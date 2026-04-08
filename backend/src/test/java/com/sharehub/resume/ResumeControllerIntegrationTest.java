@@ -2,6 +2,7 @@ package com.sharehub.resume;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.UUID;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -164,6 +165,47 @@ class ResumeControllerIntegrationTest {
         mockMvc.perform(get("/api/resumes/" + id + "/download")
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldDeleteAssociatedFileRecordWhenDeletingResume() throws Exception {
+        String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> payload = objectMapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        Long id = Long.valueOf(String.valueOf(data.get("id")));
+        UUID fileId = UUID.fromString(String.valueOf(data.get("fileId")));
+
+        Integer beforeDelete = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM files WHERE id = ?",
+            Integer.class,
+            fileId
+        );
+        assertThat(beforeDelete).isEqualTo(1);
+
+        mockMvc.perform(delete("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").value("DELETED"));
+
+        Integer afterDelete = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM files WHERE id = ?",
+            Integer.class,
+            fileId
+        );
+        assertThat(afterDelete).isZero();
+
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESUME_NOT_FOUND"));
     }
 
     @Test
