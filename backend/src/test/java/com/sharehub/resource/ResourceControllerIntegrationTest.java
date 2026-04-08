@@ -287,6 +287,41 @@ class ResourceControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }
 
+    @Test
+    void shouldRequireUserForResourceMutationEndpoints() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "guide.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            "pdf-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(post("/api/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resourceBody("未登录资源", "PDF", "PUBLIC", "java", "附件")))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(put("/api/resources/{id}", 1L)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resourceBody("未登录更新", "DOC", "PRIVATE", "spring", "更新")))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(delete("/api/resources/{id}", 1L))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(post("/api/resources/{id}/publish", 1L))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", 1L)
+                .file(file))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+    }
+
     private long createResource(String title, String category, String visibility, String tags, String summary) throws Exception {
         String response = mockMvc.perform(post("/api/resources")
                 .header(USER_KEY_HEADER, DEFAULT_USER)
