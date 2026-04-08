@@ -44,9 +44,10 @@ public class NoteController {
         Authentication authentication,
         HttpServletRequest request,
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "10") int pageSize) {
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status) {
         String ownerKey = requireActiveUser(authentication, request);
-        return ApiResponse.ok(repository.list(ownerKey, page, pageSize));
+        return ApiResponse.ok(repository.listByOwner(ownerKey, status, page, pageSize));
     }
 
     @GetMapping("/{id}")

@@ -373,6 +373,8 @@
 
 当前重要实现边界：
 
+- `GET /api/notes` 当前支持 `status`、`page`、`pageSize`
+- `page`、`pageSize` 传入小于 `1` 的值时都会按 `1` 兜底
 - 后端仍保存 `content_md` 正文
 - 这与“正文只保存在用户本地”的产品目标不一致
 - 该模块后续仍需要专项重构

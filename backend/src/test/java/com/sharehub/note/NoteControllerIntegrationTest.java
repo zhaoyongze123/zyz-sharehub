@@ -202,4 +202,62 @@ public class NoteControllerIntegrationTest {
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
     }
+
+    @Test
+    void shouldFilterNotesByStatus() throws Exception {
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Draft Note","contentMd":"# draft","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Published Note","contentMd":"# published","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mvc.perform(get("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", "PUBLISHED")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("Published Note"))
+            .andExpect(jsonPath("$.data.items[0].status").value("PUBLISHED"));
+    }
+
+    @Test
+    void shouldTreatBlankNoteStatusAsUnfiltered() throws Exception {
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Draft Note","contentMd":"# draft","visibility":"PUBLIC","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk());
+
+        mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Published Note","contentMd":"# published","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk());
+
+        mvc.perform(get("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("status", "   ")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].title").value("Published Note"))
+            .andExpect(jsonPath("$.data.items[1].title").value("Draft Note"));
+    }
 }
