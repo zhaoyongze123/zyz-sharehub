@@ -2,6 +2,8 @@ package com.sharehub.me;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,9 @@ class MeControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private UserProfileRepository userProfileRepository;
+
     @BeforeEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM favorites");
@@ -49,13 +54,18 @@ class MeControllerIntegrationTest {
 
     @Test
     void shouldAggregatePersonalCenterSummary() throws Exception {
-        mockMvc.perform(post("/api/resources")
+        String resourceResponse = mockMvc.perform(post("/api/resources")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"我的资料","type":"PDF","visibility":"PUBLIC"}
                     """))
-            .andExpect(status().isOk());
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long resourceId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(resourceResponse, Map.class).get("data")).get("id").toString());
 
         mockMvc.perform(post("/api/roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
@@ -79,7 +89,7 @@ class MeControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "me"))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/resources/1/favorite")
+        mockMvc.perform(post("/api/resources/" + resourceId + "/favorite")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk());
 
@@ -295,5 +305,47 @@ class MeControllerIntegrationTest {
         mockMvc.perform(get("/api/me/resumes"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+    }
+
+    @Test
+    void shouldRejectBannedAccessToPersonalCenter() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert("me-banned-user", "me-banned-user", null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+
+        mockMvc.perform(get("/api/me")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/me/resources")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/me/favorites")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
     }
 }

@@ -1,6 +1,7 @@
 package com.sharehub.me;
 
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,15 +21,21 @@ public class MeController {
 
     private final MeService meService;
     private final RequestAccessService requestAccessService;
+    private final UserProfileRepository userProfileRepository;
 
-    public MeController(MeService meService, RequestAccessService requestAccessService) {
+    public MeController(
+        MeService meService,
+        RequestAccessService requestAccessService,
+        UserProfileRepository userProfileRepository
+    ) {
         this.meService = meService;
         this.requestAccessService = requestAccessService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @GetMapping
     public ApiResponse<MeDto> getMe(Authentication authentication, HttpServletRequest request) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.aggregate(ownerKey));
     }
 
@@ -41,7 +48,7 @@ public class MeController {
         @RequestParam(required = false) String status,
         @RequestParam(required = false) String visibility
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.myResources(ownerKey, status, visibility, page, pageSize));
     }
 
@@ -53,7 +60,7 @@ public class MeController {
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) String status
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.myRoadmaps(ownerKey, status, page, pageSize));
     }
 
@@ -64,7 +71,7 @@ public class MeController {
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int pageSize
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.myFavorites(ownerKey, page, pageSize));
     }
 
@@ -76,7 +83,7 @@ public class MeController {
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) String status
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.myNotes(ownerKey, status, page, pageSize));
     }
 
@@ -90,7 +97,13 @@ public class MeController {
         @RequestParam(required = false) String templateKey,
         @RequestParam(required = false) String keyword
     ) {
-        String ownerKey = requestAccessService.requireUser(authentication, request);
+        String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.myResumes(ownerKey, status, templateKey, keyword, page, pageSize));
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.ensureActive(ownerKey);
+        return ownerKey;
     }
 }

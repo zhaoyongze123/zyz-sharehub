@@ -40,7 +40,7 @@ paths:
   /api/me:
     get:
       summary: 个人中心聚合信息
-      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
@@ -50,10 +50,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/resources:
     get:
       summary: 获取我的发布资料列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -84,10 +90,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/roadmaps:
     get:
       summary: 获取我的路线列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -110,6 +122,12 @@ paths:
           description: 成功
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
           content:
             application/json:
               schema:
@@ -117,7 +135,7 @@ paths:
   /api/me/favorites:
     get:
       summary: 获取我的收藏资料列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -140,10 +158,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -170,10 +194,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/resumes:
     get:
       summary: 获取我的简历工作台列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -242,6 +272,12 @@ paths:
                         type: integer
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
           content:
             application/json:
               schema:
