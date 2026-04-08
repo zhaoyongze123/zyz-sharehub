@@ -104,6 +104,31 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldFallbackToOctetStreamWhenResumeFileContentTypeBlank() throws Exception {
+        String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> payload = objectMapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        Long id = Long.valueOf(String.valueOf(data.get("id")));
+        String fileId = String.valueOf(data.get("fileId"));
+
+        jdbcTemplate.update("UPDATE files SET content_type = ? WHERE id = ?", " ", UUID.fromString(fileId));
+
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"resume-classic.pdf\""));
+    }
+
+    @Test
     void shouldListAndDeleteResume() throws Exception {
         String response = mockMvc.perform(post("/api/resumes/generate")
                 .header(USER_KEY_HEADER, DEFAULT_USER)
