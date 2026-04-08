@@ -322,6 +322,32 @@ class MeControllerIntegrationTest {
     }
 
     @Test
+    void shouldClampInvalidResumePaginationToMinimumValues() throws Exception {
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-a"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "resume-b"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/resumes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "0")
+                .param("pageSize", "-3"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("resume-b"));
+    }
+
+    @Test
     void shouldRejectAnonymousAccessToPersonalCenter() throws Exception {
         mockMvc.perform(get("/api/me"))
             .andExpect(status().isUnauthorized())
