@@ -16,10 +16,10 @@ public class RoadmapService {
     this.repository = repository;
   }
 
-  public RoadmapDto create(RoadmapDto req) {
+  public RoadmapDto create(String ownerKey, RoadmapDto req) {
     RoadmapDto payload =
         new RoadmapDto(null, req.title(), req.description(), req.visibility(), req.status() == null ? "PUBLISHED" : req.status());
-    return repository.save(payload);
+    return repository.save(ownerKey, payload);
   }
 
   public PageResponse<RoadmapDto> list(int page, int pageSize) {
@@ -28,23 +28,23 @@ public class RoadmapService {
     return repository.list(safePage, safeSize);
   }
 
-  public RoadmapDetailResponse detail(Long id) {
+  public RoadmapDetailResponse detail(Long id, String ownerKey) {
     RoadmapDto roadmap = repository.findById(id).orElse(null);
     if (roadmap == null) {
       return null;
     }
     List<RoadmapNodeDto> flatNodes = repository.findNodes(id);
     List<RoadmapNodeTree> tree = buildTree(flatNodes);
-    Map<String, Object> progress = repository.findProgress(id);
+    Map<String, Object> progress = ownerKey == null ? Map.of() : repository.findProgress(id, ownerKey);
     return new RoadmapDetailResponse(roadmap, tree, progress == null ? Map.of() : progress);
   }
 
-  public List<RoadmapNodeDto> addNode(Long id, RoadmapNodeDto req) {
-    return repository.addNode(id, req);
+  public List<RoadmapNodeDto> addNode(String ownerKey, Long id, RoadmapNodeDto req) {
+    return repository.addNode(ownerKey, id, req);
   }
 
-  public Map<String, Object> updateProgress(Long id, Map<String, Object> payload) {
-    return repository.saveProgress(id, payload);
+  public Map<String, Object> updateProgress(String ownerKey, Long id, Map<String, Object> payload) {
+    return repository.saveProgress(ownerKey, id, payload);
   }
 
   private List<RoadmapNodeTree> buildTree(List<RoadmapNodeDto> nodes) {
