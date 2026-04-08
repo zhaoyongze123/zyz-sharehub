@@ -231,17 +231,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { fetchNotes, createNote, type NoteDTO } from '@/api/notes'
+import { useAppStore } from '@/stores/app'
 
 const router = useRouter()
+const appStore = useAppStore()
 const currentNav = ref('topics')
 const activeTab = ref('latest')
 const activeCategory = ref('')
 const toggleCategories = ref(true)
 const showDropdown = ref(false)
 const showPublishModal = ref(false)
+const loading = ref(false)
+const errorMessage = ref('')
+const pageNum = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 
+const notes = ref<NoteDTO[]>([])
 const tagInput = ref('')
 
 const currentUser = { name: '当前用户', avatar: 'https://avatars.githubusercontent.com/u/99?v=4' }
@@ -265,150 +274,101 @@ const categories = [
 const filterTabs = [
   { id: 'latest', label: '最新 AI 分享' },
   { id: 'featured', label: '精选合集' },
-  { id: 'popular', label: '最多收藏' },
+  { id: 'popular', label: '最多收藏' }
 ]
-
-const mockTopics = ref([
-  {
-    id: 1,
-    title: 'Cursor & Copilot 提效实战指南 (附私有 Prompt 模板)',
-    hasLink: false,
-    excerpt: '总结了过去半年在团队落地 AI 编码工具的经验，包含如何编写高质量系统提示词引导 AI，以及实用的 Prompt 模板库。',
-    categoryColor: 'bg-teal',
-    category: 'AI 工具与效能',
-    tags: [{ label: 'AI辅助编程', icon: 'i-carbon-bot' }, { label: '最佳实践' }],
-    author: { name: 'TechLead_Wang', avatar: 'https://avatars.githubusercontent.com/u/20?v=4' },
-    likes: 128,
-    isBookmarked: true,
-    hasRead: true,
-    isMine: false,
-    time: '10 分钟前',
-    isFeatured: true
-  },
-  {
-    id: 2,
-    title: '从零手写一个基于 LangChain 的多 Agent 智能体系统',
-    hasLink: true,
-    excerpt: '分享一下最近用 Python 撸的一个轻量级多模态 Agent 框架，结合了 RAG 检索和工具调用，代码已完全开源。',
-    categoryColor: 'bg-red',
-    category: 'AI 应用与 Agent',
-    tags: [{ label: 'LangChain' }, { label: 'Agent 实战' }],
-    author: { name: 'AI_Builder', avatar: 'https://avatars.githubusercontent.com/u/25?v=4' },
-    likes: 245,
-    isBookmarked: false,
-    hasRead: false,
-    isMine: false,
-    time: '45 分钟前',
-    isFeatured: true
-  },
-  {
-    id: 3,
-    title: '万字长文：大模型 RAG 检索增强生成的 7 种进阶优化策略',
-    hasLink: true,
-    excerpt: '详细剖析了知识库向量化中的 Chunking 策略、HyDE 假设性文档嵌入以及多路召回重排（Rerank）等技巧。',
-    categoryColor: 'bg-blue',
-    category: '大模型前沿',
-    tags: [{ label: 'RAG' }, { label: '向量检索', icon: 'i-carbon-data-share' }],
-    author: { name: 'CodeJedi', avatar: 'https://avatars.githubusercontent.com/u/30?v=4' },
-    likes: 312,
-    isBookmarked: true,
-    hasRead: false,
-    isMine: false,
-    time: '2 小时前',
-    isFeatured: true
-  },
-  {
-    id: 4,
-    title: '吴恩达大模型课程《Generative AI for Everyone》双语字幕及笔记',
-    hasLink: true,
-    excerpt: '整理了全套视频资料及个人总结的学习笔记，非常适合小白快速入门生成式 AI，理解宏观技术版图。',
-    categoryColor: 'bg-green',
-    category: '学术与论文',
-    tags: [{ label: '吴恩达' }, { label: '学习资料' }],
-    author: { name: 'Student_Xiao', avatar: 'https://avatars.githubusercontent.com/u/35?v=4' },
-    likes: 189,
-    isBookmarked: false,
-    hasRead: true,
-    isMine: false,
-    time: '5 小时前',
-    isFeatured: false
-  },
-  {
-    id: 5,
-    title: '有哪些好用的类似于 Midjourney 的免费开源绘图模型？',
-    hasLink: false,
-    excerpt: '梳理了目前体验最好的几个本地可部署开源文生图模型（如 Stable Diffusion XL, Flux 等），附硬件配置要求。',
-    categoryColor: 'bg-teal',
-    category: 'AI 工具与效能',
-    tags: [{ label: 'AIGC 绘图' }],
-    author: { name: 'Fed_Explorer', avatar: '' },
-    likes: 82,
-    isBookmarked: false,
-    hasRead: false,
-    isMine: false,
-    time: '1 天前',
-    isFeatured: false
-  }
-])
 
 const renderedMarkdown = computed(() => {
   if (!newDraft.content) return ''
-  // 简易 Markdown 解析器用于预览
-  let html = newDraft.content
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    
-  // 标题
+  let html = newDraft.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>')
   html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>')
   html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>')
-  
-  // 粗体 & 斜体
   html = html.replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
   html = html.replace(/\*(.*)\*/gim, '<em>$1</em>')
-  
-  // 代码块 & 行内代码
   html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-  
-  // 引用
   html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-  
-  // 列表
   html = html.replace(/^\- (.*$)/gim, '<ul><li>$1</li></ul>')
   html = html.replace(/<\/ul>\n<ul>/gim, '')
-  
-  // 换行替换
-  html = html.split('\n').map(line => {
-    if (line.match(/^(<h|<pre|<ul|<blockquote)/)) return line;
-    return line ? `<p>${line}</p>` : '';
-  }).join('');
-  
+  html = html
+    .split('\n')
+    .map((line) => {
+      if (line.match(/^(<h|<pre|<ul|<blockquote)/)) return line
+      return line ? `<p>${line}</p>` : ''
+    })
+    .join('')
   return html
 })
 
+function mapNoteToTopic(note: NoteDTO) {
+  const status = note.status || 'DRAFT'
+  return {
+    id: note.id,
+    title: note.title || '未命名笔记',
+    excerpt: note.contentMd?.slice(0, 120) || '',
+    category: status,
+    categoryColor: status === 'PUBLISHED' ? 'bg-teal' : 'bg-gray',
+    hasLink: false,
+    tags: [] as Array<{ label: string; icon?: string }>,
+    author: {
+      name: currentUser.name,
+      avatar: currentUser.avatar
+    },
+    likes: 0,
+    isBookmarked: false,
+    hasRead: false,
+    isMine: true,
+    time: '',
+    isFeatured: status === 'PUBLISHED'
+  }
+}
+
 const displayedTopics = computed(() => {
-  let list = mockTopics.value
-  
+  let list = notes.value.map(mapNoteToTopic)
+
   if (currentNav.value === 'my-shares') {
-    list = list.filter(t => t.isMine)
+    list = list.filter((t) => t.isMine)
   } else if (currentNav.value === 'bookmarks') {
-    list = list.filter(t => t.isBookmarked)
+    list = list.filter((t) => t.isBookmarked)
   } else if (currentNav.value === 'history') {
-    list = list.filter(t => t.hasRead)
+    list = list.filter((t) => t.hasRead)
   }
-  
+
   if (activeCategory.value) {
-    list = list.filter(t => t.category === activeCategory.value)
+    list = list.filter((t) => t.tags?.some((tag: any) => tag.label === activeCategory.value))
   }
-  
+
   if (activeTab.value === 'featured') {
-    list = list.filter(t => t.isFeatured)
+    list = list.filter((t) => t.isFeatured)
   } else if (activeTab.value === 'popular') {
-    list = [...list].sort((a, b) => b.likes - a.likes)
+    list = [...list].sort((a, b) => (b.likes || 0) - (a.likes || 0))
   }
-  
+
   return list
+})
+
+async function fetchList() {
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const data = await fetchNotes({
+      page: pageNum.value,
+      pageSize: pageSize.value,
+      status: activeTab.value === 'featured' ? 'PUBLISHED' : undefined
+    })
+    notes.value = data.list || []
+    total.value = data.total ?? notes.value.length
+  } catch (e: any) {
+    errorMessage.value = e?.response?.data?.msg || '笔记列表获取失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchList)
+
+watch(activeTab, () => {
+  void fetchList()
 })
 
 function switchNav(nav: string) {
@@ -426,12 +386,7 @@ function toggleBookmark(topic: any) {
 }
 
 function readTopic(topic: any) {
-  if (topic) {
-    topic.hasRead = true
-    router.push({ name: 'note-detail', params: { id: topic.id } })
-  } else {
-    router.push({ name: 'note-detail', params: { id: 1 } }) // pinned topic
-  }
+  router.push({ name: 'note-detail', params: { id: topic?.id ?? 0 } })
 }
 
 function openExternal(url: string) {
@@ -450,34 +405,21 @@ function removeTag(index: number) {
   newDraft.tags.splice(index, 1)
 }
 
-function submitPublish() {
-  const catObj = categories.find(c => c.name === newDraft.category)
-  
-  // 生成简要 excerpt (取前 50 字)
-  const plainText = newDraft.content.replace(/<[^>]+>/g, '').substring(0, 80)
-  
-  // 生成 tags 对象
-  const topicTags = newDraft.tags.map(t => ({ label: t }))
-  if (topicTags.length === 0) topicTags.push({ label: '最新发布' })
+async function submitPublish() {
+  try {
+    await createNote({
+      title: newDraft.title,
+      contentMd: newDraft.content,
+      status: 'PUBLISHED',
+      visibility: null
+    })
+    await fetchList()
+    appStore.showToast('发布成功', '笔记已保存到云端')
+  } catch (e: any) {
+    appStore.showToast('发布失败', e?.response?.data?.msg ?? '请稍后再试', 'error')
+    return
+  }
 
-  mockTopics.value.unshift({
-    id: Date.now(),
-    title: newDraft.title,
-    excerpt: plainText + '...',
-    category: newDraft.category,
-    categoryColor: catObj ? catObj.color : 'bg-blue',
-    hasLink: newDraft.hasLink,
-    tags: topicTags,
-    author: currentUser,
-    likes: 0,
-    isBookmarked: false,
-    hasRead: false,
-    isMine: true,
-    time: '刚刚',
-    isFeatured: false
-  })
-  
-  // Reset
   newDraft.title = ''
   newDraft.content = ''
   newDraft.category = ''
@@ -485,7 +427,7 @@ function submitPublish() {
   newDraft.hasLink = false
   tagInput.value = ''
   showPublishModal.value = false
-  
+
   currentNav.value = 'my-shares'
   activeTab.value = 'latest'
   activeCategory.value = ''
