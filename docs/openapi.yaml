@@ -1048,7 +1048,7 @@ paths:
   /api/reports:
     post:
       summary: 举报内容
-      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；`reason` 未传、为空字符串或仅空白时回落为 `无`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
