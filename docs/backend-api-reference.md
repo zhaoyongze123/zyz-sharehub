@@ -371,6 +371,7 @@
 - 列表、详情、更新、删除都只作用于当前用户自己的笔记
 - `GET /api/notes` 支持 `status` 筛选；当 `status` 为空字符串或仅空白时按未传处理
 - `POST /api/notes` 未传 `status` 时默认存为 `DRAFT`
+- `PUT /api/notes/{id}` 传空字符串或仅空白 `status` 时按未传处理，保留原状态
 - 访问他人笔记时当前统一按不存在返回 `404 NOTE_NOT_FOUND`
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - `404` 统一为 `NOTE_NOT_FOUND`
