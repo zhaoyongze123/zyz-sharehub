@@ -272,6 +272,8 @@
 - 资料不存在返回 `404 RESOURCE_NOT_FOUND`
 - 文件进入 PostgreSQL 文件表
 - 成功后把 `objectKey` 更新为文件 `id`
+- 返回体包含 `resourceId` 和 `file` 两部分，其中 `file.downloadUrl` 形如 `/api/files/{uuid}`
+- 返回体中的 `file.contentType` 始终有值；上传未显式声明时回落为 `application/octet-stream`
 
 ### 5.9 `GET /api/resources/{id}/related`
 

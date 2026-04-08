@@ -502,7 +502,7 @@ paths:
   /api/resources/{id}/attachment:
     post:
       summary: 上传资料附件
-      description: 当前实现只允许 owner 上传自己的资料附件；联调可通过 `X-User-Key` 指定用户，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      description: 当前实现只允许 owner 上传自己的资料附件；联调可通过 `X-User-Key` 指定用户，非 owner 返回 `403 RESOURCE_FORBIDDEN`；成功后返回 `resourceId` 与文件元数据，其中 `file.contentType` 始终有值，上传未显式声明时回落为 `application/octet-stream`
       requestBody:
         required: true
         content:
@@ -516,6 +516,10 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceAttachmentUploadResponse'
         '401':
           description: 未登录
           content:
@@ -1097,6 +1101,20 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/StoredFileDto'
+    ResourceAttachmentUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            resourceId:
+              type: integer
+              format: int64
+            file:
+              $ref: '#/components/schemas/StoredFileDto'
     StoredFileDto:
       type: object
       properties:

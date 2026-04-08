@@ -265,14 +265,23 @@ class ResourceControllerIntegrationTest {
             .andExpect(jsonPath("$.data.file.owner").value(DEFAULT_USER))
             .andExpect(jsonPath("$.data.resourceId").value(resourceId))
             .andExpect(jsonPath("$.data.file.filename").value("guide.pdf"))
+            .andExpect(jsonPath("$.data.file.contentType").value(MediaType.APPLICATION_PDF_VALUE))
             .andExpect(jsonPath("$.data.file.downloadUrl").exists());
 
+        MockMultipartFile fallbackContentTypeFile = new MockMultipartFile(
+            "file",
+            "guide-no-type.pdf",
+            null,
+            "pdf-content".getBytes(StandardCharsets.UTF_8)
+        );
+
         mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
-                .file(file)
+                .file(fallbackContentTypeFile)
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.resourceId").value(resourceId))
-            .andExpect(jsonPath("$.data.file.filename").value("guide.pdf"))
+            .andExpect(jsonPath("$.data.file.filename").value("guide-no-type.pdf"))
+            .andExpect(jsonPath("$.data.file.contentType").value(MediaType.APPLICATION_OCTET_STREAM_VALUE))
             .andExpect(jsonPath("$.data.file.downloadUrl").exists());
 
         mockMvc.perform(get("/api/resources/{id}", resourceId))
@@ -343,12 +352,14 @@ class ResourceControllerIntegrationTest {
     }
 
     private void likeResource(long id) throws Exception {
-        mockMvc.perform(post("/api/resources/{id}/like", id))
+        mockMvc.perform(post("/api/resources/{id}/like", id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk());
     }
 
     private void favoriteResource(long id) throws Exception {
-        mockMvc.perform(post("/api/resources/{id}/favorite", id))
+        mockMvc.perform(post("/api/resources/{id}/favorite", id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk());
     }
 
