@@ -683,57 +683,162 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePageResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: 创建笔记
       description: 需要当前用户身份；创建后笔记归属当前请求用户；`status` 未传、为 `null`、空字符串或仅空白时默认保存为 `DRAFT`；`visibility` 传空字符串或仅空白时按未传处理，最终存为 `null`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteUpsertRequest'
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/notes/{id}:
     get:
       summary: 获取笔记详情
       description: 需要当前用户身份；当前实现只允许访问自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: 更新笔记
       description: 需要当前用户身份；当前实现只允许更新自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理；`status` 传空字符串或仅空白时按未传处理，保留原状态；`visibility` 传空字符串或仅空白时按未传处理，最终存为 `null`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteUpsertRequest'
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: 删除笔记
       description: 需要当前用户身份；当前实现只允许删除自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resumes/generate:
     post:
       summary: 生成简历 PDF
@@ -1381,6 +1486,87 @@ components:
         fileUpdatedAt:
           type: string
           format: date-time
+    NoteDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        contentMd:
+          type: string
+        visibility:
+          type: string
+          nullable: true
+          description: 可见性；传空字符串或仅空白时最终存为 null
+        status:
+          type: string
+          nullable: true
+          description: 笔记状态；创建时未传或空白会回落为 DRAFT
+      required:
+        - id
+        - title
+        - contentMd
+    NoteUpsertRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        contentMd:
+          type: string
+        visibility:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+      required:
+        - title
+        - contentMd
+    NoteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/NoteDto'
+        message:
+          type: string
+    NotePageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/NoteDto'
+        message:
+          type: string
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: string
+          example: DELETED
+        message:
+          type: string
     ResumeWorkbenchDto:
       type: object
       properties:
