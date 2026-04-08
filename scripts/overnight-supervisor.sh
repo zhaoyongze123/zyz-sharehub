@@ -6,10 +6,14 @@ OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
 LOG_FILE="${OUTPUT_DIR}/supervisor.log"
 DEADLINE_HOUR="${OVERNIGHT_DEADLINE_HOUR:-9}"
-CHECK_INTERVAL_SECONDS="${OVERNIGHT_CHECK_INTERVAL_SECONDS:-300}"
+CHECK_INTERVAL_SECONDS="${OVERNIGHT_CHECK_INTERVAL_SECONDS:-20}"
 STALE_SECONDS="${OVERNIGHT_STALE_SECONDS:-4200}"
-LAST_HOURLY_MARKER_FILE="${STATE_DIR}/last_hourly_marker.txt"
+RUN_SCRIPT="${PROJECT_ROOT}/scripts/overnight-hourly-run.sh"
 NOTIFY_SCRIPT="${PROJECT_ROOT}/scripts/feishu_notify.py"
+SUPERVISOR_PID_FILE="${STATE_DIR}/autopilot.pid"
+RUN_PID_FILE="${STATE_DIR}/current_run.pid"
+RUN_META_FILE="${STATE_DIR}/current_run.meta"
+CAFFEINATE_PID_FILE="${STATE_DIR}/caffeinate.pid"
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 mkdir -p "${OUTPUT_DIR}" "${STATE_DIR}"
@@ -36,89 +40,35 @@ print(max(0, int((target - now).total_seconds())))
 PY
 }
 
+cleanup() {
+  rm -f "${SUPERVISOR_PID_FILE}"
+}
+
+trap cleanup EXIT
+
+write_supervisor_pid() {
+  echo "$$" > "${SUPERVISOR_PID_FILE}"
+}
+
 restart_caffeinate() {
   local seconds="$1"
+  if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
+    local existing_pid
+    existing_pid="$(cat "${CAFFEINATE_PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${existing_pid}" ]]; then
+      kill "${existing_pid}" >/dev/null 2>&1 || true
+    fi
+  fi
   pkill -f "caffeinate -dimsu -t" >/dev/null 2>&1 || true
   nohup caffeinate -dimsu -t "${seconds}" >> "${OUTPUT_DIR}/start.log" 2>&1 &
-  echo $! > "${STATE_DIR}/caffeinate.pid"
-  echo "${seconds}" > "${STATE_DIR}/caffeinate-seconds.txt"
+  echo $! > "${CAFFEINATE_PID_FILE}"
   log "已启动保活进程，持续 ${seconds} 秒"
 }
 
-meta_value() {
-  local key="$1"
-  local file="$2"
-  awk -F'=' -v key="$key" '$1 == key { sub($1"=",""); print; exit }' "$file"
-}
-
-latest_end_epoch() {
-  local meta_file="$1"
-  local end_at
-  end_at="$(meta_value "END_AT" "${meta_file}")"
-  if [[ -z "${end_at}" ]]; then
-    echo ""
-    return 0
-  fi
-
-  python3 - "${end_at}" <<'PY'
-from datetime import datetime
-import sys
-
-value = sys.argv[1]
-try:
-    print(int(datetime.strptime(value, "%Y-%m-%d %H:%M:%S %z").timestamp()))
-except ValueError:
-    print("")
-PY
-}
-
-trigger_run() {
-  local reason="$1"
-  log "触发一轮自动推进，原因：${reason}"
-  if "${PROJECT_ROOT}/scripts/launchd-overnight-entry.sh" >> "${LOG_FILE}" 2>&1; then
-    log "自动推进触发成功：${reason}"
-  else
-    log "自动推进触发失败：${reason}"
-    notify "ShareHub 夜间推进异常
-状态：触发执行失败
-原因：${reason}
-时间：$(date '+%F %T %z')"
-  fi
-}
-
-current_hour_marker() {
-  date '+%Y%m%d%H'
-}
-
-current_minute() {
-  date '+%M'
-}
-
-mark_hourly_run() {
-  current_hour_marker > "${LAST_HOURLY_MARKER_FILE}"
-}
-
-need_hourly_run() {
-  local marker minute last_marker
-  marker="$(current_hour_marker)"
-  minute="$(current_minute)"
-  last_marker="$(cat "${LAST_HOURLY_MARKER_FILE}" 2>/dev/null || true)"
-
-  if [[ ! -f "${LAST_HOURLY_MARKER_FILE}" ]]; then
-    return 0
-  fi
-
-  if [[ "${marker}" != "${last_marker}" && "${minute}" -le 5 ]]; then
-    return 0
-  fi
-
-  return 1
-}
-
 ensure_caffeinate_alive() {
-  local remaining
+  local remaining pid
   remaining="$(remaining_seconds)"
-  if [[ ! -f "${STATE_DIR}/caffeinate.pid" ]]; then
+  if [[ ! -f "${CAFFEINATE_PID_FILE}" ]]; then
     restart_caffeinate "${remaining}"
     notify "ShareHub 夜间推进巡检
 状态：未找到保活进程，已自动补拉
@@ -126,9 +76,8 @@ ensure_caffeinate_alive() {
     return
   fi
 
-  local pid
-  pid="$(cat "${STATE_DIR}/caffeinate.pid")"
-  if ! kill -0 "${pid}" >/dev/null 2>&1; then
+  pid="$(cat "${CAFFEINATE_PID_FILE}" 2>/dev/null || true)"
+  if [[ -z "${pid}" ]] || ! kill -0 "${pid}" >/dev/null 2>&1; then
     restart_caffeinate "${remaining}"
     notify "ShareHub 夜间推进巡检
 状态：检测到保活进程已停止，已自动重启
@@ -136,30 +85,21 @@ ensure_caffeinate_alive() {
   fi
 }
 
-ensure_stale_recovery() {
-  local meta_file="${OUTPUT_DIR}/latest-meta.env"
-  if [[ ! -f "${meta_file}" ]]; then
-    trigger_run "缺少 latest-meta.env"
-    return
-  fi
-
-  local end_epoch now_epoch run_id
-  end_epoch="$(latest_end_epoch "${meta_file}")"
-  run_id="$(meta_value "RUN_ID" "${meta_file}")"
-  now_epoch="$(date '+%s')"
-  if [[ -n "${end_epoch}" ]] && (( now_epoch - end_epoch > STALE_SECONDS )); then
-    trigger_run "最近一轮超过 ${STALE_SECONDS} 秒未更新"
-    notify "ShareHub 夜间推进巡检
-状态：最近一轮执行已超时未更新，已触发补跑
-最近轮次：${run_id:-unknown}
-时间：$(date '+%F %T %z')"
-  fi
-}
-
 ensure_deadline() {
-  if [[ "$(date '+%H' | sed 's/^0*//')" -ge "${DEADLINE_HOUR}" ]]; then
+  local current_hour
+  current_hour="$(date '+%H' | sed 's/^0*//')"
+  current_hour="${current_hour:-0}"
+  if [[ "${current_hour}" -ge "${DEADLINE_HOUR}" ]]; then
     log "已到截止时间，停止夜间自动推进"
-    pkill -f "caffeinate -dimsu -t" >/dev/null 2>&1 || true
+    stop_current_run_if_any
+    if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
+      local pid
+      pid="$(cat "${CAFFEINATE_PID_FILE}" 2>/dev/null || true)"
+      if [[ -n "${pid}" ]]; then
+        kill "${pid}" >/dev/null 2>&1 || true
+      fi
+      rm -f "${CAFFEINATE_PID_FILE}"
+    fi
     notify "ShareHub 夜间推进结束
 状态：已到截止时间，自动停止
 时间：$(date '+%F %T %z')"
@@ -167,20 +107,83 @@ ensure_deadline() {
   fi
 }
 
+start_run() {
+  local reason="$1"
+  nohup bash "${RUN_SCRIPT}" >> "${LOG_FILE}" 2>&1 &
+  local run_pid=$!
+  printf 'RUN_PID=%s\nSTART_EPOCH=%s\nREASON=%s\n' "${run_pid}" "$(date '+%s')" "${reason}" > "${RUN_META_FILE}"
+  echo "${run_pid}" > "${RUN_PID_FILE}"
+  log "已启动新一轮自动推进，PID=${run_pid}，原因：${reason}"
+}
+
+stop_current_run_if_any() {
+  if [[ ! -f "${RUN_PID_FILE}" ]]; then
+    rm -f "${RUN_META_FILE}"
+    return
+  fi
+
+  local run_pid
+  run_pid="$(cat "${RUN_PID_FILE}" 2>/dev/null || true)"
+  if [[ -n "${run_pid}" ]] && kill -0 "${run_pid}" >/dev/null 2>&1; then
+    kill "${run_pid}" >/dev/null 2>&1 || true
+    sleep 1
+    kill -9 "${run_pid}" >/dev/null 2>&1 || true
+    log "已停止卡住的单轮执行，PID=${run_pid}"
+  fi
+  rm -f "${RUN_PID_FILE}" "${RUN_META_FILE}"
+}
+
+current_run_pid() {
+  cat "${RUN_PID_FILE}" 2>/dev/null || true
+}
+
+current_run_start_epoch() {
+  awk -F'=' '$1=="START_EPOCH"{print $2; exit}' "${RUN_META_FILE}" 2>/dev/null || true
+}
+
+handle_stale_run() {
+  local run_pid start_epoch now_epoch
+  run_pid="$(current_run_pid)"
+  start_epoch="$(current_run_start_epoch)"
+  now_epoch="$(date '+%s')"
+
+  if [[ -n "${run_pid}" ]] && kill -0 "${run_pid}" >/dev/null 2>&1; then
+    if [[ -n "${start_epoch}" ]] && (( now_epoch - start_epoch > STALE_SECONDS )); then
+      notify "ShareHub 夜间推进异常
+状态：单轮执行超过 ${STALE_SECONDS} 秒未结束，准备强制重启
+运行 PID：${run_pid}
+时间：$(date '+%F %T %z')"
+      stop_current_run_if_any
+      start_run "上一轮超时自愈"
+    fi
+    return
+  fi
+
+  if [[ -n "${run_pid}" ]]; then
+    log "检测到上一轮进程已退出，准备自动启动下一轮"
+    rm -f "${RUN_PID_FILE}" "${RUN_META_FILE}"
+    start_run "上一轮结束后自动续跑"
+  fi
+}
+
+ensure_run_alive() {
+  local run_pid
+  run_pid="$(current_run_pid)"
+  if [[ -z "${run_pid}" ]]; then
+    start_run "启动立即执行"
+    return
+  fi
+  handle_stale_run
+}
+
 log "夜间 supervisor 启动"
+write_supervisor_pid
 ensure_caffeinate_alive
-trigger_run "启动立即执行"
-mark_hourly_run
+ensure_run_alive
 
 while true; do
   ensure_deadline
   ensure_caffeinate_alive
-  ensure_stale_recovery
-
-  if need_hourly_run; then
-    trigger_run "整点小时批次"
-    mark_hourly_run
-  fi
-
+  ensure_run_alive
   sleep "${CHECK_INTERVAL_SECONDS}"
 done

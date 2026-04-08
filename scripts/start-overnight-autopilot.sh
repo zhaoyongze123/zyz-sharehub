@@ -11,7 +11,6 @@ START_LOG="${OUTPUT_DIR}/start.log"
 mkdir -p "${STATE_DIR}" "${OUTPUT_DIR}"
 
 chmod +x \
-  "${PROJECT_ROOT}/scripts/launchd-overnight-entry.sh" \
   "${PROJECT_ROOT}/scripts/overnight-hourly-run.sh" \
   "${PROJECT_ROOT}/scripts/overnight-monitor.sh" \
   "${PROJECT_ROOT}/scripts/overnight-supervisor.sh" \
@@ -26,11 +25,43 @@ if [[ -f "${PID_FILE}" ]]; then
   fi
 fi
 
-nohup bash -lc "cd '${PROJECT_ROOT}' && exec ./scripts/overnight-supervisor.sh" >> "${START_LOG}" 2>&1 &
-SUPERVISOR_PID=$!
-echo "${SUPERVISOR_PID}" > "${PID_FILE}"
+rm -f "${PID_FILE}"
 
-sleep 1
+python3 - "${PROJECT_ROOT}" "${START_LOG}" <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+
+project_root = Path(sys.argv[1])
+start_log = Path(sys.argv[2])
+
+with start_log.open("ab") as log_file:
+    subprocess.Popen(
+        ["bash", "-lc", "exec ./scripts/overnight-supervisor.sh"],
+        cwd=project_root,
+        stdin=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+PY
+
+SUPERVISOR_PID=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if [[ -f "${PID_FILE}" ]]; then
+    SUPERVISOR_PID="$(cat "${PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${SUPERVISOR_PID}" ]] && kill -0 "${SUPERVISOR_PID}" >/dev/null 2>&1; then
+      break
+    fi
+  fi
+  sleep 1
+done
+
+if [[ -z "${SUPERVISOR_PID}" ]] || ! kill -0 "${SUPERVISOR_PID}" >/dev/null 2>&1; then
+  echo "夜间自动推进启动失败，请检查 ${START_LOG} 和 output/overnight/supervisor.log"
+  exit 1
+fi
+
 CAFFEINATE_PID="$(cat "${CAFFEINATE_PID_FILE}" 2>/dev/null || true)"
 
 echo "已启动夜间自动推进，supervisor PID=${SUPERVISOR_PID}"

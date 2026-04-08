@@ -5,6 +5,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_DIR="${PROJECT_ROOT}/output/overnight/state"
 PID_FILE="${STATE_DIR}/autopilot.pid"
 CAFFEINATE_PID_FILE="${STATE_DIR}/caffeinate.pid"
+RUN_PID_FILE="${STATE_DIR}/current_run.pid"
 
 if [[ -f "${PID_FILE}" ]]; then
   PID="$(cat "${PID_FILE}")"
@@ -25,7 +26,14 @@ if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
 fi
 
 rm -f "${STATE_DIR}/caffeinate-seconds.txt"
+if [[ -f "${RUN_PID_FILE}" ]]; then
+  RUN_PID="$(cat "${RUN_PID_FILE}")"
+  if kill -0 "${RUN_PID}" >/dev/null 2>&1; then
+    kill "${RUN_PID}" || true
+    echo "已停止当前轮次执行，PID=${RUN_PID}"
+  fi
+  rm -f "${RUN_PID_FILE}" "${STATE_DIR}/current_run.meta"
+fi
 pkill -f "overnight-supervisor.sh" >/dev/null 2>&1 || true
-pkill -f "launchd-overnight-entry.sh" >/dev/null 2>&1 || true
 pkill -f "run_with_timeout.py .*New project" >/dev/null 2>&1 || true
 pkill -f "codex exec --dangerously-bypass-approvals-and-sandbox -C /Users/mac/Documents/New project" >/dev/null 2>&1 || true
