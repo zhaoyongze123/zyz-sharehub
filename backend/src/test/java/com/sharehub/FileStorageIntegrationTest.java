@@ -95,4 +95,12 @@ class FileStorageIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void shouldReturnNotFoundWhenFileMissing() throws Exception {
+        UUID missingId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/files/{id}", missingId))
+            .andExpect(status().isNotFound());
+    }
 }
