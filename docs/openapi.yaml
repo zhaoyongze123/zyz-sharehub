@@ -516,7 +516,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: 资料不存在（错误码 `RESOURCE_NOT_FOUND`）
+          description: 资料不存在（错误码 `NOT_FOUND`）
           content:
             application/json:
               schema:

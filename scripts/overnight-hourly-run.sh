@@ -15,6 +15,7 @@ TIMEOUT_SECONDS="${OVERNIGHT_TIMEOUT_SECONDS:-3000}"
 MAX_RETRIES="${OVERNIGHT_MAX_RETRIES:-3}"
 PRIMARY_MODEL="${OVERNIGHT_PRIMARY_MODEL:-gpt-5.4}"
 FALLBACK_MODELS="${OVERNIGHT_FALLBACK_MODELS:-gpt-5.1-codex-max,gpt-5.1-codex-mini}"
+CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
 POST_RUN_SMOKE_SCRIPT="${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
@@ -172,7 +173,7 @@ EXIT_CODE=1
 while (( ATTEMPT <= MAX_RETRIES )); do
   CURRENT_MODEL="$(model_for_attempt "${ATTEMPT}")"
   CODEX_CMD=(
-    codex
+    "${CODEX_BIN}"
     exec
     --ephemeral
     --disable multi_agent
