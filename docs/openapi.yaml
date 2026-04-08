@@ -618,6 +618,10 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/roadmaps/{id}:
     get:
       summary: 获取路线详情
@@ -626,7 +630,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 路线不存在
+          description: 路线不存在（错误码 `ROADMAP_NOT_FOUND`）
   /api/roadmaps/{id}/nodes:
     post:
       summary: 给路线新增节点
@@ -634,8 +638,12 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
-          description: 路线不存在或非 owner
+          description: 路线不存在或非 owner（错误码 `ROADMAP_NOT_FOUND`）
   /api/roadmaps/{id}/progress:
     post:
       summary: 更新路线学习进度
@@ -643,8 +651,12 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
         '404':
-          description: 路线不存在或非 owner
+          description: 路线不存在或非 owner（错误码 `ROADMAP_NOT_FOUND`）
   /api/notes:
     get:
       summary: 笔记分页列表
