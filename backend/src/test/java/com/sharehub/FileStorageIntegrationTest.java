@@ -175,6 +175,34 @@ class FileStorageIntegrationTest {
     }
 
     @Test
+    void shouldFallbackDirectUploadContentTypeWhenUploadContentTypeBlank() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "resume-blank.bin",
+            " ",
+            "resume body".getBytes()
+        );
+
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-direct")
+                .param("category", "RESUME_PDF")
+                .param("referenceType", "RESUME")
+                .param("referenceId", "resume-101-blank"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.contentType").value(MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andReturn();
+
+        JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
+        String downloadUrl = uploadJson.get("data").get("downloadUrl").asText();
+
+        mockMvc.perform(get(downloadUrl))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"resume-blank.bin\""));
+    }
+
+    @Test
     void shouldFallbackDirectUploadContentTypeWhenUploadContentTypeInvalid() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",
