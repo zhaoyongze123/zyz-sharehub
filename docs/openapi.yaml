@@ -31,6 +31,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me:
     get:
       summary: 个人中心聚合信息
@@ -271,6 +277,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
           content:
             application/json:
               schema:
