@@ -11,12 +11,14 @@ TIMEOUT_SECONDS="${OVERNIGHT_TIMEOUT_SECONDS:-3000}"
 MAX_RETRIES="${OVERNIGHT_MAX_RETRIES:-3}"
 PRIMARY_MODEL="${OVERNIGHT_PRIMARY_MODEL:-gpt-5.4}"
 FALLBACK_MODELS="${OVERNIGHT_FALLBACK_MODELS:-gpt-5.1-codex-max,gpt-5.1-codex-mini}"
+POST_RUN_SMOKE_SCRIPT="${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
 META_FILE="${RUN_DIR}/meta.env"
 NOTIFY_SCRIPT="${PROJECT_ROOT}/scripts/feishu_notify.py"
 DEFAULT_CODEX_HOME="${HOME}/.codex"
 AUTOPILOT_CODEX_HOME="${OUTPUT_DIR}/codex-home"
+START_HEAD="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -144,6 +146,22 @@ while (( ATTEMPT <= MAX_RETRIES )); do
 
   break
 done
+
+END_HEAD="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
+
+if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
+  echo "[$(date '+%F %T')] 开始执行前后端浏览器联调 smoke" | tee -a "${RAW_LOG_FILE}"
+  set +e
+  bash "${POST_RUN_SMOKE_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
+  SMOKE_EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+  echo "SMOKE_EXIT_CODE=${SMOKE_EXIT_CODE}" >> "${META_FILE}"
+  if [[ ${SMOKE_EXIT_CODE} -ne 0 ]]; then
+    EXIT_CODE=${SMOKE_EXIT_CODE}
+  fi
+else
+  echo "SMOKE_EXIT_CODE=SKIPPED" >> "${META_FILE}"
+fi
 
 {
   echo "END_AT=$(date '+%F %T %z')"

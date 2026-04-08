@@ -1,0 +1,231 @@
+import { expect, test } from '@playwright/test'
+
+const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
+const enabledModules = new Set(
+  (process.env.PLAYWRIGHT_MODULES || 'all')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+)
+
+function shouldRun(moduleName: string) {
+  return enabledModules.has('all') || enabledModules.has(moduleName)
+}
+
+function userHeaders(userKey = 'playwright-user') {
+  return {
+    'X-User-Key': userKey,
+    'Content-Type': 'application/json'
+  }
+}
+
+function adminHeaders() {
+  return {
+    'X-Admin-Token': process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token',
+    'Content-Type': 'application/json'
+  }
+}
+
+async function createPublishedResource(request: Parameters<typeof test>[0]['request'], title: string) {
+  const createResponse = await request.post(`${apiBaseUrl}/api/resources`, {
+    headers: userHeaders(),
+    data: {
+      title,
+      type: 'PDF',
+      category: 'PDF',
+      summary: `${title} summary`,
+      tags: ['agent', 'playwright'],
+      visibility: 'PUBLIC',
+      status: 'DRAFT'
+    }
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const createdBody = await createResponse.json()
+  const id = createdBody.data.id as number
+
+  const publishResponse = await request.post(`${apiBaseUrl}/api/resources/${id}/publish`, {
+    headers: userHeaders()
+  })
+  expect(publishResponse.ok()).toBeTruthy()
+  return id
+}
+
+async function createNote(request: Parameters<typeof test>[0]['request'], title: string) {
+  const response = await request.post(`${apiBaseUrl}/api/notes`, {
+    headers: userHeaders(),
+    data: {
+      title,
+      contentMd: `# ${title}\n\nplaywright`,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED'
+    }
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body.data.id as number
+}
+
+async function createResume(request: Parameters<typeof test>[0]['request'], templateKey = 'classic') {
+  const response = await request.post(`${apiBaseUrl}/api/resumes/generate`, {
+    headers: userHeaders(),
+    data: { templateKey }
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body.data.id as number
+}
+
+async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 'admin') {
+  await page.addInitScript((selectedRole) => {
+    window.localStorage.setItem('sharebase.role', selectedRole)
+    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
+    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
+  }, role)
+}
+
+test.describe.configure({ mode: 'serial' })
+
+test('backend health', async ({ request }) => {
+  test.skip(!shouldRun('backend'))
+  const response = await request.get(`${apiBaseUrl}/actuator/health`)
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  expect(body.status).toBe('UP')
+})
+
+test('resources 模块真接口联调', async ({ page, request }) => {
+  test.skip(!shouldRun('resources'))
+  const resourceId = await createPublishedResource(request, `Playwright Resource ${Date.now()}`)
+
+  const listResponse = await request.get(`${apiBaseUrl}/api/resources?page=0&pageSize=12`, {
+    headers: userHeaders()
+  })
+  expect(listResponse.ok()).toBeTruthy()
+  const listBody = await listResponse.json()
+  expect(Array.isArray(listBody.data.items)).toBeTruthy()
+  expect(listBody.data.items.some((item: { id: number }) => item.id === resourceId)).toBeTruthy()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/resources/${resourceId}`)
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.id).toBe(resourceId)
+
+  await page.goto('/resources')
+  await expect(page.locator('main').getByRole('heading', { name: '资料广场' })).toBeVisible()
+})
+
+test('roadmaps 模块真接口联调', async ({ page, request }) => {
+  test.skip(!shouldRun('roadmaps'))
+  const listResponse = await request.get(`${apiBaseUrl}/api/roadmaps?page=1&pageSize=20`)
+  expect(listResponse.ok()).toBeTruthy()
+  const listBody = await listResponse.json()
+  expect(Array.isArray(listBody.data.items)).toBeTruthy()
+
+  if (listBody.data.items.length > 0) {
+    const roadmapId = listBody.data.items[0].id
+    const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${roadmapId}`)
+    expect(detailResponse.ok()).toBeTruthy()
+  }
+
+  await page.goto('/roadmaps')
+  await expect(page.getByText('学习路线图')).toBeVisible()
+})
+
+test('notes 模块真接口联调', async ({ page, request }) => {
+  test.skip(!shouldRun('notes'))
+  const noteId = await createNote(request, `Playwright Note ${Date.now()}`)
+
+  const listResponse = await request.get(`${apiBaseUrl}/api/notes?page=1&pageSize=10`, {
+    headers: userHeaders()
+  })
+  expect(listResponse.ok()).toBeTruthy()
+  const listBody = await listResponse.json()
+  expect(Array.isArray(listBody.data.items)).toBeTruthy()
+  expect(listBody.data.items.some((item: { id: number }) => item.id === noteId)).toBeTruthy()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/notes/${noteId}`, {
+    headers: userHeaders()
+  })
+  expect(detailResponse.ok()).toBeTruthy()
+
+  await page.goto('/community')
+  await expect(page.getByText('AI 资源类别')).toBeVisible()
+})
+
+test('resumes 模块真接口联调', async ({ page, request }) => {
+  test.skip(!shouldRun('resumes'))
+  const resumeId = await createResume(request)
+
+  const workbenchResponse = await request.get(`${apiBaseUrl}/api/resumes/workbench`, {
+    headers: userHeaders()
+  })
+  expect(workbenchResponse.ok()).toBeTruthy()
+
+  const listResponse = await request.get(`${apiBaseUrl}/api/resumes?page=1&pageSize=10`, {
+    headers: userHeaders()
+  })
+  expect(listResponse.ok()).toBeTruthy()
+  const listBody = await listResponse.json()
+  expect(listBody.data.items.some((item: { id: number }) => item.id === resumeId)).toBeTruthy()
+
+  const downloadResponse = await request.get(`${apiBaseUrl}/api/resumes/${resumeId}/download`, {
+    headers: {
+      'X-User-Key': 'playwright-user'
+    }
+  })
+  expect(downloadResponse.ok()).toBeTruthy()
+
+  await loginAs(page, 'user')
+  await page.goto('/resume')
+  await expect(page.getByText('导出 PDF')).toBeVisible()
+})
+
+test('me 模块真接口联调', async ({ page, request }) => {
+  test.skip(!shouldRun('profile'))
+  await createPublishedResource(request, `Profile Resource ${Date.now()}`)
+  await createNote(request, `Profile Note ${Date.now()}`)
+  await createResume(request, 'modern')
+
+  const meResponse = await request.get(`${apiBaseUrl}/api/me`, {
+    headers: userHeaders()
+  })
+  expect(meResponse.ok()).toBeTruthy()
+
+  const resourcesResponse = await request.get(`${apiBaseUrl}/api/me/resources?page=1&pageSize=10`, {
+    headers: userHeaders()
+  })
+  expect(resourcesResponse.ok()).toBeTruthy()
+
+  const notesResponse = await request.get(`${apiBaseUrl}/api/me/notes?page=1&pageSize=10`, {
+    headers: userHeaders()
+  })
+  expect(notesResponse.ok()).toBeTruthy()
+
+  const resumesResponse = await request.get(`${apiBaseUrl}/api/me/resumes?page=1&pageSize=10`, {
+    headers: userHeaders()
+  })
+  expect(resumesResponse.ok()).toBeTruthy()
+
+  await loginAs(page, 'user')
+  await page.goto('/me')
+  await expect(page.getByRole('heading', { name: '个人资料' })).toBeVisible()
+})
+
+test('admin 模块真接口联调', async ({ page, request }) => {
+  test.skip(!shouldRun('admin'))
+  await createPublishedResource(request, `Admin Resource ${Date.now()}`)
+
+  const reportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
+    headers: adminHeaders()
+  })
+  expect(reportsResponse.ok()).toBeTruthy()
+
+  const auditLogsResponse = await request.get(`${apiBaseUrl}/api/admin/audit-logs?page=1&pageSize=20`, {
+    headers: adminHeaders()
+  })
+  expect(auditLogsResponse.ok()).toBeTruthy()
+
+  await loginAs(page, 'admin')
+  await page.goto('/admin')
+  await expect(page.getByText('管理中心仪表盘')).toBeVisible()
+})

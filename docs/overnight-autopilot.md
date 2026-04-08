@@ -16,8 +16,14 @@
 
 ```bash
 cd /Users/mac/Documents/New\ project
+export POSTGRES_PASSWORD='你的开发库密码'
+export REDIS_PASSWORD='你的开发 Redis 密码'
 ./scripts/start-overnight-autopilot.sh
 ```
+
+如果不想污染当前 shell，可改为写入 `backend/.env.cloud-dev.local`，由 `scripts/run-backend-cloud-dev.sh` 和浏览器 smoke 脚本自动读取。
+
+如果没有 cloud-dev 密码，浏览器联调会自动回落到本机自包含 smoke profile（`test` profile + H2），保证夜间链路仍可自验证。
 
 ## 停止方式
 
@@ -33,6 +39,11 @@ cd /Users/mac/Documents/New\ project
 - 最近一轮总结：`output/overnight/latest-message.md`
 - 运行状态：`output/overnight/latest-meta.env`
 - 诊断脚本：`scripts/overnight-monitor.sh`
+- 浏览器 smoke 日志：`output/overnight/<RUN_ID>/browser-smoke/smoke.log`
+- 后端联调日志：`output/overnight/<RUN_ID>/browser-smoke/backend.log`
+- 前端联调日志：`output/overnight/<RUN_ID>/browser-smoke/frontend.log`
+- Playwright 报告：`output/overnight/<RUN_ID>/browser-smoke/playwright-report`
+- 后端模式标记：`output/overnight/<RUN_ID>/browser-smoke/backend-mode.txt`
 
 ## 关键实现
 
@@ -44,6 +55,8 @@ cd /Users/mac/Documents/New\ project
 - 到 09:00 后 supervisor 自动退出
 - 每轮调用 `codex exec`
 - 默认单轮超时 3000 秒，避免单次卡死整夜
+- 每轮代码成功后会自动启动前后端，并执行对应模块的 Playwright 浏览器 smoke；联调失败则本轮失败，不按成功态继续推进
+- 浏览器联调优先走 cloud-dev 后端；若缺少 PostgreSQL/Redis 密码，则自动回落到本机 smoke profile，避免整夜因环境变量缺失直接停摆
 - 使用 `caffeinate -dimsu -t` 保持机器不休眠直到截止时间
 - 每轮结束会自动 push 当前分支并发飞书总结
 - 如果自动化或业务阻塞导致无法继续推进，会发飞书异常通知

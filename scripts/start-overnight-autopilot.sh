@@ -14,9 +14,11 @@ export OVERNIGHT_DEADLINE_HOUR="${OVERNIGHT_DEADLINE_HOUR:-9}"
 
 chmod +x \
   "${PROJECT_ROOT}/scripts/overnight-hourly-run.sh" \
+  "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh" \
   "${PROJECT_ROOT}/scripts/overnight-monitor.sh" \
   "${PROJECT_ROOT}/scripts/overnight-supervisor.sh" \
   "${PROJECT_ROOT}/scripts/feishu_notify.py" \
+  "${PROJECT_ROOT}/scripts/run-backend-smoke.sh" \
   "${PROJECT_ROOT}/scripts/run_with_timeout.py"
 
 if [[ -f "${PID_FILE}" ]]; then
