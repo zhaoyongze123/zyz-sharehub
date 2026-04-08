@@ -585,7 +585,7 @@ paths:
   /api/roadmaps:
     get:
       summary: 路线分页列表
-      description: 当前列表仍返回全量路线，`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底
+      description: 当前列表仍返回全量路线，`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底，且返回结果按 `id` 倒序排列
       parameters:
         - in: query
           name: page
@@ -602,7 +602,7 @@ paths:
           description: 成功
     post:
       summary: 创建路线
-      description: 需要当前用户身份；创建记录的 owner 固定取请求用户，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；创建记录的 owner 固定取请求用户，联调可通过 `X-User-Key` 指定用户；`status` 未传时默认补成 `PUBLISHED`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
