@@ -301,6 +301,32 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void shouldClampInvalidResumePaginationToMinimumValues() throws Exception {
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "alpha"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "beta"))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .param("page", "0")
+                .param("pageSize", "-5"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.pageSize").value(1))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.items[0].templateKey").value("beta"));
+    }
+
+    @Test
     void shouldReturnResumeWorkbenchSummary() throws Exception {
         mockMvc.perform(post("/api/resumes/generate")
                 .header(USER_KEY_HEADER, DEFAULT_USER)
