@@ -220,4 +220,23 @@ class FileStorageIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("FILE_EMPTY"));
     }
+
+    @Test
+    void shouldRejectDirectUploadWhenFilenameMissing() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            " ",
+            MediaType.APPLICATION_OCTET_STREAM_VALUE,
+            new byte[]{1}
+        );
+
+        mockMvc.perform(multipart("/api/files/upload")
+                .file(file)
+                .param("owner", "user-1")
+                .param("category", "AVATAR")
+                .param("referenceType", "USER")
+                .param("referenceId", "user-1"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_NAME_REQUIRED"));
+    }
 }

@@ -26,12 +26,16 @@ public class FileStorageService {
 
     public StoredFileDto storeMultipart(String owner, FileCategory category, String referenceType, String referenceId, MultipartFile file) {
         try {
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || originalFilename.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "FILE_NAME_REQUIRED");
+            }
             return storeBytes(
                 owner,
                 category,
                 referenceType,
                 referenceId,
-                defaultFilename(file.getOriginalFilename()),
+                originalFilename,
                 defaultContentType(file.getContentType()),
                 file.getBytes()
             );
@@ -127,10 +131,6 @@ public class FileStorageService {
         if (data.length > properties.getMaxSize()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "FILE_TOO_LARGE");
         }
-    }
-
-    private String defaultFilename(String filename) {
-        return (filename == null || filename.isBlank()) ? "upload.bin" : filename;
     }
 
     private String defaultContentType(String contentType) {
