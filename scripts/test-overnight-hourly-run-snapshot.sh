@@ -69,9 +69,10 @@ git init --bare -q "${TEST_REMOTE}"
 git -C "${TEST_PROJECT}" remote add origin "${TEST_REMOTE}"
 git -C "${TEST_PROJECT}" push -q -u origin test-branch
 
-HOME="${TEST_ROOT}/home" \
-OVERNIGHT_CODEX_BIN="${TEST_ROOT}/bin/fake-codex" \
-"${TEST_PROJECT}/scripts/overnight-hourly-run.sh" \
+env -u OVERNIGHT_PROJECT_ROOT -u OVERNIGHT_RUN_SNAPSHOT_ACTIVE \
+  HOME="${TEST_ROOT}/home" \
+  OVERNIGHT_CODEX_BIN="${TEST_ROOT}/bin/fake-codex" \
+  "${TEST_PROJECT}/scripts/overnight-hourly-run.sh" \
   >"${TEST_ROOT}/hourly-run.log" 2>&1 &
 RUN_PID=$!
 
