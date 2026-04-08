@@ -57,7 +57,12 @@ print("\n".join(ordered))
 PY
 }
 
-mapfile -t MODEL_SEQUENCE < <(build_model_sequence)
+MODEL_SEQUENCE=()
+while IFS= read -r line; do
+  if [[ -n "${line}" ]]; then
+    MODEL_SEQUENCE+=("${line}")
+  fi
+done < <(build_model_sequence)
 
 model_for_attempt() {
   local index=$(( $1 - 1 ))

@@ -10,6 +10,8 @@ START_LOG="${OUTPUT_DIR}/start.log"
 
 mkdir -p "${STATE_DIR}" "${OUTPUT_DIR}"
 
+export OVERNIGHT_DEADLINE_HOUR="${OVERNIGHT_DEADLINE_HOUR:-23}"
+
 chmod +x \
   "${PROJECT_ROOT}/scripts/overnight-hourly-run.sh" \
   "${PROJECT_ROOT}/scripts/overnight-monitor.sh" \
