@@ -830,7 +830,7 @@ paths:
   /api/resumes/generate:
     post:
       summary: 生成简历 PDF
-      description: 当前实现按请求用户生成简历，联调可通过 `X-User-Key` 指定用户；`templateKey` 未传、为空、`null` 或仅空白时会回落为 `default`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户生成简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`templateKey` 未传、为空、`null` 或仅空白时会回落为 `default`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       requestBody:
         required: false
         content:
@@ -859,7 +859,7 @@ paths:
   /api/resumes:
     get:
       summary: 获取我的简历分页列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -909,7 +909,7 @@ paths:
   /api/resumes/{id}:
     get:
       summary: 获取简历生成记录
-      description: 当前实现只返回当前用户拥有的简历，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现只返回当前用户拥有的简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       parameters:
         - in: path
           name: id
@@ -944,7 +944,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: 删除简历记录
-      description: 当前实现只允许当前用户删除自己的简历，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现只允许当前用户删除自己的简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       parameters:
         - in: path
           name: id
@@ -989,7 +989,7 @@ paths:
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF
-      description: 当前实现只允许当前用户下载自己的简历，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现只允许当前用户下载自己的简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       parameters:
         - in: path
           name: id
@@ -1046,7 +1046,7 @@ paths:
   /api/resumes/workbench:
     get:
       summary: 获取我的简历工作台聚合信息
-      description: 当前实现按请求用户聚合数据，联调可通过 `X-User-Key` 指定用户；`templateBreakdown` 按数量倒序返回，数量相同时按 `templateKey` 升序稳定排序；`recentItems` 按创建时间倒序返回，时间相同时按 `id` 倒序稳定排序，且最多返回最近 5 条；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 当前实现按请求用户聚合数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`templateBreakdown` 按数量倒序返回，数量相同时按 `templateKey` 升序稳定排序；`recentItems` 按创建时间倒序返回，时间相同时按 `id` 倒序稳定排序，且最多返回最近 5 条；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
