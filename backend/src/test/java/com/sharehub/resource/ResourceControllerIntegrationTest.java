@@ -297,6 +297,38 @@ class ResourceControllerIntegrationTest {
     }
 
     @Test
+    void shouldRejectInvalidResourceAttachmentFile() throws Exception {
+        long resourceId = createResource("附件校验资源", "PDF", "PUBLIC", "java", "附件校验");
+
+        MockMultipartFile emptyFile = new MockMultipartFile(
+            "file",
+            "empty.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            new byte[0]
+        );
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(emptyFile)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_EMPTY"));
+
+        byte[] oversizedPayload = new byte[5 * 1024 * 1024 + 1];
+        MockMultipartFile oversizedFile = new MockMultipartFile(
+            "file",
+            "oversized.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            oversizedPayload
+        );
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(oversizedFile)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("FILE_TOO_LARGE"));
+    }
+
+    @Test
     void shouldRequireUserForResourceMutationEndpoints() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",

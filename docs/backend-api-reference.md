@@ -270,6 +270,7 @@
 - 非 owner 返回 `403 RESOURCE_FORBIDDEN`
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 资料不存在返回 `404 RESOURCE_NOT_FOUND`
+- 文件校验失败时返回 `400`，当前已覆盖 `FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`
 - 文件进入 PostgreSQL 文件表
 - 成功后把 `objectKey` 更新为文件 `id`
 - 返回体包含 `resourceId` 和 `file` 两部分，其中 `file.downloadUrl` 形如 `/api/files/{uuid}`

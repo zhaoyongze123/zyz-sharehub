@@ -520,6 +520,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResourceAttachmentUploadResponse'
+        '400':
+          description: 文件校验失败（错误码可能为 `FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: 未登录
           content:
