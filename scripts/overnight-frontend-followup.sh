@@ -18,6 +18,7 @@ RAW_LOG_FILE="${FOLLOWUP_DIR}/codex-output.log"
 META_FILE="${FOLLOWUP_DIR}/meta.env"
 WORKTREE_ROOT="${PROJECT_ROOT}/output/overnight/frontend-worktrees"
 FRONTEND_WORKDIR=""
+START_EPOCH="$(date '+%s')"
 TIMEOUT_SECONDS="${OVERNIGHT_FRONTEND_FOLLOWUP_TIMEOUT_SECONDS:-2400}"
 MODEL="${OVERNIGHT_FRONTEND_FOLLOWUP_MODEL:-gpt-5.1-codex-max}"
 CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
@@ -234,18 +235,47 @@ python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" \
   < "${PROMPT_FILE}" 2>&1 | tee -a "${RAW_LOG_FILE}"
 EXIT_CODE=${PIPESTATUS[0]}
 set -e
+END_EPOCH="$(date '+%s')"
+DURATION_SECONDS=$(( END_EPOCH - START_EPOCH ))
 
 if [[ ${EXIT_CODE} -ne 0 ]]; then
   log "前端子代理执行失败，exit=${EXIT_CODE}"
-  python3 "${NOTIFY_SCRIPT}" "ShareHub 前端子代理异常 | 轮次 ${RUN_DIR##*/} | 模块 ${MODULES} | 分支 ${FRONTEND_BRANCH} | exit=${EXIT_CODE}" >> "${RAW_LOG_FILE}" 2>&1 || true
+  python3 "${NOTIFY_SCRIPT}" \
+    --event "前端子代理异常" \
+    --status "需关注" \
+    --run-id "${RUN_DIR##*/}" \
+    --module "${MODULES}" \
+    --frontend-branch "${FRONTEND_BRANCH}" \
+    --duration-seconds "${DURATION_SECONDS}" \
+    --reason "前端子代理执行失败，exit=${EXIT_CODE}" \
+    --evidence "${FOLLOWUP_DIR}/codex-output.log" \
+    >> "${RAW_LOG_FILE}" 2>&1 || true
   exit "${EXIT_CODE}"
 fi
 
 if ! git -C "${WORKTREE_DIR}" push origin "${FRONTEND_BRANCH}" >> "${RAW_LOG_FILE}" 2>&1; then
   log "前端子代理 push 失败"
-  python3 "${NOTIFY_SCRIPT}" "ShareHub 前端子代理异常 | 轮次 ${RUN_DIR##*/} | 模块 ${MODULES} | 分支 ${FRONTEND_BRANCH} | push 失败" >> "${RAW_LOG_FILE}" 2>&1 || true
+  python3 "${NOTIFY_SCRIPT}" \
+    --event "前端子代理异常" \
+    --status "需关注" \
+    --run-id "${RUN_DIR##*/}" \
+    --module "${MODULES}" \
+    --frontend-branch "${FRONTEND_BRANCH}" \
+    --duration-seconds "${DURATION_SECONDS}" \
+    --reason "前端子代理 push 失败" \
+    --evidence "${FOLLOWUP_DIR}/codex-output.log" \
+    >> "${RAW_LOG_FILE}" 2>&1 || true
   exit 1
 fi
 
 log "前端子代理执行完成，已推送分支 ${FRONTEND_BRANCH}"
-python3 "${NOTIFY_SCRIPT}" "ShareHub 前端子代理完成 | 轮次 ${RUN_DIR##*/} | 模块 ${MODULES} | 分支 ${FRONTEND_BRANCH}" >> "${RAW_LOG_FILE}" 2>&1 || true
+python3 "${NOTIFY_SCRIPT}" \
+  --event "前端子代理完成" \
+  --status "成功" \
+  --run-id "${RUN_DIR##*/}" \
+  --module "${MODULES}" \
+  --frontend-branch "${FRONTEND_BRANCH}" \
+  --duration-seconds "${DURATION_SECONDS}" \
+  --result "已推送前端分支" \
+  --evidence "${FOLLOWUP_DIR}/meta.env" \
+  >> "${RAW_LOG_FILE}" 2>&1 || true

@@ -81,18 +81,26 @@ ensure_caffeinate_alive() {
   remaining="$(remaining_seconds)"
   if [[ ! -f "${CAFFEINATE_PID_FILE}" ]]; then
     restart_caffeinate "${remaining}"
-    notify "ShareHub 夜间推进巡检
-状态：未找到保活进程，已自动补拉
-时间：$(date '+%F %T %z')"
+    python3 "${NOTIFY_SCRIPT}" \
+      --event "保活巡检" \
+      --status "已恢复" \
+      --reason "未找到保活进程" \
+      --action "已自动补拉 caffeinate" \
+      --evidence "${LOG_FILE}" \
+      >> "${LOG_FILE}" 2>&1 || true
     return
   fi
 
   pid="$(cat "${CAFFEINATE_PID_FILE}" 2>/dev/null || true)"
   if [[ -z "${pid}" ]] || ! kill -0 "${pid}" >/dev/null 2>&1; then
     restart_caffeinate "${remaining}"
-    notify "ShareHub 夜间推进巡检
-状态：检测到保活进程已停止，已自动重启
-时间：$(date '+%F %T %z')"
+    python3 "${NOTIFY_SCRIPT}" \
+      --event "保活巡检" \
+      --status "已恢复" \
+      --reason "检测到保活进程已停止" \
+      --action "已自动重启 caffeinate" \
+      --evidence "${LOG_FILE}" \
+      >> "${LOG_FILE}" 2>&1 || true
   fi
 }
 
@@ -108,9 +116,13 @@ ensure_deadline() {
       fi
       rm -f "${CAFFEINATE_PID_FILE}"
     fi
-    notify "ShareHub 夜间推进结束
-状态：已到截止时间，自动停止
-时间：$(date '+%F %T %z')"
+    python3 "${NOTIFY_SCRIPT}" \
+      --event "夜间推进结束" \
+      --status "成功" \
+      --reason "已到截止时间，自动停止" \
+      --action "结束 supervisor 与保活进程" \
+      --evidence "${LOG_FILE}" \
+      >> "${LOG_FILE}" 2>&1 || true
     exit 0
   fi
 }
@@ -174,10 +186,14 @@ handle_stale_run() {
 
   if [[ -n "${run_pid}" ]] && kill -0 "${run_pid}" >/dev/null 2>&1; then
     if [[ -n "${start_epoch}" ]] && (( now_epoch - start_epoch > STALE_SECONDS )); then
-      notify "ShareHub 夜间推进异常
-状态：单轮执行超过 ${STALE_SECONDS} 秒未结束，准备强制重启
-运行 PID：${run_pid}
-时间：$(date '+%F %T %z')"
+      python3 "${NOTIFY_SCRIPT}" \
+        --event "单轮超时自愈" \
+        --status "需关注" \
+        --stage "supervisor" \
+        --reason "单轮执行超过 ${STALE_SECONDS} 秒未结束" \
+        --action "准备强制重启当前轮次，PID=${run_pid}" \
+        --evidence "${LOG_FILE}" \
+        >> "${LOG_FILE}" 2>&1 || true
       stop_current_run_if_any
       start_run "上一轮超时自愈"
     fi

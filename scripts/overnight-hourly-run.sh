@@ -26,6 +26,7 @@ DEFAULT_CODEX_HOME="${HOME}/.codex"
 AUTOPILOT_CODEX_HOME="${OUTPUT_DIR}/codex-home"
 START_HEAD="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
 RUN_SOURCE="${OVERNIGHT_RUN_SOURCE:-manual}"
+START_EPOCH="$(date '+%s')"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -279,19 +280,76 @@ if [[ -z "${ISSUE_HINT}" && -n "${TRANSIENT_ERROR_HINT}" ]]; then
   ISSUE_HINT="${TRANSIENT_ERROR_HINT}"
 fi
 ISSUE_HINT="$(printf '%s' "${ISSUE_HINT}" | tr '\n' ' ' | tr '\r' ' ' | cut -c1-300)"
+END_EPOCH="$(date '+%s')"
+DURATION_SECONDS=$(( END_EPOCH - START_EPOCH ))
+
+NEXT_TASK_STATUS="未启用自动续跑（手动触发）"
+if [[ "${RUN_SOURCE}" == "supervisor" ]]; then
+  NEXT_TASK_STATUS="由 supervisor 自动续跑"
+fi
+
+SMOKE_STATUS_TEXT="跳过"
+if [[ "${SMOKE_EXIT_CODE:-SKIPPED}" == "0" ]]; then
+  SMOKE_STATUS_TEXT="通过"
+elif [[ "${SMOKE_EXIT_CODE:-SKIPPED}" != "SKIPPED" ]]; then
+  SMOKE_STATUS_TEXT="失败"
+fi
+
+FRONTEND_FOLLOWUP_STATUS_TEXT="跳过"
+if [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-SKIPPED}" == "0" ]]; then
+  FRONTEND_FOLLOWUP_STATUS_TEXT="通过"
+elif [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-SKIPPED}" != "SKIPPED" ]]; then
+  FRONTEND_FOLLOWUP_STATUS_TEXT="失败"
+fi
 
 if [[ -n "${BLOCKED_LINE}" ]]; then
   echo "[$(date '+%F %T')] 检测到阻塞标记：${BLOCKED_LINE}" | tee -a "${RAW_LOG_FILE}"
-  python3 "${NOTIFY_SCRIPT}" "ShareHub 夜间推进阻塞 | 轮次 ${RUN_ID} | 分支 ${CURRENT_BRANCH:-unknown} | ${BLOCKED_LINE}" >> "${RAW_LOG_FILE}" 2>&1 || true
+  python3 "${NOTIFY_SCRIPT}" \
+    --event "自动推进阻塞" \
+    --status "需关注" \
+    --run-id "${RUN_ID}" \
+    --branch "${CURRENT_BRANCH:-unknown}" \
+    --duration-seconds "${DURATION_SECONDS}" \
+    --stage "主轮次" \
+    --reason "${BLOCKED_LINE}" \
+    --impact "本轮未能继续推进，需要查看日志排查" \
+    --evidence "${RUN_DIR}/codex-output.log" \
+    >> "${RAW_LOG_FILE}" 2>&1 || true
   EXIT_CODE=1
 fi
 
 if [[ ${EXIT_CODE} -eq 0 ]]; then
   echo "[$(date '+%F %T')] 第 ${RUN_ID} 轮完成" | tee -a "${RAW_LOG_FILE}"
-  python3 "${NOTIFY_SCRIPT}" "ShareHub 夜间推进完成 | 轮次 ${RUN_ID} | 分支 ${CURRENT_BRANCH:-unknown} | push=${PUSH_STATUS} | 摘要: ${SUMMARY}" >> "${RAW_LOG_FILE}" 2>&1 || true
+  python3 "${NOTIFY_SCRIPT}" \
+    --event "单轮完成" \
+    --status "成功" \
+    --run-id "${RUN_ID}" \
+    --branch "${CURRENT_BRANCH:-unknown}" \
+    --duration-seconds "${DURATION_SECONDS}" \
+    --commit "$(git -C "${PROJECT_ROOT}" log --oneline -1 2>/dev/null || true)" \
+    --smoke "${SMOKE_STATUS_TEXT}" \
+    --frontend-followup "${FRONTEND_FOLLOWUP_STATUS_TEXT}" \
+    --push-status "${PUSH_STATUS}" \
+    --next-task "${NEXT_TASK_STATUS}" \
+    --result "${SUMMARY}" \
+    --evidence "${RUN_DIR}/meta.env" \
+    >> "${RAW_LOG_FILE}" 2>&1 || true
 else
   echo "[$(date '+%F %T')] 第 ${RUN_ID} 轮异常退出，exit=${EXIT_CODE}" | tee -a "${RAW_LOG_FILE}"
-  python3 "${NOTIFY_SCRIPT}" "ShareHub 夜间推进异常 | 轮次 ${RUN_ID} | exit=${EXIT_CODE} | 分支 ${CURRENT_BRANCH:-unknown} | push=${PUSH_STATUS} | 问题: ${ISSUE_HINT:-未提取到关键错误，请查看 latest.log} | 摘要: ${SUMMARY}" >> "${RAW_LOG_FILE}" 2>&1 || true
+  python3 "${NOTIFY_SCRIPT}" \
+    --event "单轮异常" \
+    --status "需关注" \
+    --run-id "${RUN_ID}" \
+    --branch "${CURRENT_BRANCH:-unknown}" \
+    --duration-seconds "${DURATION_SECONDS}" \
+    --smoke "${SMOKE_STATUS_TEXT}" \
+    --frontend-followup "${FRONTEND_FOLLOWUP_STATUS_TEXT}" \
+    --push-status "${PUSH_STATUS}" \
+    --next-task "${NEXT_TASK_STATUS}" \
+    --reason "${ISSUE_HINT:-未提取到关键错误，请查看 latest.log}" \
+    --result "${SUMMARY}" \
+    --evidence "${RUN_DIR}/codex-output.log" \
+    >> "${RAW_LOG_FILE}" 2>&1 || true
 fi
 
 python3 - "${META_FILE}" "${EXIT_CODE}" "${PUSH_STATUS}" <<'PY'
