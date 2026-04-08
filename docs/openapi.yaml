@@ -627,27 +627,33 @@ paths:
   /api/resumes/{id}:
     get:
       summary: 获取简历生成记录
-      description: 当前实现只返回当前用户拥有的简历，联调可通过 `X-User-Key` 指定用户
+      description: 当前实现只返回当前用户拥有的简历，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
           description: 简历不存在或非 owner（错误码 `RESUME_NOT_FOUND`）
     delete:
       summary: 删除简历记录
-      description: 当前实现只允许当前用户删除自己的简历，联调可通过 `X-User-Key` 指定用户
+      description: 当前实现只允许当前用户删除自己的简历，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
           description: 简历不存在或非 owner（错误码 `RESUME_NOT_FOUND`）
   /api/resumes/{id}/download:
     get:
       summary: 下载简历 PDF
-      description: 当前实现只允许当前用户下载自己的简历，联调可通过 `X-User-Key` 指定用户
+      description: 当前实现只允许当前用户下载自己的简历，联调可通过 `X-User-Key` 指定用户，未带身份时返回 `401 NOT_LOGGED_IN`
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
           description: 简历不存在/非 owner（错误码 `RESUME_NOT_FOUND`），或简历未绑定文件（错误码 `RESUME_FILE_NOT_FOUND`），或文件记录缺失
   /api/resumes/workbench:

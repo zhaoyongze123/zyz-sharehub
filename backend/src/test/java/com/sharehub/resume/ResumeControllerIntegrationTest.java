@@ -223,6 +223,18 @@ class ResumeControllerIntegrationTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
 
+        mockMvc.perform(get("/api/resumes/1"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(delete("/api/resumes/1"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/resumes/1/download"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
         mockMvc.perform(post("/api/resumes/generate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
