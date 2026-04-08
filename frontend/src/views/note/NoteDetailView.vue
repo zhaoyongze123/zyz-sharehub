@@ -1,5 +1,8 @@
 <template>
-  <div class="page-shell detail-grid" v-if="note">
+  <div class="page-shell" v-if="isLoading">
+    <BaseEmpty title="加载中" description="正在拉取笔记详情..." />
+  </div>
+  <div class="page-shell detail-grid" v-else-if="note">
     <section class="detail-main">
       <HeroBanner kicker="笔记详情" :title="note.title" :description="note.summary || ''">
         <template #actions>
@@ -18,17 +21,21 @@
           <p>继续阅读相关的工程笔记。</p>
         </div>
         <div class="related-grid">
-          <NoteCard v-for="item in relatedNotesView" :key="item.id" :item="item" />
+          <NoteCard v-for="item in relatedNotes" :key="item.id" :item="item" />
         </div>
       </div>
     </section>
 
     <aside class="detail-side">
-      <NoteOutline :items="note.outline || []" />
+      <NoteOutline :items="note?.outline || []" />
       <BaseEmpty title="关联资料" description="联调后可展示引用资料与路线的精确关系。" />
     </aside>
 
     <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
+  </div>
+
+  <div v-else-if="loadError" class="page-shell">
+    <BaseErrorState title="笔记加载失败" :description="loadError" />
   </div>
 
   <div v-else class="page-shell">
@@ -37,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -49,55 +56,76 @@ import InteractionBar from '@/components/business/InteractionBar.vue'
 import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
 import ReportDialog from '@/components/business/ReportDialog.vue'
+import { fetchNote, fetchNotes, type NoteItemDto } from '@/api/notes'
 import { useAppStore } from '@/stores/app'
-import { fetchNoteDetail, type NoteItemDto } from '@/api/notes'
+
+type NoteCardItem = {
+  id: number
+  title: string
+  summary: string
+  updatedAt: string
+  status: string
+  tags: string[]
+}
 
 const route = useRoute()
 const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
-const likes = ref(86)
-const favorites = ref(112)
+const likes = ref(0)
+const favorites = ref(0)
+const detail = ref<NoteItemDto | null>(null)
+const relatedNotes = ref<NoteCardItem[]>([])
+const isLoading = ref(false)
+const loadError = ref('')
 
-const note = ref<NoteItemDto | null>(null)
-const relatedNotes = ref<NoteItemDto[]>([])
-const relatedNotesView = computed(() =>
-  relatedNotes.value.map((item) => ({
-    ...item,
-    summary: item.summary || '',
-    updatedAt: item.updatedAt || '',
-    status: item.status || '',
-    tags: item.tags || []
-  }))
-)
+const note = computed(() => {
+  if (!detail.value) return null
+  return {
+    ...detail.value,
+    id: Number(detail.value.id),
+    title: detail.value.title ?? '',
+    summary: detail.value.summary ?? '',
+    content: detail.value.content ?? '',
+    status: detail.value.status ?? '',
+    tags: detail.value.tags ?? [],
+    outline: (detail.value as any).outline || [],
+    updatedAt: (detail.value as any).updatedAt || (detail.value as any).updated_at || ''
+  }
+})
+
 const renderedHtml = computed(() => {
-  if (!note.value) return ''
+  if (!note.value?.content) return ''
   const html = marked(note.value.content || note.value.summary || '')
   return DOMPurify.sanitize(html as string)
 })
 
-const loadNote = async (id: string | number) => {
+async function loadDetail() {
+  isLoading.value = true
+  loadError.value = ''
   try {
-    const { data } = await fetchNoteDetail(id)
-    note.value = data.data
-  } catch (e) {
-    note.value = null
+    const res = await fetchNote(route.params.id as string)
+    detail.value = res
+    likes.value = (res as any).likes ?? 0
+    favorites.value = (res as any).favorites ?? 0
+  } catch (err: any) {
+    loadError.value = err?.response?.data?.msg || err?.message || '加载失败'
+  } finally {
+    isLoading.value = false
   }
 }
 
-watch(
-  () => route.params.id,
-  (id) => {
-    if (id) loadNote(id as string)
-  },
-  { immediate: true }
-)
-
-onMounted(() => {
-  if (route.params.id) {
-    loadNote(route.params.id as string)
+async function loadRelated() {
+  try {
+    const { list } = await fetchNotes({ page: 1, pageSize: 3 })
+    relatedNotes.value = (list || [])
+      .filter((item) => String(item.id) !== String(route.params.id))
+      .slice(0, 2)
+      .map(mapToCardItem)
+  } catch (err) {
+    console.warn('load related failed', err)
   }
-})
+}
 
 function likeNote() {
   likes.value += 1
@@ -113,6 +141,22 @@ function submitReport() {
   reportVisible.value = false
   appStore.showToast('举报已提交', reportReason.value || '已进入处理队列')
   reportReason.value = ''
+}
+
+onMounted(() => {
+  loadDetail()
+  loadRelated()
+})
+
+function mapToCardItem(item: NoteItemDto): NoteCardItem {
+  return {
+    id: Number(item.id),
+    title: item.title ?? '未命名笔记',
+    summary: item.summary ?? '',
+    updatedAt: (item as any).updatedAt || (item as any).updated_at || '',
+    status: item.status ?? 'DRAFT',
+    tags: item.tags ?? []
+  }
 }
 </script>
 

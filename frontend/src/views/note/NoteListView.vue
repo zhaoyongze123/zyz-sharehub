@@ -144,13 +144,12 @@
             </div>
             <p class="topic-excerpt" v-if="topic.excerpt">{{ topic.excerpt }}</p>
             <div class="topic-meta">
-              <span class="meta-tag" @click="toggleCategory(topic.category)" style="cursor:pointer">
+              <span class="meta-tag" v-if="topic.category" @click="toggleCategory(topic.category)" style="cursor:pointer">
                 <span class="dot" :class="topic.categoryColor"></span> 
                 {{ topic.category }}
               </span>
-              <span class="badge gray" v-for="tag in topic.tags" :key="tag.label">
-                <div :class="tag.icon" class="badge-icon" v-if="tag.icon"></div>
-                {{ tag.label }}
+              <span class="badge gray" v-for="tag in topic.tags" :key="tag">
+                {{ tag }}
               </span>
               <button class="likes-btn" :class="{ 'liked': topic.isBookmarked }" @click="toggleBookmark(topic)">
                 <div :class="topic.isBookmarked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" class="icon-xs"></div> 
@@ -159,14 +158,22 @@
             </div>
           </div>
           <div class="topic-author">
-            <img :src="topic.author.avatar" class="user-avatar" v-if="topic.author.avatar"/>
-            <div class="user-avatar author-initial bg-gray" v-else>{{ topic.author.name.charAt(0).toUpperCase() }}</div>
-            <span class="author-name">{{ topic.author.name }}</span>
+            <img :src="topic.authorAvatar" class="user-avatar" v-if="topic.authorAvatar"/>
+            <div class="user-avatar author-initial bg-gray" v-else>{{ topic.authorName?.charAt(0)?.toUpperCase() || 'U' }}</div>
+            <span class="author-name">{{ topic.authorName || '我' }}</span>
           </div>
-          <div class="topic-time">{{ topic.time }}</div>
+          <div class="topic-time">{{ topic.updatedText }}</div>
         </article>
         
-        <div v-if="displayedTopics.length === 0" class="empty-state">
+        <div v-if="isLoading" class="empty-state">
+           <div class="i-carbon-progress-bar empty-icon"></div>
+           <p>正在加载笔记...</p>
+        </div>
+        <div v-else-if="errorMessage" class="empty-state">
+           <div class="i-carbon-warning-alt empty-icon"></div>
+           <p>{{ errorMessage }}</p>
+        </div>
+        <div v-else-if="displayedTopics.length === 0" class="empty-state">
            <div class="i-carbon-not-found empty-icon"></div>
            <p>没有找到符合条件的 AI 分享内容。</p>
         </div>
@@ -231,13 +238,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchNoteList, createNote, type NoteItemDto } from '@/api/notes'
+import { createNoteAndUnwrap, fetchNotes, type NoteItemDto } from '@/api/notes'
 import { useAppStore } from '@/stores/app'
+
+type TopicView = {
+  id: string | number
+  title: string
+  excerpt: string
+  content: string
+  tags: string[]
+  category?: string
+  categoryColor?: string
+  status: string
+  updatedText: string
+  updatedRaw?: string
+  hasRead?: boolean
+  isBookmarked?: boolean
+  likes?: number
+  authorName?: string
+  authorAvatar?: string
+  hasLink?: boolean
+}
 
 const router = useRouter()
 const appStore = useAppStore()
+
 const currentNav = ref('topics')
 const activeTab = ref('latest')
 const activeCategory = ref('')
@@ -246,8 +273,15 @@ const showDropdown = ref(false)
 const showPublishModal = ref(false)
 
 const tagInput = ref('')
+const isLoading = ref(false)
+const isPublishing = ref(false)
+const errorMessage = ref('')
 
-const currentUser = { name: '当前用户', avatar: 'https://avatars.githubusercontent.com/u/99?v=4' }
+const pagination = reactive({
+  page: 1,
+  pageSize: 10,
+  total: 0
+})
 
 const newDraft = reactive({
   title: '',
@@ -268,69 +302,51 @@ const categories = [
 const filterTabs = [
   { id: 'latest', label: '最新 AI 分享' },
   { id: 'featured', label: '精选合集' },
-  { id: 'popular', label: '最多收藏' },
+  { id: 'popular', label: '最近更新' }
 ]
 
-const topics = ref<NoteItemDto[]>([])
-const loading = ref(false)
-const pagination = reactive({ page: 1, pageSize: 10, total: 0 })
+const topics = ref<TopicView[]>([])
+
+const statusByTab: Record<string, string> = {
+  latest: '',
+  featured: 'PUBLISHED',
+  popular: ''
+}
 
 const renderedMarkdown = computed(() => {
   if (!newDraft.content) return ''
-  // 简易 Markdown 解析器用于预览
   let html = newDraft.content
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    
-  // 标题
+
   html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>')
   html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>')
   html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>')
-  
-  // 粗体 & 斜体
+
   html = html.replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
   html = html.replace(/\*(.*)\*/gim, '<em>$1</em>')
-  
-  // 代码块 & 行内代码
+
   html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-  
-  // 引用
+
   html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-  
-  // 列表
+
   html = html.replace(/^\- (.*$)/gim, '<ul><li>$1</li></ul>')
   html = html.replace(/<\/ul>\n<ul>/gim, '')
-  
-  // 换行替换
-  html = html.split('\n').map(line => {
-    if (line.match(/^(<h|<pre|<ul|<blockquote)/)) return line;
-    return line ? `<p>${line}</p>` : '';
-  }).join('');
-  
+
+  html = html
+    .split('\n')
+    .map((line) => {
+      if (line.match(/^(<h|<pre|<ul|<blockquote)/)) return line
+      return line ? `<p>${line}</p>` : ''
+    })
+    .join('')
+
   return html
 })
 
-const viewTopics = computed(() =>
-  topics.value.map((item) => ({
-    id: item.id,
-    title: item.title,
-    excerpt: item.summary,
-    hasLink: false,
-    category: item.status || '未分类',
-    categoryColor: 'bg-teal',
-    tags: (item.tags || []).map((t) => ({ label: t, icon: '' })),
-    author: { name: '我', avatar: currentUser.avatar },
-    likes: (item.tags || []).length,
-    isBookmarked: false,
-    hasRead: false,
-    isMine: true,
-    time: formatDate(item.updatedAt || item.createdAt)
-  }))
-)
-
 const displayedTopics = computed(() => {
-  let list = viewTopics.value
+  let list = topics.value
 
   if (currentNav.value === 'bookmarks') {
     list = list.filter((t) => t.isBookmarked)
@@ -339,15 +355,81 @@ const displayedTopics = computed(() => {
   }
 
   if (activeCategory.value) {
-    list = list.filter((t) => t.category === activeCategory.value || t.tags.some((tag) => tag.label === activeCategory.value))
+    list = list.filter((t) => (t.tags || []).includes(activeCategory.value))
   }
 
-  if (activeTab.value === 'popular') {
-    list = [...list].sort((a, b) => b.likes - a.likes)
+  if (activeTab.value === 'featured') {
+    list = list.filter((t) => t.status === 'PUBLISHED')
+  } else if (activeTab.value === 'popular') {
+    list = [...list].sort((a, b) => (b.updatedRaw ? new Date(b.updatedRaw).getTime() : 0) - (a.updatedRaw ? new Date(a.updatedRaw).getTime() : 0))
   }
 
   return list
 })
+
+function formatDate(val?: string) {
+  if (!val) return '刚刚'
+  const parsed = new Date(val)
+  if (Number.isNaN(parsed.getTime())) return val
+  return parsed.toLocaleDateString('zh-CN')
+}
+
+function pickColor(tag?: string) {
+  if (!tag) return 'bg-blue'
+  const map: Record<string, string> = {
+    大模型前沿: 'bg-blue',
+    'AI 应用与 Agent': 'bg-red',
+    提示词工程: 'bg-green',
+    'AI 工具与效能': 'bg-teal',
+    学术与论文: 'bg-yellow'
+  }
+  return map[tag] || 'bg-blue'
+}
+
+function normalizeNote(item: NoteItemDto): TopicView {
+  const rawUpdated = (item as any).updatedAt || (item as any).updated_at || (item as any).createdAt || (item as any).created_at
+  const plainText = item.summary || (item.content ? item.content.replace(/[#>*`\-]/g, '').slice(0, 120) : '')
+  const firstTag = item.tags?.[0]
+  return {
+    id: item.id,
+    title: item.title || '未命名笔记',
+    excerpt: plainText,
+    content: item.content || '',
+    tags: item.tags || [],
+    category: firstTag || '未分组',
+    categoryColor: pickColor(firstTag),
+    status: item.status || 'DRAFT',
+    updatedText: formatDate(rawUpdated),
+    updatedRaw: rawUpdated,
+    hasRead: false,
+    isBookmarked: false,
+    likes: 0,
+    authorName: '我',
+    authorAvatar: '',
+    hasLink: false
+  }
+}
+
+async function loadTopics() {
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const { list, total, pageNum, pageSize } = await fetchNotes({
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      status: statusByTab[activeTab.value]
+    })
+    topics.value = (list || []).map(normalizeNote)
+    pagination.total = total ?? list?.length ?? 0
+    pagination.page = pageNum || pagination.page
+    pagination.pageSize = pageSize || pagination.pageSize
+  } catch (err: any) {
+    errorMessage.value = err?.response?.data?.msg || err?.message || '笔记列表加载失败'
+    appStore.showToast('笔记列表加载失败', errorMessage.value, 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
 
 function switchNav(nav: string) {
   currentNav.value = nav
@@ -358,18 +440,17 @@ function toggleCategory(name: string) {
   activeCategory.value = activeCategory.value === name ? '' : name
 }
 
-function toggleBookmark(topic: any) {
+function toggleBookmark(topic: TopicView) {
   topic.isBookmarked = !topic.isBookmarked
-  topic.likes += topic.isBookmarked ? 1 : -1
+  topic.likes = (topic.likes || 0) + (topic.isBookmarked ? 1 : -1)
 }
 
-function readTopic(topic: any) {
+function readTopic(topic: TopicView | null) {
   if (topic) {
     topic.hasRead = true
     router.push({ name: 'note-detail', params: { id: topic.id } })
   } else {
-    const firstId = topics.value[0]?.id ?? 1
-    router.push({ name: 'note-detail', params: { id: firstId } })
+    router.push({ name: 'note-detail', params: { id: 1 } })
   }
 }
 
@@ -390,67 +471,40 @@ function removeTag(index: number) {
 }
 
 async function submitPublish() {
+  if (!newDraft.title || !newDraft.content) return
+  isPublishing.value = true
   try {
-    const payload = {
+    const payload: Partial<NoteItemDto> = {
       title: newDraft.title,
       content: newDraft.content,
-      summary: newDraft.content.slice(0, 120),
+      summary: newDraft.content.replace(/<[^>]+>/g, '').slice(0, 120),
       status: 'PUBLISHED',
-      tags: newDraft.tags
+      tags: [...newDraft.tags]
     }
-    await createNote(payload)
-    appStore.showToast('发布成功', '笔记已保存到云端')
+    await createNoteAndUnwrap(payload)
+    appStore.showToast('发布成功', '笔记已提交到后端')
     await loadTopics()
-    resetDraft()
-    currentNav.value = 'my-shares'
+    newDraft.title = ''
+    newDraft.content = ''
+    newDraft.category = ''
+    newDraft.tags = []
+    newDraft.hasLink = false
+    tagInput.value = ''
+    showPublishModal.value = false
+    currentNav.value = 'topics'
     activeTab.value = 'latest'
     activeCategory.value = ''
-    showPublishModal.value = false
-  } catch (e) {
-    appStore.showToast('发布失败', '请稍后重试', 'error')
-  }
-}
-
-function resetDraft() {
-  newDraft.title = ''
-  newDraft.content = ''
-  newDraft.category = ''
-  newDraft.tags = []
-  newDraft.hasLink = false
-  tagInput.value = ''
-}
-
-function formatDate(dateStr?: string) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return dateStr
-  return d.toLocaleString()
-}
-
-async function loadTopics() {
-  loading.value = true
-  try {
-    const { data } = await fetchNoteList({
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      status: activeTab.value === 'featured' ? 'PUBLISHED' : undefined
-    })
-    topics.value = data.data.list || []
-    pagination.total = data.data.total
-  } catch (e) {
-    appStore.showToast('加载笔记失败', '请检查网络或稍后重试', 'error')
+  } catch (err: any) {
+    const msg = err?.response?.data?.msg || err?.message || '发布失败'
+    appStore.showToast('发布失败', msg, 'error')
   } finally {
-    loading.value = false
+    isPublishing.value = false
   }
 }
 
-watch([activeTab, activeCategory, currentNav], () => {
-  if (activeTab.value === 'latest' || activeTab.value === 'featured') {
-    loadTopics()
-  }
-})
-
-onMounted(() => {
+onMounted(loadTopics)
+watch(activeTab, () => {
+  pagination.page = 1
   loadTopics()
 })
 </script>
