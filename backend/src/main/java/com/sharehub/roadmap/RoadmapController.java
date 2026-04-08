@@ -51,7 +51,7 @@ public class RoadmapController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        RoadmapDetailResponse detail = service.detail(id, resolveUser(authentication, request));
+        RoadmapDetailResponse detail = service.detail(id, resolveActiveUser(authentication, request));
         if (detail == null) {
             throw new NotFoundException("ROADMAP_NOT_FOUND");
         }
@@ -78,8 +78,15 @@ public class RoadmapController {
         return ApiResponse.ok(service.updateProgress(requireActiveUser(authentication, request), id, req));
     }
 
-    private String resolveUser(Authentication authentication, HttpServletRequest request) {
-        return requestAccessService.resolveUser(authentication, request).orElse(null);
+    private String resolveActiveUser(Authentication authentication, HttpServletRequest request) {
+        Optional<String> resolvedUser = requestAccessService.resolveUser(authentication, request);
+        if (resolvedUser.isEmpty()) {
+            return null;
+        }
+        String userKey = resolvedUser.get();
+        userProfileRepository.upsert(userKey, userKey, null);
+        userProfileRepository.ensureActive(userKey);
+        return userKey;
     }
 
     private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
