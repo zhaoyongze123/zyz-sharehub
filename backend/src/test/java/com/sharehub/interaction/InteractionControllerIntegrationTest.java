@@ -277,7 +277,17 @@ public class InteractionControllerIntegrationTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"));
 
+        mvc.perform(delete("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
         mvc.perform(post("/api/resources/1/like")
+                .header(RequestAccessService.USER_KEY_HEADER, banned.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mvc.perform(delete("/api/resources/1/like")
                 .header(RequestAccessService.USER_KEY_HEADER, banned.login()))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"));
