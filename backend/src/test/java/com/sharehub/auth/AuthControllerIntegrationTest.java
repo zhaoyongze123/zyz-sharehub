@@ -8,9 +8,16 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,6 +30,8 @@ class AuthControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void shouldReturnCurrentUserProfileWhenUserHeaderProvided() throws Exception {
@@ -44,12 +53,26 @@ class AuthControllerIntegrationTest {
             "png".getBytes()
         );
 
-        mockMvc.perform(multipart("/api/auth/avatar")
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/auth/avatar")
                 .file(file)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value("OK"))
-            .andExpect(jsonPath("$.data.category").value("AVATAR"));
+            .andExpect(jsonPath("$.data.category").value("AVATAR"))
+            .andExpect(jsonPath("$.data.owner").value(USER_KEY))
+            .andExpect(jsonPath("$.data.filename").value("avatar.png"))
+            .andExpect(jsonPath("$.data.downloadUrl").exists())
+            .andReturn();
+
+        JsonNode uploadJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());
+        String downloadUrl = uploadJson.get("data").get("downloadUrl").asText();
+
+        MvcResult downloadResult = mockMvc.perform(get(downloadUrl))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.IMAGE_PNG_VALUE))
+            .andReturn();
+
+        assertThat(downloadResult.getResponse().getContentAsByteArray()).isEqualTo("png".getBytes());
 
         mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())

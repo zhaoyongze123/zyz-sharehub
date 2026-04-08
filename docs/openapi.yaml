@@ -243,13 +243,15 @@ paths:
   /api/auth/avatar:
     post:
       summary: 上传用户头像
-      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；当前实现仅校验文件非空且大小不超过 5MB
+      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；当前复用文件存储能力，`owner` 取当前登录用户，`category=AVATAR`，`referenceType=USER_AVATAR`，`referenceId` 为当前用户标识；真实实现校验文件非空、文件名存在且大小不超过 5MB
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
+              required:
+                - file
               properties:
                 file:
                   type: string
@@ -257,8 +259,12 @@ paths:
       responses:
         '200':
           description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredFileUploadResponse'
         '400':
-          description: 文件校验失败（当前真实实现仅覆盖空文件、缺失文件名、缺失归属信息、超过大小限制）
+          description: 文件校验失败（错误码可能为 `FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
           content:
             application/json:
               schema:
