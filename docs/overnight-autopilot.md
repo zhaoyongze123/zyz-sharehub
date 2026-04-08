@@ -47,6 +47,8 @@ cd /Users/mac/Documents/New\ project
 - 前端联调日志：`output/overnight/<RUN_ID>/browser-smoke/frontend.log`
 - Playwright 报告：`output/overnight/<RUN_ID>/browser-smoke/playwright-report`
 - 后端模式标记：`output/overnight/<RUN_ID>/browser-smoke/backend-mode.txt`
+- 前端子代理日志：`output/overnight/<RUN_ID>/frontend-followup/codex-output.log`
+- 前端子代理 prompt：`output/overnight/<RUN_ID>/frontend-followup/prompt.txt`
 
 ## 关键实现
 
@@ -61,6 +63,7 @@ cd /Users/mac/Documents/New\ project
 - `hourly-run` 通过 `output/overnight/state/hourly-run.lock` 保证同一时刻只会有一个轮次执行；重复触发时会直接跳过，不再并发拉起第二轮
 - `hourly-run` 启动时会先把自身脚本复制到 `output/overnight/state/hourly-run.exec.sh` 再执行，避免值守过程中脚本被覆盖后同一轮前后逻辑漂移
 - 每轮代码成功后会自动启动前后端，并执行对应模块的 Playwright 浏览器 smoke；联调失败则本轮失败，不按成功态继续推进
+- 当浏览器 smoke 成功后，会继续派发一个独立前端跟进子代理，只处理本轮已通过联调的模块对应前端页面，并推送到独立前端分支
 - 浏览器联调优先走 cloud-dev 后端；若缺少 PostgreSQL/Redis 密码，则自动回落到本机 smoke profile，避免整夜因环境变量缺失直接停摆
 - 浏览器 smoke 在健康检查成功后，还会对前后端分别做一次短时稳定性校验，避免服务刚启动即退出却被误判为可用
 - 使用 `caffeinate -dimsu -t` 保持机器不休眠直到截止时间
@@ -73,6 +76,14 @@ cd /Users/mac/Documents/New\ project
   - 默认 `9`
 - `OVERNIGHT_TIMEOUT_SECONDS`
   - 默认 `3000`
+- `OVERNIGHT_FRONTEND_FOLLOWUP_MODEL`
+  - 默认 `gpt-5.1-codex-max`
+- `OVERNIGHT_FRONTEND_FOLLOWUP_TIMEOUT_SECONDS`
+  - 默认 `2400`
+- `OVERNIGHT_FRONTEND_FOLLOWUP_ALL_MODULES`
+  - 默认 `0`，表示前端子代理只跟进一个最适合闭环的模块；设为 `1` 时才会尝试同轮覆盖多个模块
+- `OVERNIGHT_FRONTEND_FOLLOWUP_DRY_RUN`
+  - 设为 `1` 时只生成前端子代理 prompt 和分支计划，不实际执行
 
 例如：
 

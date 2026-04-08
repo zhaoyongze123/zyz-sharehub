@@ -160,6 +160,18 @@ for path in files:
             modules.add("profile")
     if path.startswith("backend/"):
         modules.add("backend")
+        if "resource" in lowered:
+            modules.add("resources")
+        if "roadmap" in lowered:
+            modules.add("roadmaps")
+        if "note" in lowered:
+            modules.add("notes")
+        if "resume" in lowered:
+            modules.add("resumes")
+        if "admin" in lowered or "audit" in lowered or "report" in lowered:
+            modules.add("admin")
+        if "me/" in lowered or "profile" in lowered or "auth" in lowered or "user" in lowered:
+            modules.add("profile")
 
 if frontend_changed and (frontend_global_changed or not modules.intersection({"resources", "roadmaps", "notes", "resumes", "admin", "profile"})):
     modules.update({"resources", "roadmaps", "notes", "resumes", "admin", "profile"})

@@ -15,6 +15,7 @@ export OVERNIGHT_DEADLINE_HOUR="${OVERNIGHT_DEADLINE_HOUR:-9}"
 chmod +x \
   "${PROJECT_ROOT}/scripts/overnight-hourly-run.sh" \
   "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh" \
+  "${PROJECT_ROOT}/scripts/overnight-frontend-followup.sh" \
   "${PROJECT_ROOT}/scripts/overnight-monitor.sh" \
   "${PROJECT_ROOT}/scripts/overnight-supervisor.sh" \
   "${PROJECT_ROOT}/scripts/feishu_notify.py" \

@@ -17,6 +17,7 @@ PRIMARY_MODEL="${OVERNIGHT_PRIMARY_MODEL:-gpt-5.4}"
 FALLBACK_MODELS="${OVERNIGHT_FALLBACK_MODELS:-gpt-5.1-codex-max,gpt-5.1-codex-mini}"
 CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
 POST_RUN_SMOKE_SCRIPT="${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"
+POST_FRONTEND_FOLLOWUP_SCRIPT="${PROJECT_ROOT}/scripts/overnight-frontend-followup.sh"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
 META_FILE="${RUN_DIR}/meta.env"
@@ -222,6 +223,20 @@ if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
   fi
 else
   echo "SMOKE_EXIT_CODE=SKIPPED" >> "${META_FILE}"
+fi
+
+if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
+  echo "[$(date '+%F %T')] 开始执行前端跟进子代理" | tee -a "${RAW_LOG_FILE}"
+  set +e
+  bash "${POST_FRONTEND_FOLLOWUP_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
+  FRONTEND_FOLLOWUP_EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+  echo "FRONTEND_FOLLOWUP_EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}" >> "${META_FILE}"
+  if [[ ${FRONTEND_FOLLOWUP_EXIT_CODE} -ne 0 ]]; then
+    EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}
+  fi
+else
+  echo "FRONTEND_FOLLOWUP_EXIT_CODE=SKIPPED" >> "${META_FILE}"
 fi
 
 {
