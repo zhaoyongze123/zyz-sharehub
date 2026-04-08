@@ -914,6 +914,16 @@ paths:
                               type: string
                             fileUrl:
                               type: string
+                            fileName:
+                              type: string
+                            fileSize:
+                              type: integer
+                            fileCreatedAt:
+                              type: string
+                              format: date-time
+                            fileUpdatedAt:
+                              type: string
+                              format: date-time
                   message:
                     type: string
         '401':

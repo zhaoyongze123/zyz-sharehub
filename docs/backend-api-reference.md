@@ -445,13 +445,15 @@
 - 简历不存在或非 owner 返回 `404 RESUME_NOT_FOUND`
 - 若文件记录已丢失，当前实现返回空 body 的 `404`
 - `Content-Type` 优先使用文件记录中的 `contentType`；若为空、`NULL` 或非法则回落为 `application/octet-stream`
-- 规范响应体：`application/json`，结构同 `ErrorResponse`（`success=false, code, message`），示例：
+- 当简历不存在或非 owner 时，错误响应体为 `application/json`，结构同 `ErrorResponse`（`success=false, code, message`），示例：
   - `{ success:false, code:"RESUME_NOT_FOUND", message:"RESUME_NOT_FOUND" }`
+- 当底层文件记录已丢失时，仅返回空 body 的 `404`
 - 响应头：`Content-Disposition` 为 `attachment; filename="{原始文件名}"`
 
 `GET /api/resumes/workbench`
 
 - 按当前用户聚合简历统计
+- `recentItems` 元素结构与简历列表项保持一致，包含 `fileUrl`、`fileName`、`fileSize`、`fileCreatedAt`、`fileUpdatedAt`
 - 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 用户已被封禁时返回 `403 USER_BANNED`
 
