@@ -9,12 +9,12 @@
 
         <div class="user-profile-header">
           <div class="user-avatar-wrapper">
-            <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" class="avatar-preview" alt="avatar" />
-            <div v-else class="i-carbon-user-avatar user-avatar-icon"></div>
+            <img v-if="authStore.profile?.avatarUrl" :src="authStore.profile.avatarUrl" class="user-avatar-img" alt="avatar" />
+            <div v-else class="i-carbon-logo-github user-avatar-icon"></div>
           </div>
           <div class="user-info">
-            <div class="user-name">{{ authStore.profile?.nickname }}</div>
-            <div class="user-type">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</div>
+            <div class="user-name">{{ authStore.profile?.nickname || authStore.profile?.login || '未登录' }}</div>
+            <div class="user-type">{{ authStore.profile ? '个人帐户' : '未登录' }}</div>
           </div>
         </div>
 
@@ -44,8 +44,8 @@
               <div class="setting-item avatar-item">
                 <div class="item-info">头像</div>
                 <div class="item-control row-control">
-                  <img :src="authStore.profile?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4'" class="avatar-preview" />
-                  <button class="btn-outline" :disabled="uploadingAvatar" @click="handleAvatarChange">{{ uploadingAvatar ? '上传中…' : '更换头像' }}</button>
+                  <img :src="authStore.profile?.avatarUrl || defaultAvatar" class="avatar-preview" />
+                  <button class="btn-outline" @click="handleAvatarChange">更换头像</button>
                 </div>
               </div>
               <div class="setting-item">
@@ -54,7 +54,7 @@
                   <p class="item-desc">用于社区显示和个人主页URL（sharehub.com/@{{ profileForm.username }}）</p>
                 </div>
                 <div class="item-control">
-                  <input type="text" class="control-input" v-model="profileForm.username" />
+                  <input type="text" class="control-input" v-model="profileForm.username" disabled />
                 </div>
               </div>
               <div class="setting-item">
@@ -120,7 +120,7 @@
                   <div class="i-carbon-logo-github" style="font-size: 24px;"></div>
                   <div class="item-info">
                     GitHub
-                    <p class="item-desc">已连接至 {{ authStore.profile?.nickname }}</p>
+                    <p class="item-desc">已连接至 {{ authStore.profile?.nickname || authStore.profile?.login }}</p>
                   </div>
                 </div>
                 <div class="item-control"><button class="btn-outline text-danger" @click="handleUnbind">解除绑定</button></div>
@@ -175,11 +175,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+
 import { useAppStore } from '@/stores/app'
-import { uploadAvatar } from '@/api/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -199,28 +199,22 @@ const currentTabLabel = computed(() => {
 })
 
 // 个人资料相关
+const defaultAvatar = 'https://avatars.githubusercontent.com/u/9919?s=64&v=4'
+
 const profileForm = reactive({
-  username: authStore.profile?.nickname || '',
+  username: authStore.profile?.nickname || authStore.profile?.login || '',
   bio: authStore.profile?.headline || '',
   website: ''
 })
 
-const syncProfileForm = () => {
-  profileForm.username = authStore.profile?.nickname || ''
-  profileForm.bio = authStore.profile?.headline || ''
-}
-
 onMounted(async () => {
-  await authStore.bootstrap()
-  syncProfileForm()
-})
-
-watch(
-  () => authStore.profile,
-  () => {
-    syncProfileForm()
+  if (!authStore.initialized) {
+    await authStore.bootstrap()
   }
-)
+  if (!authStore.profile) return
+  profileForm.username = authStore.profile.nickname || authStore.profile.login || ''
+  profileForm.bio = authStore.profile.headline || ''
+})
 
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -233,30 +227,28 @@ const triggerToast = (msg: string) => {
   }, 3000)
 }
 
-const uploadingAvatar = ref(false)
 const handleAvatarChange = () => {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*'
   input.onchange = async () => {
-    const file = input.files?.[0]
-    if (!file) return
+    if (!input.files?.length) return
+    const file = input.files[0]
     try {
-      uploadingAvatar.value = true
-      await uploadAvatar(file)
+      await authStore.updateAvatar(file)
       triggerToast('头像已更新')
-      await authStore.bootstrap()
-    } catch (err) {
-      triggerToast('头像上传失败，请稍后重试')
-    } finally {
-      uploadingAvatar.value = false
+    } catch (error) {
+      triggerToast('头像更新失败')
     }
   }
   input.click()
 }
 
-const handleSaveProfile = () => {
-  triggerToast('后端暂未开放资料修改接口，已保持当前信息')
+const handleSaveProfile = async () => {
+  await authStore.updateProfile({
+    headline: profileForm.bio
+  })
+  triggerToast('个人资料保存成功！')
 }
 
 // 偏好设置相关

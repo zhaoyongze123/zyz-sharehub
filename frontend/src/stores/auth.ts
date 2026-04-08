@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia'
-import { fetchCurrentUser } from '@/api/auth'
+import { fetchMe, uploadAvatar, type MeDto } from '@/api/me'
 
 export interface UserProfile {
   id: number
-  login?: string
   nickname: string
   role: 'guest' | 'user' | 'admin'
-  headline?: string
+  headline: string
+  login?: string
   avatarUrl?: string | null
 }
 
@@ -21,49 +21,60 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     async bootstrap() {
-      if (this.initialized) {
-        return
-      }
+      if (this.initialized) return
 
       try {
-        const user = await fetchCurrentUser()
-        this.profile = {
-          id: user.id,
-          login: user.login,
-          nickname: user.name || user.login,
-          role: 'user',
-          headline: '',
-          avatarUrl: user.avatarUrl
-        }
-        window.localStorage.setItem('sharebase.userKey', user.login)
-        window.localStorage.setItem('sharebase.nickname', user.name || user.login)
-        window.localStorage.setItem('sharebase.role', 'user')
-      } catch (err) {
-        // 未登录或其他错误时保持未初始化的访客状态
+        const me = await fetchMe()
+        this.hydrateFromMe(me)
+      } catch (error: any) {
+        // 未登录时后端返回 401，保持未登录态
         this.profile = null
       } finally {
         this.initialized = true
       }
     },
-    loginAs(role: 'user' | 'admin') {
-      window.localStorage.setItem('sharebase.role', role)
+    hydrateFromMe(me: MeDto) {
+      const { profile } = me
       this.profile = {
-        id: 1,
-        nickname: role === 'admin' ? 'Admin Zoe' : 'Alex Chen',
-        role,
-        headline: role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者'
+        id: profile.id,
+        nickname: profile.name || profile.login,
+        role: 'user',
+        headline: '',
+        login: profile.login,
+        avatarUrl: profile.avatarUrl
       }
     },
-    updateProfile(data: Partial<UserProfile>) {
-      if (this.profile) {
-        Object.assign(this.profile, data)
-        if (data.nickname) {
-          window.localStorage.setItem('sharebase.nickname', data.nickname)
-        }
-        if (data.headline) {
-          window.localStorage.setItem('sharebase.headline', data.headline)
-        }
+    async refreshMe() {
+      const me = await fetchMe()
+      this.hydrateFromMe(me)
+    },
+    loginAs(role: 'user' | 'admin' = 'user') {
+      // 保留本地联调入口：写入 userKey/adminToken，方便后端用 header 识别
+      const pseudoUserKey = role === 'admin' ? 'dev-admin' : 'dev-user'
+      window.localStorage.setItem('sharebase.userKey', pseudoUserKey)
+      if (role === 'admin') {
+        window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
       }
+      this.profile = {
+        id: 0,
+        nickname: role === 'admin' ? 'Admin Zoe' : 'Alex Chen',
+        role,
+        headline: role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者',
+        login: pseudoUserKey,
+        avatarUrl: null
+      }
+    },
+    async updateProfile(data: Partial<UserProfile>) {
+      if (!this.profile) return
+      // 前端暂未有更新接口，先本地更新
+      Object.assign(this.profile, data)
+    },
+    async updateAvatar(file: File) {
+      const stored = await uploadAvatar(file)
+      if (this.profile) {
+        this.profile.avatarUrl = stored.downloadUrl || this.profile.avatarUrl
+      }
+      return stored
     },
     logout() {
       window.localStorage.removeItem('sharebase.role')
