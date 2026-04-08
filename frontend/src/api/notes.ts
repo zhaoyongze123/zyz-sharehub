@@ -35,6 +35,8 @@ export interface CreateNotePayload {
   status?: string | null
 }
 
+export interface UpdateNotePayload extends CreateNotePayload {}
+
 export async function fetchNotes(params: FetchNotesParams) {
   const response = await apiClient.get<BackendApiResponse<BackendPageResponse<NoteDTO>>>('/notes', {
     params
@@ -50,5 +52,20 @@ export async function fetchNotes(params: FetchNotesParams) {
 
 export async function createNote(payload: CreateNotePayload) {
   const response = await apiClient.post<BackendApiResponse<NoteDTO>>('/notes', payload)
+  return response.data.data
+}
+
+export async function fetchNoteDetail(id: number) {
+  const response = await apiClient.get<BackendApiResponse<NoteDTO>>(`/notes/${id}`)
+  return response.data.data
+}
+
+export async function updateNote(id: number, payload: UpdateNotePayload) {
+  const response = await apiClient.put<BackendApiResponse<NoteDTO>>(`/notes/${id}`, payload)
+  return response.data.data
+}
+
+export async function deleteNote(id: number) {
+  const response = await apiClient.delete<BackendApiResponse<string>>(`/notes/${id}`)
   return response.data.data
 }
