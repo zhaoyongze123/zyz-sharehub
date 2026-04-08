@@ -439,23 +439,24 @@ function startFocusAnimation() {
   const subtitle = document.getElementById("focusSubtitle");
   const textToType = "为前沿技术而生。";
 
-  if (!cursor || !titleText) return;
-  const cursorEl = cursor;
-  const titleTextEl = titleText;
+  if (!(cursor instanceof HTMLElement) || !(titleText instanceof HTMLElement) || !(subtitle instanceof HTMLElement)) return;
+  const safeCursor = cursor as HTMLElement;
+  const safeTitleText = titleText as HTMLElement;
+  const safeSubtitle = subtitle as HTMLElement;
 
   setTimeout(() => {
-    cursorEl.classList.add("dropped");
+    safeCursor.classList.add("dropped");
     setTimeout(() => {
-      cursorEl.classList.add("blinking");
+      safeCursor.classList.add("blinking");
       let i = 0;
       function typeNext() {
         if (i < textToType.length) {
-          titleTextEl.textContent += textToType.charAt(i);
+          safeTitleText.textContent += textToType.charAt(i);
           i += 1;
           setTimeout(typeNext, 40);
         } else {
-          cursorEl.classList.remove("blinking");
-          if (subtitle) subtitle.classList.add("is-visible");
+          safeCursor.classList.remove("blinking");
+          safeSubtitle.classList.add("is-visible");
         }
       }
       typeNext();

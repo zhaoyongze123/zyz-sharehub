@@ -51,34 +51,70 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { fetchRoadmaps, type RoadmapListItem } from '@/api/roadmaps'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
-import { fetchRoadmaps, type Roadmap } from '@/api/roadmaps'
+import { useRoadmapStore } from '@/stores/roadmap'
 import { useAppStore } from '@/stores/app'
 
-const appStore = useAppStore()
 const route = useRoute()
-const keyword = ref(String(route.query.keyword || ''))
-const category = ref('全部')
-const loading = ref(false)
-const loadError = ref(false)
-const roadmaps = ref<Roadmap[]>([])
+const roadmapStore = useRoadmapStore()
+const appStore = useAppStore()
 
-const categoryOptions = [{ label: '全部路线', value: '全部' }]
+const keyword = ref(String(route.query.keyword ?? roadmapStore.keyword ?? ''))
+const category = ref(roadmapStore.selectedTag || '全部')
+const roadmaps = ref<RoadmapListItem[]>([])
+const total = ref(0)
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+
+const categoryOptions = [
+  { label: '全部路线', value: '全部' },
+  { label: '已发布', value: 'PUBLISHED' },
+  { label: '草稿', value: 'DRAFT' },
+  { label: '私密', value: 'PRIVATE' }
+]
+
+const normalizedKeyword = computed(() => keyword.value.trim().toLowerCase())
+
+const filteredRoadmaps = computed(() => {
+  return roadmaps.value.filter((item) => {
+    const text = `${item.title ?? ''}${item.summary ?? ''}${item.description ?? ''}`.toLowerCase()
+    const matchKeyword = !normalizedKeyword.value || text.includes(normalizedKeyword.value)
+    const categoryValue = category.value.toUpperCase()
+    const statusMatches = [item.status, item.visibility]
+      .filter(Boolean)
+      .some((val) => String(val).toUpperCase() === categoryValue)
+    const tagMatches = item.tags?.some((tag) => String(tag).toUpperCase() === categoryValue)
+    const matchCategory = category.value === '全部' || statusMatches || tagMatches
+    return matchKeyword && matchCategory
+  })
+})
+
+const status = computed(() => {
+  if (loading.value) return 'loading'
+  if (loadError.value) return 'error'
+  if (!filteredRoadmaps.value.length) return 'empty'
+  return 'ready'
+})
 
 async function loadRoadmaps() {
   loading.value = true
-  loadError.value = false
+  loadError.value = null
   try {
-    const data = await fetchRoadmaps({ page: 1, pageSize: 50 })
-    roadmaps.value = data?.items || []
+    const response = await fetchRoadmaps({
+      page: roadmapStore.pageNum,
+      pageSize: roadmapStore.pageSize,
+      status: category.value === '全部' ? undefined : category.value
+    })
+    roadmaps.value = response.list
+    total.value = response.total ?? response.list.length
   } catch (error: any) {
-    loadError.value = true
-    appStore.showToast('路线加载失败', error?.response?.data?.message || '请稍后再试', 'error')
+    loadError.value = error?.message ?? '加载失败'
   } finally {
     loading.value = false
   }
@@ -86,21 +122,13 @@ async function loadRoadmaps() {
 
 onMounted(loadRoadmaps)
 
-const filteredRoadmaps = computed(() => {
-  return roadmaps.value.filter((item) => {
-    const summary = item.description || ''
-    const matchKeyword = !keyword.value || `${item.title}${summary}`.toLowerCase().includes(keyword.value.toLowerCase())
-    const itemCategory = item.category || '全部'
-    const matchCategory = category.value === '全部' || itemCategory === category.value
-    return matchKeyword && matchCategory
-  })
+watch(keyword, (val) => {
+  roadmapStore.keyword = val
 })
 
-const status = computed(() => {
-  if (loadError.value) return 'error'
-  if (loading.value) return 'loading'
-  if (!filteredRoadmaps.value.length) return 'empty'
-  return 'ready'
+watch(category, () => {
+  roadmapStore.selectedTag = category.value
+  loadRoadmaps()
 })
 </script>
 
