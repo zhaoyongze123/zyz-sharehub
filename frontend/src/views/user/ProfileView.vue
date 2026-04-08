@@ -174,12 +174,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 import { useAppStore } from '@/stores/app'
-import { apiClient } from '@/api/client'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -200,13 +199,19 @@ const currentTabLabel = computed(() => {
 
 // 个人资料相关
 const profileForm = reactive({
-  username: '',
-  bio: '',
-  website: '',
-  avatarUrl: ''
+  username: authStore.profile?.nickname || '',
+  bio: authStore.profile?.bio || authStore.profile?.headline || '',
+  website: authStore.profile?.website || '',
+  avatarUrl: authStore.profile?.avatarUrl || ''
 })
 
-const loadingProfile = ref(false)
+watch(() => authStore.profile, (val) => {
+  if (!val) return
+  profileForm.username = val.nickname || ''
+  profileForm.bio = val.bio || val.headline || ''
+  profileForm.website = val.website || ''
+  profileForm.avatarUrl = val.avatarUrl || ''
+}, { immediate: true })
 
 const profileAvatar = computed(() => profileForm.avatarUrl || authStore.profile?.avatarUrl || 'https://avatars.githubusercontent.com/u/9919?s=64&v=4')
 
@@ -228,18 +233,12 @@ const handleAvatarChange = () => {
   input.onchange = async () => {
     const file = input.files?.[0]
     if (!file) return
-    const formData = new FormData()
-    formData.append('file', file)
     try {
-      const resp = await apiClient.post('/auth/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      const url = resp.data?.data?.downloadUrl || resp.data?.data?.url || resp.data?.data?.path || ''
+      const url = await authStore.uploadAvatar(file)
       if (url) {
         profileForm.avatarUrl = url
-        await authStore.updateProfile({ avatarUrl: url })
+        triggerToast('头像已更新')
       }
-      triggerToast('头像已更新')
     } catch (e) {
       triggerToast('头像更新失败，请稍后再试')
     }
@@ -248,26 +247,22 @@ const handleAvatarChange = () => {
 }
 
 const handleSaveProfile = async () => {
-  await authStore.updateProfile({
-    nickname: profileForm.username,
-    headline: profileForm.bio,
-    website: profileForm.website
-  })
-  triggerToast('个人资料保存成功！')
-}
-
-const loadProfile = async () => {
-  loadingProfile.value = true
-  const data = await authStore.refreshProfile()
-  profileForm.username = data?.nickname || ''
-  profileForm.bio = data?.headline || ''
-  profileForm.website = data?.website || ''
-  profileForm.avatarUrl = data?.avatarUrl || ''
-  loadingProfile.value = false
+  try {
+    await authStore.fetchProfile(true)
+    authStore.updateProfile({
+      nickname: profileForm.username,
+      headline: profileForm.bio,
+      bio: profileForm.bio,
+      website: profileForm.website
+    })
+    triggerToast('个人资料保存成功！')
+  } catch (err) {
+    triggerToast('保存失败，请稍后重试')
+  }
 }
 
 onMounted(() => {
-  loadProfile()
+  authStore.fetchProfile()
 })
 
 // 偏好设置相关
