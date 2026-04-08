@@ -1,7 +1,7 @@
 <template>
   <div class="page-shell detail-grid" v-if="note">
     <section class="detail-main">
-      <HeroBanner kicker="笔记详情" :title="note.title" :description="note.summary">
+      <HeroBanner kicker="笔记详情" :title="note.title" :description="note.summary || ''">
         <template #actions>
           <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
           <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
@@ -18,13 +18,13 @@
           <p>继续阅读相关的工程笔记。</p>
         </div>
         <div class="related-grid">
-          <NoteCard v-for="item in relatedNotes" :key="item.id" :item="item" />
+          <NoteCard v-for="item in relatedNotesView" :key="item.id" :item="item" />
         </div>
       </div>
     </section>
 
     <aside class="detail-side">
-      <NoteOutline :items="note.outline" />
+      <NoteOutline :items="note.outline || []" />
       <BaseEmpty title="关联资料" description="联调后可展示引用资料与路线的精确关系。" />
     </aside>
 
@@ -37,8 +37,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
@@ -47,8 +49,8 @@ import InteractionBar from '@/components/business/InteractionBar.vue'
 import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
 import ReportDialog from '@/components/business/ReportDialog.vue'
-import { notes } from '@/mock/notes'
 import { useAppStore } from '@/stores/app'
+import { fetchNoteDetail, type NoteItemDto } from '@/api/notes'
 
 const route = useRoute()
 const appStore = useAppStore()
@@ -57,19 +59,44 @@ const reportReason = ref('')
 const likes = ref(86)
 const favorites = ref(112)
 
-const note = computed(() => notes.find((item) => String(item.id) === String(route.params.id)))
-const relatedNotes = computed(() => notes.filter((item) => item.id !== note.value?.id).slice(0, 2))
+const note = ref<NoteItemDto | null>(null)
+const relatedNotes = ref<NoteItemDto[]>([])
+const relatedNotesView = computed(() =>
+  relatedNotes.value.map((item) => ({
+    ...item,
+    summary: item.summary || '',
+    updatedAt: item.updatedAt || '',
+    status: item.status || '',
+    tags: item.tags || []
+  }))
+)
 const renderedHtml = computed(() => {
   if (!note.value) return ''
-  return note.value.content
-    .split('\n')
-    .map((line) => {
-      if (line.startsWith('# ')) return `<h1>${line.slice(2)}</h1>`
-      if (line.startsWith('## ')) return `<h2>${line.slice(3)}</h2>`
-      if (!line.trim()) return '<br />'
-      return `<p>${line}</p>`
-    })
-    .join('')
+  const html = marked(note.value.content || note.value.summary || '')
+  return DOMPurify.sanitize(html as string)
+})
+
+const loadNote = async (id: string | number) => {
+  try {
+    const { data } = await fetchNoteDetail(id)
+    note.value = data.data
+  } catch (e) {
+    note.value = null
+  }
+}
+
+watch(
+  () => route.params.id,
+  (id) => {
+    if (id) loadNote(id as string)
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (route.params.id) {
+    loadNote(route.params.id as string)
+  }
 })
 
 function likeNote() {
