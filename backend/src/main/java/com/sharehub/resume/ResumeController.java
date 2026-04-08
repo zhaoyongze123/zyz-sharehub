@@ -12,6 +12,7 @@ import com.sharehub.files.StoredFileDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -123,10 +124,28 @@ public class ResumeController {
         }
 
         FileRecord file = record.get();
+        MediaType mediaType = resolveMediaType(file.getContentType());
         return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_PDF)
+            .contentType(mediaType)
             .header("Content-Disposition", "attachment; filename=\"" + file.getFilename() + "\"")
             .body(file.getData());
+    }
+
+    private MediaType resolveMediaType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        String normalizedContentType = contentType.trim();
+        if (normalizedContentType.contains(";") && !normalizedContentType.contains("=")) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        try {
+            return MediaType.parseMediaType(normalizedContentType);
+        } catch (InvalidMediaTypeException exception) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 
     private String normalize(String value) {
