@@ -338,7 +338,7 @@
 真实行为：
 
 - 按文件 `id` 直接返回二进制内容
-- `Content-Type` 优先使用入库时的 `contentType`，若为空或非法则回落到 `application/octet-stream`
+- `Content-Type` 优先使用入库时的 `contentType`，若为空、`NULL` 或非法则回落到 `application/octet-stream`
 - `Content-Disposition` 固定为 `attachment; filename="{原始文件名}"`
 - 文件不存在时返回空 body 的 `404`
 
@@ -429,7 +429,7 @@
 - 简历不存在或非 owner 返回 `404 RESUME_NOT_FOUND`
 - 简历记录存在但未绑定文件时返回 `404 RESUME_FILE_NOT_FOUND`
 - 若文件记录已丢失，当前实现返回空 body 的 `404`
-- `Content-Type` 优先使用文件记录中的 `contentType`；若为空或非法则回落为 `application/octet-stream`
+- `Content-Type` 优先使用文件记录中的 `contentType`；若为空、`NULL` 或非法则回落为 `application/octet-stream`
 - 规范响应体：`application/json`，结构同 `ErrorResponse`（`success=false, code, message`），示例：
   - `{ success:false, code:"RESUME_NOT_FOUND", message:"RESUME_NOT_FOUND" }`
   - `{ success:false, code:"RESUME_FILE_NOT_FOUND", message:"RESUME_FILE_NOT_FOUND" }`

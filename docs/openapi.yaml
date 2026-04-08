@@ -750,7 +750,7 @@ paths:
           description: 成功
           headers:
             Content-Type:
-              description: 优先使用文件记录中的 `contentType`；若为空或非法则回落到 `application/octet-stream`
+              description: 优先使用文件记录中的 `contentType`；若为空、`NULL` 或非法则回落到 `application/octet-stream`
               schema:
                 type: string
             Content-Disposition:
