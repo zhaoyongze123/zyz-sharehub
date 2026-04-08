@@ -721,7 +721,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 资源不存在
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/comments/{id}/reply:
@@ -733,7 +733,7 @@ paths:
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
-          description: 父评论不存在
+          description: 父评论不存在（错误码 `COMMENT_NOT_FOUND`）
   /api/resources/{id}/favorite:
     post:
       summary: 收藏资料
@@ -741,7 +741,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 资源不存在
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
     delete:
@@ -750,7 +750,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 资源不存在
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/like:
@@ -760,7 +760,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 资源不存在
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
     delete:
@@ -769,7 +769,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 资源不存在
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/interactions:
@@ -785,7 +785,7 @@ paths:
         '200':
           description: 成功
         '404':
-          description: 资源不存在
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/admin/reports:

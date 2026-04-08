@@ -203,6 +203,13 @@ public class InteractionControllerIntegrationTest {
     void writeEndpointsShouldRejectMissingResource() throws Exception {
         var payload = mapper.writeValueAsString(Map.of("content", "hello"));
 
+        mvc.perform(post("/api/comments/999999/reply")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
+
         mvc.perform(post("/api/resources/999999/comments")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
