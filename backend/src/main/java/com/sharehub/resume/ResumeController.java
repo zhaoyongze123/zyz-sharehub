@@ -2,7 +2,6 @@ package com.sharehub.resume;
 
 import com.sharehub.auth.RequestAccessService;
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import com.sharehub.files.FileCategory;
 import com.sharehub.files.FileRecord;
@@ -114,9 +113,6 @@ public class ResumeController {
     public ResponseEntity<byte[]> download(Authentication authentication, HttpServletRequest request, @PathVariable Long id) {
         String ownerKey = requestAccessService.requireUser(authentication, request);
         ResumeDto resume = resumeRepository.findOwned(id, ownerKey);
-        if (resume.fileId() == null) {
-            throw new NotFoundException("RESUME_FILE_NOT_FOUND");
-        }
         Optional<FileRecord> record = fileStorageService.load(resume.fileId());
         if (record.isEmpty()) {
             return ResponseEntity.notFound().build();
