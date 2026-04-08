@@ -757,6 +757,11 @@ paths:
               description: 固定为 `attachment; filename="{原始文件名}"`
               schema:
                 type: string
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
