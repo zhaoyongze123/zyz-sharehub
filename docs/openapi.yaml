@@ -1527,15 +1527,23 @@ components:
           description: 实际返回下载链接 `/api/resumes/{id}/download`
         fileName:
           type: string
+          nullable: true
+          description: 关联文件记录存在时返回文件名；若底层文件记录已丢失则为 `null`
         fileSize:
           type: integer
           format: int64
+          nullable: true
+          description: 关联文件记录存在时返回文件大小；若底层文件记录已丢失则为 `null`
         fileCreatedAt:
           type: string
           format: date-time
+          nullable: true
+          description: 关联文件记录存在时返回文件创建时间；若底层文件记录已丢失则为 `null`
         fileUpdatedAt:
           type: string
           format: date-time
+          nullable: true
+          description: 关联文件记录存在时返回文件更新时间；若底层文件记录已丢失则为 `null`
     ResourceDto:
       type: object
       properties:

@@ -201,7 +201,7 @@ public class ResumeRepository {
         Long id = resultSet.getLong("id");
         UUID fileId = resultSet.getObject("file_id", UUID.class);
         String fileName = resultSet.getString("filename");
-        long fileSize = resultSet.getLong("size");
+        Long fileSize = resultSet.getObject("size", Long.class);
         Instant fileCreatedAt = toInstant(resultSet, "file_created_at");
         Instant fileUpdatedAt = toInstant(resultSet, "file_updated_at");
         return new ResumeDto(
@@ -211,7 +211,7 @@ public class ResumeRepository {
             fileId,
             "/api/resumes/" + id + "/download",
             fileName,
-            fileSize == 0 && resultSet.wasNull() ? null : fileSize,
+            fileSize,
             fileCreatedAt,
             fileUpdatedAt
         );
