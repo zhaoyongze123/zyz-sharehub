@@ -16,6 +16,19 @@ RUN_META_FILE="${STATE_DIR}/current_run.meta"
 CAFFEINATE_PID_FILE="${STATE_DIR}/caffeinate.pid"
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
+DEADLINE_EPOCH="$(python3 - "$DEADLINE_HOUR" <<'PY'
+from datetime import datetime, timedelta
+import sys
+
+deadline_hour = int(sys.argv[1])
+now = datetime.now()
+target = now.replace(hour=deadline_hour, minute=0, second=0, microsecond=0)
+if now >= target:
+    target += timedelta(days=1)
+print(int(target.timestamp()))
+PY
+)"
+
 mkdir -p "${OUTPUT_DIR}" "${STATE_DIR}"
 
 log() {
@@ -27,17 +40,13 @@ notify() {
 }
 
 remaining_seconds() {
-  python3 - "${DEADLINE_HOUR}" <<'PY'
-from datetime import datetime, timedelta
-import sys
-
-deadline_hour = int(sys.argv[1])
-now = datetime.now()
-target = now.replace(hour=deadline_hour, minute=0, second=0, microsecond=0)
-if now >= target:
-    target += timedelta(days=1)
-print(max(0, int((target - now).total_seconds())))
-PY
+  local now
+  now="$(date '+%s')"
+  if [[ "${now}" -ge "${DEADLINE_EPOCH}" ]]; then
+    echo 0
+  else
+    echo $(( DEADLINE_EPOCH - now ))
+  fi
 }
 
 cleanup() {
@@ -86,10 +95,7 @@ ensure_caffeinate_alive() {
 }
 
 ensure_deadline() {
-  local current_hour
-  current_hour="$(date '+%H' | sed 's/^0*//')"
-  current_hour="${current_hour:-0}"
-  if [[ "${current_hour}" -ge "${DEADLINE_HOUR}" ]]; then
+  if [[ "$(date '+%s')" -ge "${DEADLINE_EPOCH}" ]]; then
     log "已到截止时间，停止夜间自动推进"
     stop_current_run_if_any
     if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
@@ -176,7 +182,7 @@ ensure_run_alive() {
   handle_stale_run
 }
 
-log "夜间 supervisor 启动"
+log "夜间 supervisor 启动，截止时间 $(date -r "${DEADLINE_EPOCH}" '+%F %T %z')"
 write_supervisor_pid
 ensure_caffeinate_alive
 ensure_run_alive

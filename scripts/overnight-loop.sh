@@ -10,12 +10,7 @@ DEADLINE_HOUR="${OVERNIGHT_DEADLINE_HOUR:-9}"
 HEARTBEAT_FILE="${STATE_DIR}/heartbeat.txt"
 LOOP_LOG="${OUTPUT_DIR}/loop.log"
 
-now_epoch() {
-  date '+%s'
-}
-
-deadline_epoch() {
-  python3 - "$DEADLINE_HOUR" <<'PY'
+DEADLINE_EPOCH="$(python3 - "$DEADLINE_HOUR" <<'PY'
 from datetime import datetime, timedelta
 import sys
 
@@ -26,6 +21,14 @@ if now >= target:
     target = target + timedelta(days=1)
 print(int(target.timestamp()))
 PY
+)"
+
+now_epoch() {
+  date '+%s'
+}
+
+deadline_epoch() {
+  echo "${DEADLINE_EPOCH}"
 }
 
 sleep_until_next_hour() {
@@ -38,7 +41,7 @@ PY
 }
 
 TARGET_EPOCH="$(deadline_epoch)"
-echo "[$(date '+%F %T')] 夜间自动推进启动，截止到 $(date -r "${TARGET_EPOCH}" '+%F %T')" | tee -a "${LOOP_LOG}"
+echo "[$(date '+%F %T')] 夜间自动推进启动，截止到 $(date -r "${TARGET_EPOCH}" '+%F %T %z')" | tee -a "${LOOP_LOG}"
 
 while true; do
   CURRENT_EPOCH="$(now_epoch)"
