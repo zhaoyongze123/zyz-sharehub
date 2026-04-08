@@ -69,16 +69,30 @@ bash scripts/sharehub-cloud-dev-tunnel.sh
 - `127.0.0.1:55432` -> 云端 PostgreSQL
 - `127.0.0.1:56379` -> 云端 Redis
 
-## 本地联调建议环境变量
+## 本地启动后端
+
+先启用仓库内的 `cloud-dev` profile：
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:55432/sharehub_dev
-SPRING_DATASOURCE_USERNAME=sharehub_dev
-SPRING_DATASOURCE_PASSWORD=请填写开发库密码
-SPRING_DATA_REDIS_HOST=127.0.0.1
-SPRING_DATA_REDIS_PORT=56379
-SPRING_DATA_REDIS_PASSWORD=请填写开发 Redis 密码
+export SPRING_PROFILES_ACTIVE=cloud-dev
 ```
+
+## 本地联调建议环境变量
+
+当前仓库的 [application-cloud-dev.yml](/Users/mac/Documents/New%20project/backend/src/main/resources/application-cloud-dev.yml) 读取以下环境变量：
+
+```bash
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=55432
+POSTGRES_DB=sharehub_dev
+POSTGRES_USER=sharehub_dev
+POSTGRES_PASSWORD=请填写开发库密码
+REDIS_HOST=127.0.0.1
+REDIS_PORT=56379
+REDIS_PASSWORD=请填写开发 Redis 密码
+```
+
+如果你更习惯直接覆盖 Spring Boot 标准配置，也可以显式传入 `SPRING_DATASOURCE_*` / `SPRING_DATA_REDIS_*`，但夜间联调默认建议使用上面的 `POSTGRES_*` / `REDIS_*` 组合，和仓库配置保持一致。
 
 ## 验证命令
 
