@@ -48,13 +48,14 @@ public class InteractionControllerIntegrationTest {
 
     @Test
     void commentReplyFavoriteLikeReportPersisted() throws Exception {
+        long resourceId = createResource("互动资源");
         var commentPayload = mapper.writeValueAsString(Map.of("content", "hello"));
-        mvc.perform(post("/api/resources/1/comments")
+        mvc.perform(post("/api/resources/" + resourceId + "/comments")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(commentPayload))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.resourceId").value(1));
+            .andExpect(jsonPath("$.data.resourceId").value(resourceId));
 
         var replyPayload = mapper.writeValueAsString(Map.of("content", "reply"));
         mvc.perform(post("/api/comments/1/reply")
@@ -63,71 +64,71 @@ public class InteractionControllerIntegrationTest {
                         .content(replyPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.parentId").value(1))
-                .andExpect(jsonPath("$.data.resourceId").value(1));
+                .andExpect(jsonPath("$.data.resourceId").value(resourceId));
 
-        mvc.perform(post("/api/resources/1/favorite")
+        mvc.perform(post("/api/resources/" + resourceId + "/favorite")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(1));
 
-        mvc.perform(post("/api/resources/1/like")
+        mvc.perform(post("/api/resources/" + resourceId + "/like")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(1));
 
-        var reportPayload = mapper.writeValueAsString(Map.of("resourceId", "1", "reason", "spam"));
+        var reportPayload = mapper.writeValueAsString(Map.of("resourceId", String.valueOf(resourceId), "reason", "spam"));
         mvc.perform(post("/api/reports")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(reportPayload))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("OPEN"))
-            .andExpect(jsonPath("$.data.targetId").value(1));
+            .andExpect(jsonPath("$.data.targetId").value(resourceId));
 
-        mvc.perform(get("/api/resources/1/comments"))
+        mvc.perform(get("/api/resources/" + resourceId + "/comments"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data", hasSize(1)))
             .andExpect(jsonPath("$.data[0].children", hasSize(1)));
 
-        mvc.perform(get("/api/resources/1/interactions"))
+        mvc.perform(get("/api/resources/" + resourceId + "/interactions"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.resourceId").value(1))
+            .andExpect(jsonPath("$.data.resourceId").value(resourceId))
             .andExpect(jsonPath("$.data.comments").value(2))
             .andExpect(jsonPath("$.data.favorites").value(1))
             .andExpect(jsonPath("$.data.likes").value(1))
             .andExpect(jsonPath("$.data.reports").value(1));
 
-        mvc.perform(post("/api/resources/1/favorite")
+        mvc.perform(post("/api/resources/" + resourceId + "/favorite")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(1));
 
-        mvc.perform(delete("/api/resources/1/favorite")
+        mvc.perform(delete("/api/resources/" + resourceId + "/favorite")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(0));
 
-        mvc.perform(delete("/api/resources/1/favorite")
+        mvc.perform(delete("/api/resources/" + resourceId + "/favorite")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(0));
 
-        mvc.perform(post("/api/resources/1/like")
+        mvc.perform(post("/api/resources/" + resourceId + "/like")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(1));
 
-        mvc.perform(delete("/api/resources/1/like")
+        mvc.perform(delete("/api/resources/" + resourceId + "/like")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(0));
 
-        mvc.perform(delete("/api/resources/1/like")
+        mvc.perform(delete("/api/resources/" + resourceId + "/like")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(0));
 
-        mvc.perform(get("/api/resources/1/interactions"))
+        mvc.perform(get("/api/resources/" + resourceId + "/interactions"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(0))
             .andExpect(jsonPath("$.data.likes").value(0));
@@ -136,12 +137,12 @@ public class InteractionControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("HIDDEN"));
 
-        mvc.perform(get("/api/resources/1/comments"))
+        mvc.perform(get("/api/resources/" + resourceId + "/comments"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data", hasSize(1)))
             .andExpect(jsonPath("$.data[0].children", hasSize(0)));
 
-        mvc.perform(get("/api/resources/1/interactions"))
+        mvc.perform(get("/api/resources/" + resourceId + "/interactions"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.comments").value(1));
 
@@ -149,12 +150,12 @@ public class InteractionControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("VISIBLE"));
 
-        mvc.perform(get("/api/resources/1/comments"))
+        mvc.perform(get("/api/resources/" + resourceId + "/comments"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data", hasSize(1)))
             .andExpect(jsonPath("$.data[0].children", hasSize(1)));
 
-        mvc.perform(get("/api/resources/1/interactions"))
+        mvc.perform(get("/api/resources/" + resourceId + "/interactions"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.comments").value(2));
     }
@@ -198,7 +199,71 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
     }
 
+    @Test
+    void writeEndpointsShouldRejectMissingResource() throws Exception {
+        var payload = mapper.writeValueAsString(Map.of("content", "hello"));
+
+        mvc.perform(post("/api/resources/999999/comments")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mvc.perform(post("/api/resources/999999/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mvc.perform(delete("/api/resources/999999/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mvc.perform(post("/api/resources/999999/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mvc.perform(delete("/api/resources/999999/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mvc.perform(post("/api/reports")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("resourceId", "999999", "reason", "spam"))))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {
         return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
+    }
+
+    private long createResource(String title) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO resources (title, type, summary, owner_key, visibility, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            title,
+            "PDF",
+            "互动测试资源",
+            USER_KEY,
+            "PUBLIC",
+            "PUBLISHED"
+        );
+        Long id = jdbcTemplate.queryForObject(
+            "SELECT MAX(id) FROM resources WHERE owner_key = ? AND title = ?",
+            Long.class,
+            USER_KEY,
+            title
+        );
+        if (id == null) {
+            throw new IllegalStateException("FAILED_TO_CREATE_RESOURCE");
+        }
+        return id;
     }
 }

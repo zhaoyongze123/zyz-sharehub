@@ -720,6 +720,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资源不存在
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/comments/{id}/reply:
@@ -738,6 +740,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资源不存在
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
     delete:
@@ -745,6 +749,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资源不存在
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/like:
@@ -753,6 +759,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资源不存在
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
     delete:
@@ -760,6 +768,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资源不存在
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/interactions:
@@ -774,6 +784,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '404':
+          description: 资源不存在
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/admin/reports:

@@ -4,6 +4,7 @@ import com.sharehub.admin.AdminAuditLogDto;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import com.sharehub.resource.ResourceDto;
+import com.sharehub.resource.ResourceRepository;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -24,9 +25,11 @@ public class InteractionRepository {
     private static final String DEFAULT_OPERATOR_KEY = "system-admin";
 
     private final JdbcTemplate jdbcTemplate;
+    private final ResourceRepository resourceRepository;
 
-    public InteractionRepository(JdbcTemplate jdbcTemplate) {
+    public InteractionRepository(JdbcTemplate jdbcTemplate, ResourceRepository resourceRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.resourceRepository = resourceRepository;
     }
 
     private static final String STATUS_VISIBLE = "VISIBLE";
@@ -43,6 +46,8 @@ public class InteractionRepository {
             ParentTarget parentTarget = findParentTarget(parentId);
             effectiveResourceId = parentTarget.resourceId();
             noteId = parentTarget.noteId();
+        } else {
+            requireResource(resourceId);
         }
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -72,6 +77,7 @@ public class InteractionRepository {
     }
 
     public int addFavorite(Long resourceId, String userKey) {
+        requireResource(resourceId);
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             Integer.class,
@@ -94,6 +100,7 @@ public class InteractionRepository {
     }
 
     public int removeFavorite(Long resourceId, String userKey) {
+        requireResource(resourceId);
         jdbcTemplate.update(
             "DELETE FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             resourceId,
@@ -220,6 +227,7 @@ public class InteractionRepository {
     }
 
     public int addLike(Long resourceId, String userKey) {
+        requireResource(resourceId);
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             Integer.class,
@@ -242,6 +250,7 @@ public class InteractionRepository {
     }
 
     public int removeLike(Long resourceId, String userKey) {
+        requireResource(resourceId);
         jdbcTemplate.update(
             "DELETE FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             resourceId,
@@ -251,6 +260,7 @@ public class InteractionRepository {
     }
 
     public ReportRecord saveReport(Long resourceId, String reason, String reporter) {
+        requireResource(resourceId);
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
@@ -460,6 +470,12 @@ public class InteractionRepository {
     private long count(String sql, Long resourceId) {
         Long value = jdbcTemplate.queryForObject(sql, Long.class, resourceId);
         return value == null ? 0L : value;
+    }
+
+    private void requireResource(Long resourceId) {
+        if (resourceId == null || !resourceRepository.existsById(resourceId)) {
+            throw new NotFoundException("RESOURCE_NOT_FOUND");
+        }
     }
 
     private void bindLong(PreparedStatement statement, int index, Long value) throws SQLException {
