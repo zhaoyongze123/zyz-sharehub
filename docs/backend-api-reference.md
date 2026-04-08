@@ -223,29 +223,36 @@
 
 当前真实行为：
 
-- `ownerKey` 固定写死为 `local-dev-user`
+- 统一通过 `RequestAccessService` 解析当前用户
+- 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - `status` 固定初始化为 `DRAFT`
-
-这意味着当前仍是单用户联调实现，不是完整多用户隔离。
 
 ### 5.5 `PUT /api/resources/{id}`
 
 当前真实行为：
 
-- 未做 owner 鉴权
+- 只允许当前 owner 更新自己的资料
+- 非 owner 返回 `403 RESOURCE_FORBIDDEN`
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 不存在返回 `404 NOT_FOUND`
 
 ### 5.6 `DELETE /api/resources/{id}`
 
 当前真实行为：
 
-- 找到后删除
+- 只允许当前 owner 删除自己的资料
+- 非 owner 返回 `403 RESOURCE_FORBIDDEN`
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 不存在返回 `404 RESOURCE_NOT_FOUND`
 
 ### 5.7 `POST /api/resources/{id}/publish`
 
 真实行为：
 
+- 只允许当前 owner 发布自己的资料
+- 非 owner 返回 `403 RESOURCE_FORBIDDEN`
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 资料状态改为 `PUBLISHED`
 - 不存在返回 `404 NOT_FOUND`
 
@@ -253,6 +260,9 @@
 
 真实行为：
 
+- 只允许当前 owner 上传自己的资料附件
+- 非 owner 返回 `403 RESOURCE_FORBIDDEN`
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 - 资料不存在返回 `404 RESOURCE_NOT_FOUND`
 - 文件进入 PostgreSQL 文件表
 - 成功后把 `objectKey` 更新为文件 `id`
@@ -314,8 +324,9 @@
 
 当前真实边界：
 
-- 全部接口当前都使用固定 owner=`local-dev-user`
-- 暂未接入真实登录态隔离
+- 全部接口统一通过 `RequestAccessService` 解析当前用户
+- 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
+- 未带用户身份时返回 `401 NOT_LOGGED_IN`
 
 ### 8.1 生成接口
 
@@ -391,14 +402,13 @@
 以下内容已经由代码证实，后续需要继续收口：
 
 1. `docs/backend-api-reference.md` 此次补齐前原本不存在。
-2. `resumes` 文档语义曾写成用户态接口，但当前实现实际上固定 owner。
+2. `resumes` 已切到按请求用户隔离，但仍依赖 `X-User-Key` / OAuth 上下文，不是完整业务登录流。
 3. `admin` 文档曾声明 `401`，但真实实现只有 `403`。
-4. `resources/{id}` 的 `410 RESOURCE_REMOVED` 在旧 OpenAPI 中缺失。
+4. `resources` 写接口已经切到按请求用户隔离，联调依赖 `X-User-Key` / OAuth 上下文，不是完整业务登录流。
 5. `auth/avatar` 旧文档承诺了图片类型白名单，但当前实现并没有该校验。
 
 ## 12. 推荐联调顺序
 
 1. 先使用 `X-User-Key` 打通 `auth/me` 和 `me`
-2. 再打通 `resources`
-3. 再接 `roadmaps`
-4. 最后处理 `notes` 的本地存储重构与 `resumes` 的多用户隔离
+2. 再接 `roadmaps`
+3. 最后处理 `notes` 的本地存储重构

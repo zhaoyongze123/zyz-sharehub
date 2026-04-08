@@ -20,7 +20,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ResumeRepository {
 
-    private static final String DEFAULT_OWNER_KEY = "local-dev-user";
     private static final String DEFAULT_WORKBENCH_STATUS = "GENERATED";
     private static final int RECENT_LIMIT = 5;
 
@@ -30,7 +29,7 @@ public class ResumeRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public ResumeDto create(String templateKey, UUID fileId) {
+    public ResumeDto create(String ownerKey, String templateKey, UUID fileId) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
@@ -42,7 +41,7 @@ public class ResumeRepository {
                     new String[] {"id"}
                 );
                 statement.setString(1, templateKey);
-                statement.setString(2, DEFAULT_OWNER_KEY);
+                statement.setString(2, ownerKey);
                 statement.setString(3, DEFAULT_WORKBENCH_STATUS);
                 statement.setObject(4, fileId, Types.OTHER);
                 return statement;

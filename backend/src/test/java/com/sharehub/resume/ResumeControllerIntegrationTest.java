@@ -23,6 +23,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ResumeControllerIntegrationTest {
+    private static final String USER_KEY_HEADER = "X-User-Key";
+    private static final String DEFAULT_USER = "local-dev-user";
+    private static final String OTHER_USER = "other-user";
 
     @Autowired
     private MockMvc mockMvc;
@@ -42,6 +45,7 @@ class ResumeControllerIntegrationTest {
     @Test
     void shouldGenerateDetailAndDownloadResume() throws Exception {
         String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
             .andExpect(status().isOk())
@@ -55,7 +59,8 @@ class ResumeControllerIntegrationTest {
         Map<?, ?> data = (Map<?, ?>) payload.get("data");
         Long id = Long.valueOf(String.valueOf(data.get("id")));
 
-        mockMvc.perform(get("/api/resumes/" + id))
+        mockMvc.perform(get("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.fileUrl").value("/api/resumes/" + id + "/download"))
             .andExpect(jsonPath("$.data.fileName").value("resume-classic.pdf"))
@@ -63,7 +68,8 @@ class ResumeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.fileCreatedAt").exists())
             .andExpect(jsonPath("$.data.fileUpdatedAt").exists());
 
-        mockMvc.perform(get("/api/resumes/" + id + "/download"))
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Type", MediaType.APPLICATION_PDF_VALUE));
     }
@@ -71,6 +77,7 @@ class ResumeControllerIntegrationTest {
     @Test
     void shouldListAndDeleteResume() throws Exception {
         String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
             .andExpect(status().isOk())
@@ -82,37 +89,45 @@ class ResumeControllerIntegrationTest {
         Map<?, ?> data = (Map<?, ?>) payload.get("data");
         Long id = Long.valueOf(String.valueOf(data.get("id")));
 
-        mockMvc.perform(get("/api/resumes").param("status", "GENERATED"))
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .param("status", "GENERATED"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].id").value(id.intValue()))
             .andExpect(jsonPath("$.data.items[0].fileName").value("resume-classic.pdf"))
             .andExpect(jsonPath("$.data.items[0].fileSize").isNumber());
 
-        mockMvc.perform(delete("/api/resumes/" + id))
+        mockMvc.perform(delete("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value("DELETED"));
 
-        mockMvc.perform(get("/api/resumes/" + id))
+        mockMvc.perform(get("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/api/resumes/" + id + "/download"))
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound());
     }
 
     @Test
     void shouldFilterResumesByTemplateAndKeyword() throws Exception {
         mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "alpha"))))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "beta"))))
             .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .param("templateKey", "alpha")
                 .param("page", "1")
                 .param("pageSize", "10"))
@@ -121,6 +136,7 @@ class ResumeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].templateKey").value("alpha"));
 
         mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .param("keyword", "BETA")
                 .param("page", "1")
                 .param("pageSize", "10"))
@@ -132,21 +148,25 @@ class ResumeControllerIntegrationTest {
     @Test
     void shouldReturnResumeWorkbenchSummary() throws Exception {
         mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "modern"))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/resumes/workbench"))
+        mockMvc.perform(get("/api/resumes/workbench")
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(3))
             .andExpect(jsonPath("$.data.generatedCount").value(3))
@@ -155,5 +175,43 @@ class ResumeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.templateBreakdown[1].templateKey").value("modern"))
             .andExpect(jsonPath("$.data.templateBreakdown[1].count").value(1))
             .andExpect(jsonPath("$.data.recentItems.length()").value(3));
+    }
+
+    @Test
+    void shouldIsolateResumeOperationsByOwner() throws Exception {
+        String response = mockMvc.perform(post("/api/resumes/generate")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("templateKey", "classic"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> payload = objectMapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+        Long id = Long.valueOf(String.valueOf(data.get("id")));
+
+        mockMvc.perform(get("/api/resumes")
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(delete("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/resumes/" + id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.templateKey").value("classic"));
     }
 }

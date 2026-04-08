@@ -27,6 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ResourceControllerIntegrationTest {
+    private static final String USER_KEY_HEADER = "X-User-Key";
+    private static final String DEFAULT_USER = "local-dev-user";
+    private static final String OTHER_USER = "other-user";
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,6 +57,7 @@ class ResourceControllerIntegrationTest {
     @Test
     void shouldCreateDraftResourceWithExtendedFields() throws Exception {
         mockMvc.perform(post("/api/resources")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(resourceBody("Spring 实战", "PDF", "PUBLIC", "spring,java", "资源简介")))
             .andExpect(status().isOk())
@@ -139,6 +143,7 @@ class ResourceControllerIntegrationTest {
         long resourceId = createResource("旧标题", "PDF", "PUBLIC", "java", "旧简介");
 
         mockMvc.perform(put("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -155,7 +160,8 @@ class ResourceControllerIntegrationTest {
             .andExpect(jsonPath("$.data.category").value("DOC"))
             .andExpect(jsonPath("$.data.visibility").value("PRIVATE"));
 
-        mockMvc.perform(post("/api/resources/{id}/publish", resourceId))
+        mockMvc.perform(post("/api/resources/{id}/publish", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
 
@@ -163,6 +169,44 @@ class ResourceControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("新标题"))
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+    }
+
+    @Test
+    void shouldRejectNonOwnerMutationRequests() throws Exception {
+        long resourceId = createResource("多用户资源", "PDF", "PUBLIC", "java", "隔离");
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "guide.pdf",
+            MediaType.APPLICATION_PDF_VALUE,
+            "pdf-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(put("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, OTHER_USER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resourceBody("越权标题", "DOC", "PRIVATE", "hack", "越权")))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("RESOURCE_FORBIDDEN"));
+
+        mockMvc.perform(post("/api/resources/{id}/publish", resourceId)
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("RESOURCE_FORBIDDEN"));
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(file)
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("RESOURCE_FORBIDDEN"));
+
+        mockMvc.perform(delete("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("RESOURCE_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/resources/{id}", resourceId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("多用户资源"));
     }
 
     @Test
@@ -189,7 +233,8 @@ class ResourceControllerIntegrationTest {
     void shouldDeleteWithStableSemantics() throws Exception {
         long resourceId = createResource("待删除", "PDF", "PUBLIC", "java", "删除");
 
-        mockMvc.perform(delete("/api/resources/{id}", resourceId))
+        mockMvc.perform(delete("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value("DELETED"));
 
@@ -197,7 +242,8 @@ class ResourceControllerIntegrationTest {
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
-        mockMvc.perform(delete("/api/resources/{id}", 999999))
+        mockMvc.perform(delete("/api/resources/{id}", 999999)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }
@@ -212,7 +258,18 @@ class ResourceControllerIntegrationTest {
             "pdf-content".getBytes(StandardCharsets.UTF_8)
         );
 
-        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId).file(file))
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(file)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.file.owner").value(DEFAULT_USER))
+            .andExpect(jsonPath("$.data.resourceId").value(resourceId))
+            .andExpect(jsonPath("$.data.file.filename").value("guide.pdf"))
+            .andExpect(jsonPath("$.data.file.downloadUrl").exists());
+
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", resourceId)
+                .file(file)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.resourceId").value(resourceId))
             .andExpect(jsonPath("$.data.file.filename").value("guide.pdf"))
@@ -223,13 +280,16 @@ class ResourceControllerIntegrationTest {
             .andExpect(jsonPath("$.data.objectKey").isNotEmpty())
             .andExpect(jsonPath("$.data.downloadCount").value(1));
 
-        mockMvc.perform(multipart("/api/resources/{id}/attachment", 999999L).file(file))
+        mockMvc.perform(multipart("/api/resources/{id}/attachment", 999999L)
+                .file(file)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }
 
     private long createResource(String title, String category, String visibility, String tags, String summary) throws Exception {
         String response = mockMvc.perform(post("/api/resources")
+                .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(resourceBody(title, category, visibility, tags, summary)))
             .andExpect(status().isOk())
@@ -242,7 +302,8 @@ class ResourceControllerIntegrationTest {
     }
 
     private void publishResource(long id) throws Exception {
-        mockMvc.perform(post("/api/resources/{id}/publish", id))
+        mockMvc.perform(post("/api/resources/{id}/publish", id)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isOk());
     }
 

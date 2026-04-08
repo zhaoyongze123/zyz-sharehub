@@ -8,13 +8,11 @@ PROMPT_FILE="${PROJECT_ROOT}/scripts/overnight-manager-prompt.md"
 RUN_ID="$(date '+%Y%m%d-%H%M%S')"
 RUN_DIR="${OUTPUT_DIR}/${RUN_ID}"
 TIMEOUT_SECONDS="${OVERNIGHT_TIMEOUT_SECONDS:-3000}"
+MAX_RETRIES="${OVERNIGHT_MAX_RETRIES:-3}"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
 META_FILE="${RUN_DIR}/meta.env"
-USE_RESUME_MARKER="${STATE_DIR}/use_resume"
 NOTIFY_SCRIPT="${PROJECT_ROOT}/scripts/feishu_notify.py"
-RUN_PID_FILE="${STATE_DIR}/current_run.pid"
-RUN_META_FILE="${STATE_DIR}/current_run.meta"
 DEFAULT_CODEX_HOME="${HOME}/.codex"
 AUTOPILOT_CODEX_HOME="${OUTPUT_DIR}/codex-home"
 
@@ -46,6 +44,7 @@ export CODEX_HOME="${AUTOPILOT_CODEX_HOME}"
   echo "START_AT=$(date '+%F %T %z')"
   echo "PROJECT_ROOT=${PROJECT_ROOT}"
   echo "TIMEOUT_SECONDS=${TIMEOUT_SECONDS}"
+  echo "MAX_RETRIES=${MAX_RETRIES}"
   echo "CODEX_HOME=${CODEX_HOME}"
 } > "${META_FILE}"
 
@@ -69,30 +68,53 @@ export CODEX_HOME="${AUTOPILOT_CODEX_HOME}"
 CODEX_BASE_CMD=(
   codex
   exec
+  --ephemeral
+  --disable multi_agent
+  -c 'model_reasoning_effort="low"'
+  -m gpt-5.2
   --dangerously-bypass-approvals-and-sandbox
   -C "${PROJECT_ROOT}"
   -o "${LAST_MESSAGE_FILE}"
 )
 
-if [[ -f "${USE_RESUME_MARKER}" ]]; then
-  CODEX_CMD=("${CODEX_BASE_CMD[@]}" resume --last)
-else
-  CODEX_CMD=("${CODEX_BASE_CMD[@]}")
-fi
+CODEX_CMD=("${CODEX_BASE_CMD[@]}")
 
 echo "[$(date '+%F %T')] 开始执行第 ${RUN_ID} 轮，日志目录: ${RUN_DIR}" | tee -a "${RAW_LOG_FILE}"
 
-set +e
-python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${CODEX_CMD[@]}" - \
-  < "${RUN_DIR}/prompt.txt" 2>&1 | tee -a "${RAW_LOG_FILE}"
-EXIT_CODE=${PIPESTATUS[0]}
-set -e
+TRANSIENT_ERROR_HINT=""
+ATTEMPT=1
+EXIT_CODE=1
 
-touch "${USE_RESUME_MARKER}"
+while (( ATTEMPT <= MAX_RETRIES )); do
+  rm -f "${LAST_MESSAGE_FILE}"
+  echo "[$(date '+%F %T')] 执行尝试 ${ATTEMPT}/${MAX_RETRIES}" | tee -a "${RAW_LOG_FILE}"
+
+  set +e
+  python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${CODEX_CMD[@]}" - \
+    < "${RUN_DIR}/prompt.txt" 2>&1 | tee -a "${RAW_LOG_FILE}"
+  EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+
+  if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
+    break
+  fi
+
+  TRANSIENT_ERROR_HINT="$(rg -m 1 'high demand|stream disconnected|Reconnecting|temporary errors|no last agent message' "${RAW_LOG_FILE}" 2>/dev/null || true)"
+  if [[ -n "${TRANSIENT_ERROR_HINT}" && ${ATTEMPT} -lt ${MAX_RETRIES} ]]; then
+    BACKOFF_SECONDS=$(( ATTEMPT * 5 ))
+    echo "[$(date '+%F %T')] 检测到瞬时错误，${BACKOFF_SECONDS}s 后重试: ${TRANSIENT_ERROR_HINT}" | tee -a "${RAW_LOG_FILE}"
+    sleep "${BACKOFF_SECONDS}"
+    ATTEMPT=$(( ATTEMPT + 1 ))
+    continue
+  fi
+
+  break
+done
 
 {
   echo "END_AT=$(date '+%F %T %z')"
   echo "EXIT_CODE=${EXIT_CODE}"
+  echo "ATTEMPTS=${ATTEMPT}"
 } >> "${META_FILE}"
 
 git -C "${PROJECT_ROOT}" status --short --branch > "${RUN_DIR}/git-status.txt" || true
@@ -124,6 +146,9 @@ SUMMARY="$(tail -n 40 "${LAST_MESSAGE_FILE}" 2>/dev/null || tail -n 30 "${RAW_LO
 SUMMARY="$(printf '%s' "${SUMMARY}" | tr '\n' ' ' | tr '\r' ' ' | cut -c1-1500)"
 BLOCKED_LINE="$(rg -m 1 '^AUTOPILOT_BLOCKED:' "${LAST_MESSAGE_FILE}" 2>/dev/null || true)"
 ISSUE_HINT="$(rg -m 1 'AUTOPILOT_BLOCKED:|ERROR|Exception|failed|timed out|Permission denied|Operation not permitted|migration' "${RAW_LOG_FILE}" 2>/dev/null || true)"
+if [[ -z "${ISSUE_HINT}" && -n "${TRANSIENT_ERROR_HINT}" ]]; then
+  ISSUE_HINT="${TRANSIENT_ERROR_HINT}"
+fi
 ISSUE_HINT="$(printf '%s' "${ISSUE_HINT}" | tr '\n' ' ' | tr '\r' ' ' | cut -c1-300)"
 
 if [[ -n "${BLOCKED_LINE}" ]]; then

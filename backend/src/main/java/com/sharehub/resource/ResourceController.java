@@ -2,6 +2,7 @@ package com.sharehub.resource;
 
 import com.sharehub.auth.UserProfileDto;
 import com.sharehub.auth.UserProfileRepository;
+import com.sharehub.auth.RequestAccessService;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
@@ -11,11 +12,13 @@ import com.sharehub.files.StoredFileDto;
 import com.sharehub.interaction.InteractionRepository;
 import com.sharehub.interaction.InteractionSummaryDto;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,21 +50,29 @@ public class ResourceController {
     private final FileStorageService fileStorageService;
     private final InteractionRepository interactionRepository;
     private final UserProfileRepository userProfileRepository;
+    private final RequestAccessService requestAccessService;
 
     public ResourceController(
         ResourceRepository repository,
         FileStorageService fileStorageService,
         InteractionRepository interactionRepository,
-        UserProfileRepository userProfileRepository
+        UserProfileRepository userProfileRepository,
+        RequestAccessService requestAccessService
     ) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
         this.interactionRepository = interactionRepository;
         this.userProfileRepository = userProfileRepository;
+        this.requestAccessService = requestAccessService;
     }
 
     @PostMapping
-    public ApiResponse<ResourceDto> create(@Valid @RequestBody ResourceDto req) {
+    public ApiResponse<ResourceDto> create(
+        Authentication authentication,
+        HttpServletRequest request,
+        @Valid @RequestBody ResourceDto req
+    ) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
         ResourceEntity entity = new ResourceEntity();
         entity.setTitle(req.title());
         entity.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
@@ -69,7 +80,7 @@ public class ResourceController {
         entity.setTags(req.tags());
         entity.setExternalUrl(req.externalUrl());
         entity.setObjectKey(req.objectKey());
-        entity.setOwnerKey("local-dev-user");
+        entity.setOwnerKey(ownerKey);
         entity.setVisibility(req.visibility());
         entity.setStatus("DRAFT");
         return ApiResponse.ok(enrichResource(repository.save(entity)));
@@ -168,38 +179,47 @@ public class ResourceController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<ResourceDto> update(@PathVariable Long id, @Valid @RequestBody ResourceDto req) {
-        return repository.findById(id)
-            .map(existing -> {
-                existing.setTitle(req.title());
-                existing.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
-                existing.setSummary(req.summary());
-                existing.setTags(req.tags());
-                existing.setExternalUrl(req.externalUrl());
-                existing.setObjectKey(req.objectKey());
-                existing.setVisibility(req.visibility());
-                existing.setStatus(req.status() == null ? existing.getStatus() : req.status());
-                return ApiResponse.ok(enrichResource(repository.save(existing)));
-            })
-            .orElseThrow(() -> new NotFoundException("NOT_FOUND"));
+    public ApiResponse<ResourceDto> update(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @Valid @RequestBody ResourceDto req
+    ) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        ResourceEntity existing = requireOwnedResource(id, ownerKey);
+        existing.setTitle(req.title());
+        existing.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
+        existing.setSummary(req.summary());
+        existing.setTags(req.tags());
+        existing.setExternalUrl(req.externalUrl());
+        existing.setObjectKey(req.objectKey());
+        existing.setVisibility(req.visibility());
+        existing.setStatus(req.status() == null ? existing.getStatus() : req.status());
+        return ApiResponse.ok(enrichResource(repository.save(existing)));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<String> delete(@PathVariable Long id) {
-        ResourceEntity entity = repository.findById(id)
-            .orElseThrow(() -> new NotFoundException("RESOURCE_NOT_FOUND"));
+    public ApiResponse<String> delete(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        ResourceEntity entity = requireOwnedResource(id, ownerKey, "RESOURCE_NOT_FOUND");
         repository.delete(entity);
         return ApiResponse.ok("DELETED");
     }
 
     @PostMapping("/{id}/publish")
-    public ApiResponse<ResourceDto> publish(@PathVariable Long id) {
-        return repository.findById(id)
-            .map(entity -> {
-                entity.setStatus("PUBLISHED");
-                return ApiResponse.ok(enrichResource(repository.save(entity)));
-            })
-            .orElseThrow(() -> new NotFoundException("NOT_FOUND"));
+    public ApiResponse<ResourceDto> publish(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        ResourceEntity entity = requireOwnedResource(id, ownerKey);
+        entity.setStatus("PUBLISHED");
+        return ApiResponse.ok(enrichResource(repository.save(entity)));
     }
 
     private List<String> parseStatuses(String status) {
@@ -268,24 +288,40 @@ public class ResourceController {
     }
 
     @PostMapping(path = "/{id}/attachment", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<Map<String, Object>> uploadAttachment(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
-        return repository.findById(id)
-            .map(entity -> {
-                StoredFileDto stored = fileStorageService.storeMultipart(
-                    "resource:" + id,
-                    FileCategory.RESOURCE_ATTACHMENT,
-                    "RESOURCE",
-                    String.valueOf(id),
-                    file
-                );
-                entity.setObjectKey(stored.id().toString());
-                repository.save(entity);
+    public ApiResponse<Map<String, Object>> uploadAttachment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @RequestPart("file") MultipartFile file
+    ) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        ResourceEntity entity = requireOwnedResource(id, ownerKey, "RESOURCE_NOT_FOUND");
+        StoredFileDto stored = fileStorageService.storeMultipart(
+            ownerKey,
+            FileCategory.RESOURCE_ATTACHMENT,
+            "RESOURCE",
+            String.valueOf(id),
+            file
+        );
+        entity.setObjectKey(stored.id().toString());
+        repository.save(entity);
 
-                Map<String, Object> result = new HashMap<>();
-                result.put("resourceId", id);
-                result.put("file", stored);
-                return ApiResponse.ok(result);
-            })
-            .orElseThrow(() -> new NotFoundException("RESOURCE_NOT_FOUND"));
+        Map<String, Object> result = new HashMap<>();
+        result.put("resourceId", id);
+        result.put("file", stored);
+        return ApiResponse.ok(result);
+    }
+
+    private ResourceEntity requireOwnedResource(Long id, String ownerKey) {
+        return requireOwnedResource(id, ownerKey, "NOT_FOUND");
+    }
+
+    private ResourceEntity requireOwnedResource(Long id, String ownerKey, String notFoundCode) {
+        ResourceEntity entity = repository.findById(id)
+            .orElseThrow(() -> new NotFoundException(notFoundCode));
+        if (!entity.getOwnerKey().equals(ownerKey)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "RESOURCE_FORBIDDEN");
+        }
+        return entity;
     }
 }
