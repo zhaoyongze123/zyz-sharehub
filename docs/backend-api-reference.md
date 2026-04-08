@@ -437,6 +437,7 @@
 - `page`
 - `pageSize`
 - `status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理
+- `status`、`templateKey`、`keyword` 若带前后空白，会先裁剪再参与筛选
 - `page`、`pageSize` 传入小于 `1` 的值时都会按 `1` 兜底
 - 用户已被封禁时返回 `403 USER_BANNED`
 
