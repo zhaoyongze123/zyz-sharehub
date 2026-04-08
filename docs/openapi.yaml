@@ -720,12 +720,16 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/comments/{id}/reply:
     post:
       summary: 回复评论
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
         '404':
           description: 父评论不存在
   /api/resources/{id}/favorite:
@@ -734,22 +738,30 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
     delete:
       summary: 取消收藏资料
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/like:
     post:
       summary: 点赞资料
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
     delete:
       summary: 取消点赞资料
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/resources/{id}/interactions:
     get:
       summary: 获取资源互动聚合计数
@@ -762,6 +774,8 @@ paths:
       responses:
         '200':
           description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
   /api/admin/reports:
     get:
       summary: 举报列表

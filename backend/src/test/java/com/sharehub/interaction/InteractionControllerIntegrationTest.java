@@ -1,6 +1,7 @@
 package com.sharehub.interaction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.auth.RequestAccessService;
 import com.sharehub.config.AdminTokenFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 public class InteractionControllerIntegrationTest {
 
+    private static final String USER_KEY = "local-dev-user";
+
     @Autowired
     private MockMvc mvc;
 
@@ -47,6 +50,7 @@ public class InteractionControllerIntegrationTest {
     void commentReplyFavoriteLikeReportPersisted() throws Exception {
         var commentPayload = mapper.writeValueAsString(Map.of("content", "hello"));
         mvc.perform(post("/api/resources/1/comments")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(commentPayload))
             .andExpect(status().isOk())
@@ -54,22 +58,26 @@ public class InteractionControllerIntegrationTest {
 
         var replyPayload = mapper.writeValueAsString(Map.of("content", "reply"));
         mvc.perform(post("/api/comments/1/reply")
+                        .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(replyPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.parentId").value(1))
                 .andExpect(jsonPath("$.data.resourceId").value(1));
 
-        mvc.perform(post("/api/resources/1/favorite"))
+        mvc.perform(post("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(1));
 
-        mvc.perform(post("/api/resources/1/like"))
+        mvc.perform(post("/api/resources/1/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(1));
 
         var reportPayload = mapper.writeValueAsString(Map.of("resourceId", "1", "reason", "spam"));
         mvc.perform(post("/api/reports")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(reportPayload))
             .andExpect(status().isOk())
@@ -89,27 +97,33 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.likes").value(1))
             .andExpect(jsonPath("$.data.reports").value(1));
 
-        mvc.perform(post("/api/resources/1/favorite"))
+        mvc.perform(post("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(1));
 
-        mvc.perform(delete("/api/resources/1/favorite"))
+        mvc.perform(delete("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(0));
 
-        mvc.perform(delete("/api/resources/1/favorite"))
+        mvc.perform(delete("/api/resources/1/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.favorites").value(0));
 
-        mvc.perform(post("/api/resources/1/like"))
+        mvc.perform(post("/api/resources/1/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(1));
 
-        mvc.perform(delete("/api/resources/1/like"))
+        mvc.perform(delete("/api/resources/1/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(0));
 
-        mvc.perform(delete("/api/resources/1/like"))
+        mvc.perform(delete("/api/resources/1/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.likes").value(0));
 
@@ -143,6 +157,45 @@ public class InteractionControllerIntegrationTest {
         mvc.perform(get("/api/resources/1/interactions"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.comments").value(2));
+    }
+
+    @Test
+    void writeEndpointsShouldRequireLogin() throws Exception {
+        var payload = mapper.writeValueAsString(Map.of("content", "hello"));
+
+        mvc.perform(post("/api/resources/1/comments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mvc.perform(post("/api/comments/1/reply")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mvc.perform(post("/api/resources/1/favorite"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mvc.perform(delete("/api/resources/1/favorite"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mvc.perform(post("/api/resources/1/like"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mvc.perform(delete("/api/resources/1/like"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mvc.perform(post("/api/reports")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("resourceId", "1", "reason", "spam"))))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {

@@ -1,8 +1,11 @@
 package com.sharehub.interaction;
 
+import com.sharehub.auth.RequestAccessService;
 import com.sharehub.common.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -10,14 +13,22 @@ import org.springframework.web.bind.annotation.*;
 public class InteractionController {
 
     private final InteractionRepository repository;
+    private final RequestAccessService requestAccessService;
 
-    public InteractionController(InteractionRepository repository) {
+    public InteractionController(InteractionRepository repository, RequestAccessService requestAccessService) {
         this.repository = repository;
+        this.requestAccessService = requestAccessService;
     }
 
     @PostMapping("/resources/{id}/comments")
-    public ApiResponse<InteractionRepository.CommentRecord> comment(@PathVariable Long id, @RequestBody Map<String, String> req) {
-        InteractionRepository.CommentRecord comment = repository.saveComment(id, req.get("content"), null);
+    public ApiResponse<InteractionRepository.CommentRecord> comment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @RequestBody Map<String, String> req
+    ) {
+        String author = requestAccessService.requireUser(authentication, request);
+        InteractionRepository.CommentRecord comment = repository.saveComment(id, req.get("content"), null, author);
         return ApiResponse.ok(comment);
     }
 
@@ -27,32 +38,58 @@ public class InteractionController {
     }
 
     @PostMapping("/comments/{id}/reply")
-    public ApiResponse<InteractionRepository.CommentRecord> reply(@PathVariable Long id, @RequestBody Map<String, String> req) {
-        InteractionRepository.CommentRecord reply = repository.saveComment(id, req.get("content"), id);
+    public ApiResponse<InteractionRepository.CommentRecord> reply(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @RequestBody Map<String, String> req
+    ) {
+        String author = requestAccessService.requireUser(authentication, request);
+        InteractionRepository.CommentRecord reply = repository.saveComment(id, req.get("content"), id, author);
         return ApiResponse.ok(reply);
     }
 
     @PostMapping("/resources/{id}/favorite")
-    public ApiResponse<Map<String, Object>> favorite(@PathVariable Long id) {
-        int total = repository.addFavorite(id);
+    public ApiResponse<Map<String, Object>> favorite(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        int total = repository.addFavorite(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
     }
 
     @DeleteMapping("/resources/{id}/favorite")
-    public ApiResponse<Map<String, Object>> unfavorite(@PathVariable Long id) {
-        int total = repository.removeFavorite(id);
+    public ApiResponse<Map<String, Object>> unfavorite(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        int total = repository.removeFavorite(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
     }
 
     @PostMapping("/resources/{id}/like")
-    public ApiResponse<Map<String, Object>> like(@PathVariable Long id) {
-        int total = repository.addLike(id);
+    public ApiResponse<Map<String, Object>> like(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        int total = repository.addLike(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
     }
 
     @DeleteMapping("/resources/{id}/like")
-    public ApiResponse<Map<String, Object>> unlike(@PathVariable Long id) {
-        int total = repository.removeLike(id);
+    public ApiResponse<Map<String, Object>> unlike(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        int total = repository.removeLike(id, userKey);
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
     }
 
@@ -62,10 +99,14 @@ public class InteractionController {
     }
 
     @PostMapping("/reports")
-    public ApiResponse<InteractionRepository.ReportRecord> report(@RequestBody Map<String, String> req) {
+    public ApiResponse<InteractionRepository.ReportRecord> report(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestBody Map<String, String> req
+    ) {
+        String reporter = requestAccessService.requireUser(authentication, request);
         long resourceId = Long.parseLong(req.getOrDefault("resourceId", "0"));
         String reason = req.getOrDefault("reason", "无");
-        String reporter = req.getOrDefault("reporter", "anonymous");
         InteractionRepository.ReportRecord report = repository.saveReport(resourceId, reason, reporter);
         return ApiResponse.ok(report);
     }

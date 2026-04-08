@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Repository
 public class InteractionRepository {
 
-    private static final String DEFAULT_USER_KEY = "local-dev-user";
     private static final String DEFAULT_OPERATOR_KEY = "system-admin";
 
     private final JdbcTemplate jdbcTemplate;
@@ -33,7 +32,7 @@ public class InteractionRepository {
     private static final String STATUS_VISIBLE = "VISIBLE";
     private static final String STATUS_HIDDEN = "HIDDEN";
 
-    public CommentRecord saveComment(Long resourceId, String content, Long parentId) {
+    public CommentRecord saveComment(Long resourceId, String content, Long parentId, String authorKey) {
         if (content == null || content.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "COMMENT_CONTENT_REQUIRED");
         }
@@ -61,7 +60,7 @@ public class InteractionRepository {
                 bindLong(statement, 1, finalResourceId);
                 bindLong(statement, 2, finalNoteId);
                 bindLong(statement, 3, parentId);
-                statement.setString(4, DEFAULT_USER_KEY);
+                statement.setString(4, authorKey);
                 statement.setString(5, content);
                 statement.setString(6, STATUS_VISIBLE);
                 statement.setTimestamp(7, Timestamp.from(Instant.now()));
@@ -72,18 +71,18 @@ public class InteractionRepository {
         return findComment(keyHolder.getKey().longValue());
     }
 
-    public int addFavorite(Long resourceId) {
+    public int addFavorite(Long resourceId, String userKey) {
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             Integer.class,
             resourceId,
-            DEFAULT_USER_KEY
+            userKey
         );
         if (exists == null || exists == 0) {
             jdbcTemplate.update(
                 "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
                 resourceId,
-                DEFAULT_USER_KEY
+                userKey
             );
         }
         Integer total = jdbcTemplate.queryForObject(
@@ -94,11 +93,11 @@ public class InteractionRepository {
         return total == null ? 0 : total;
     }
 
-    public int removeFavorite(Long resourceId) {
+    public int removeFavorite(Long resourceId, String userKey) {
         jdbcTemplate.update(
             "DELETE FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             resourceId,
-            DEFAULT_USER_KEY
+            userKey
         );
         return (int) count("SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL", resourceId);
     }
@@ -220,18 +219,18 @@ public class InteractionRepository {
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
-    public int addLike(Long resourceId) {
+    public int addLike(Long resourceId, String userKey) {
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             Integer.class,
             resourceId,
-            DEFAULT_USER_KEY
+            userKey
         );
         if (exists == null || exists == 0) {
             jdbcTemplate.update(
                 "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
                 resourceId,
-                DEFAULT_USER_KEY
+                userKey
             );
         }
         Integer total = jdbcTemplate.queryForObject(
@@ -242,11 +241,11 @@ public class InteractionRepository {
         return total == null ? 0 : total;
     }
 
-    public int removeLike(Long resourceId) {
+    public int removeLike(Long resourceId, String userKey) {
         jdbcTemplate.update(
             "DELETE FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             resourceId,
-            DEFAULT_USER_KEY
+            userKey
         );
         return (int) count("SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL", resourceId);
     }
@@ -264,7 +263,7 @@ public class InteractionRepository {
                 );
                 statement.setString(1, "RESOURCE");
                 statement.setLong(2, resourceId);
-                statement.setString(3, reporter == null || reporter.isBlank() ? DEFAULT_USER_KEY : reporter);
+                statement.setString(3, reporter);
                 statement.setString(4, reason == null || reason.isBlank() ? "无" : reason);
                 statement.setString(5, null);
                 statement.setString(6, "OPEN");
