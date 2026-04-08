@@ -275,7 +275,7 @@ cp "${META_FILE}" "${OUTPUT_DIR}/latest-meta.env" 2>/dev/null || true
 SUMMARY="$(tail -n 40 "${LAST_MESSAGE_FILE}" 2>/dev/null || tail -n 30 "${RAW_LOG_FILE}" | tail -n 20)"
 SUMMARY="$(printf '%s' "${SUMMARY}" | tr '\n' ' ' | tr '\r' ' ' | cut -c1-1500)"
 BLOCKED_LINE="$(rg -m 1 '^AUTOPILOT_BLOCKED:' "${LAST_MESSAGE_FILE}" 2>/dev/null || true)"
-ISSUE_HINT="$(rg -m 1 'AUTOPILOT_BLOCKED:|ERROR|Exception|failed|timed out|Permission denied|Operation not permitted|migration' "${RAW_LOG_FILE}" 2>/dev/null || true)"
+ISSUE_HINT="$(rg -m 1 '^ERROR:|unexpected status|stream disconnected|timed out|Permission denied|Operation not permitted|no last agent message' "${RAW_LOG_FILE}" 2>/dev/null || true)"
 if [[ -z "${ISSUE_HINT}" && -n "${TRANSIENT_ERROR_HINT}" ]]; then
   ISSUE_HINT="${TRANSIENT_ERROR_HINT}"
 fi
