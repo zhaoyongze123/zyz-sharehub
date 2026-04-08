@@ -8,12 +8,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,9 +35,19 @@ public class AdminControllerIntegrationTest {
     @Autowired
     private InteractionRepository interactionRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void cleanup() throws Exception {
         Files.deleteIfExists(Path.of("data/interaction.json"));
+        jdbcTemplate.update("DELETE FROM admin_audit_logs");
+        jdbcTemplate.update("DELETE FROM reports");
+        jdbcTemplate.update("DELETE FROM comments");
+        jdbcTemplate.update("DELETE FROM favorites");
+        jdbcTemplate.update("DELETE FROM likes");
+        jdbcTemplate.update("DELETE FROM resources");
+        jdbcTemplate.update("DELETE FROM users");
     }
 
     @Test
@@ -82,11 +95,143 @@ public class AdminControllerIntegrationTest {
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
     }
 
+    @Test
+    void resolveReportShouldRemoveResourceAndWriteAuditLog() throws Exception {
+        long resourceId = insertResource("被举报资源");
+        interactionRepository.saveReport(resourceId, "spam", "alice");
+
+        long reportId = jdbcTemplate.queryForObject("SELECT id FROM reports WHERE target_id = ?", Long.class, resourceId);
+
+        mvc.perform(adminPost("/api/admin/reports/" + reportId + "/resolve")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(reportId))
+            .andExpect(jsonPath("$.data.status").value("RESOLVED"));
+
+        mvc.perform(adminGet("/api/admin/audit-logs")
+                .param("action", "AUTO_REMOVE_RESOURCE")
+                .param("targetType", "RESOURCE"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].targetId").value(String.valueOf(resourceId)));
+
+        String resourceStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM resources WHERE id = ?",
+            String.class,
+            resourceId
+        );
+        String reportStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM reports WHERE id = ?",
+            String.class,
+            reportId
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals("REMOVED", resourceStatus);
+        org.junit.jupiter.api.Assertions.assertEquals("RESOLVED", reportStatus);
+    }
+
+    @Test
+    void moderationEndpointsShouldUpdateDomainState() throws Exception {
+        long resourceId = insertResource("待封禁资源");
+        long userId = insertUser("blocked-user");
+        long commentId = insertComment(resourceId, "需要隐藏");
+
+        mvc.perform(adminPost("/api/admin/resources/" + resourceId + "/block"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("REMOVED"));
+
+        mvc.perform(adminPost("/api/admin/resources/" + resourceId + "/restore"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mvc.perform(adminPost("/api/admin/users/" + userId + "/ban"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("BANNED"));
+
+        mvc.perform(adminPost("/api/admin/users/" + userId + "/unban"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mvc.perform(adminPost("/api/admin/comments/" + commentId + "/hide"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("HIDDEN"));
+
+        mvc.perform(adminPost("/api/admin/comments/" + commentId + "/restore"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("VISIBLE"));
+
+        mvc.perform(adminGet("/api/admin/audit-logs")
+                .param("targetType", "COMMENT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2));
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "PUBLISHED",
+            jdbcTemplate.queryForObject("SELECT status FROM resources WHERE id = ?", String.class, resourceId)
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "ACTIVE",
+            jdbcTemplate.queryForObject("SELECT status FROM users WHERE id = ?", String.class, userId)
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "VISIBLE",
+            jdbcTemplate.queryForObject("SELECT status FROM comments WHERE id = ?", String.class, commentId)
+        );
+    }
+
     private MockHttpServletRequestBuilder adminGet(String uri) {
         return get(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
 
     private MockHttpServletRequestBuilder adminPost(String uri) {
         return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
+    }
+
+    private long insertResource(String title) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO resources (title, type, summary, owner_key, visibility, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+            title,
+            "PDF",
+            "summary",
+            "local-dev-user",
+            "PUBLIC",
+            "PUBLISHED",
+            Timestamp.from(Instant.now()),
+            Timestamp.from(Instant.now())
+        );
+        return jdbcTemplate.queryForObject("SELECT id FROM resources ORDER BY id DESC LIMIT 1", Long.class);
+    }
+
+    private long insertUser(String login) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO users (login, name, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+            login,
+            "Tester",
+            "ACTIVE",
+            Timestamp.from(Instant.now()),
+            Timestamp.from(Instant.now())
+        );
+        return jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, login);
+    }
+
+    private long insertComment(long resourceId, String content) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO comments (resource_id, author_key, content, status, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+            resourceId,
+            "local-dev-user",
+            content,
+            "VISIBLE",
+            Timestamp.from(Instant.now())
+        );
+        return jdbcTemplate.queryForObject("SELECT id FROM comments ORDER BY id DESC LIMIT 1", Long.class);
     }
 }
