@@ -154,6 +154,15 @@ public class AdminControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
+        mvc.perform(adminGet("/api/admin/audit-logs")
+                .param("targetType", "USER"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].action").value("UNBAN_USER"))
+            .andExpect(jsonPath("$.data.items[0].targetId").value(String.valueOf(userId)))
+            .andExpect(jsonPath("$.data.items[1].action").value("BAN_USER"))
+            .andExpect(jsonPath("$.data.items[1].targetId").value(String.valueOf(userId)));
+
         mvc.perform(adminPost("/api/admin/comments/" + commentId + "/hide"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("HIDDEN"));

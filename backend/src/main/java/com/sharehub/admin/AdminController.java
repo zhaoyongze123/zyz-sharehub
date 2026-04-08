@@ -92,12 +92,16 @@ public class AdminController {
 
     @PostMapping("/users/{id}/ban")
     public ApiResponse<UserProfileDto> banUser(@PathVariable Long id) {
-        return ApiResponse.ok(userProfileRepository.updateStatus(id, "BANNED"));
+        UserProfileDto profile = userProfileRepository.updateStatus(id, "BANNED");
+        interactionRepository.appendAuditLog("BAN_USER", "USER", String.valueOf(id), "{}");
+        return ApiResponse.ok(profile);
     }
 
     @PostMapping("/users/{id}/unban")
     public ApiResponse<UserProfileDto> unbanUser(@PathVariable Long id) {
-        return ApiResponse.ok(userProfileRepository.updateStatus(id, "ACTIVE"));
+        UserProfileDto profile = userProfileRepository.updateStatus(id, "ACTIVE");
+        interactionRepository.appendAuditLog("UNBAN_USER", "USER", String.valueOf(id), "{}");
+        return ApiResponse.ok(profile);
     }
 
     @PostMapping("/comments/{id}/hide")

@@ -1052,7 +1052,7 @@ paths:
   /api/admin/users/{id}/ban:
     post:
       summary: 封禁用户
-      description: 管理员接口，将用户状态标记为 BANNED
+      description: 管理员接口，将用户状态标记为 BANNED，并写入一条 `BAN_USER` 审计日志
       responses:
         '200':
           description: 成功
@@ -1071,7 +1071,7 @@ paths:
   /api/admin/users/{id}/unban:
     post:
       summary: 解封用户
-      description: 管理员将用户重新置为活跃
+      description: 管理员将用户重新置为活跃，并写入一条 `UNBAN_USER` 审计日志
       responses:
         '200':
           description: 成功
