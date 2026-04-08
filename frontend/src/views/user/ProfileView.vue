@@ -205,6 +205,7 @@ const currentTabLabel = computed(() => {
 // 个人资料相关
 const loadingProfile = ref(false)
 const avatarUploading = ref(false)
+const defaultAvatar = 'https://avatars.githubusercontent.com/u/9919?s=128&v=4'
 
 const profileForm = reactive({
   username: '',
@@ -212,14 +213,14 @@ const profileForm = reactive({
   website: ''
 })
 
-const userDisplayName = computed(() => authStore.profile?.name || authStore.profile?.login || '当前用户')
-const userTypeLabel = computed(() => authStore.profile?.status === 'BANNED' ? '已封禁' : '个人帐户')
-const avatarUrl = computed(() => authStore.profile?.avatarUrl || '')
+const userDisplayName = computed(() => authStore.profile?.nickname || authStore.profile?.name || authStore.profile?.login || '当前用户')
+const userTypeLabel = computed(() => authStore.profile?.role === 'admin' ? '管理员' : (authStore.profile?.status === 'BANNED' ? '已封禁' : '个人帐户'))
+const avatarUrl = computed(() => authStore.profile?.avatarUrl || defaultAvatar)
 
 const syncProfileForm = () => {
-  profileForm.username = authStore.profile?.name || authStore.profile?.login || ''
-  profileForm.bio = ''
-  profileForm.website = ''
+  profileForm.username = authStore.profile?.nickname || authStore.profile?.login || ''
+  profileForm.bio = authStore.profile?.headline || authStore.profile?.bio || ''
+  profileForm.website = authStore.profile?.website || ''
 }
 
 const loadProfile = async () => {

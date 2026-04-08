@@ -11,6 +11,9 @@ export interface UserProfile {
   nickname?: string
   role?: 'guest' | 'user' | 'admin'
   headline?: string
+  username?: string | null
+  website?: string | null
+  bio?: string | null
 }
 
 export interface MeSummary {
@@ -99,7 +102,16 @@ export const useAuthStore = defineStore('auth', {
     updateProfile(data: Partial<UserProfile>) {
       if (this.profile) {
         Object.assign(this.profile, data)
+        if (data.nickname) {
+          window.localStorage.setItem('sharebase.nickname', data.nickname)
+        }
+        if (data.headline) {
+          window.localStorage.setItem('sharebase.headline', data.headline)
+        }
       }
+    },
+    setProfile(profile: UserProfile | null) {
+      this.profile = profile
     },
     logout() {
       window.localStorage.removeItem('sharebase.role')
@@ -117,11 +129,15 @@ function mapProfileFromDto(dto: any): UserProfile {
   return {
     id: dto?.id ?? null,
     login: dto?.login ?? '',
-    name: dto?.name ?? null,
+    name: dto?.name ?? dto?.nickname ?? null,
     avatarFileId: dto?.avatarFileId ?? null,
     avatarUrl: dto?.avatarUrl ?? null,
     status: dto?.status ?? null,
-    nickname: dto?.name ?? dto?.login ?? '',
-    role: 'user'
+    nickname: dto?.nickname ?? dto?.name ?? dto?.login ?? '',
+    role: (dto?.role as UserProfile['role']) ?? 'user',
+    headline: dto?.headline ?? dto?.bio ?? null,
+    username: dto?.username ?? null,
+    website: dto?.website ?? null,
+    bio: dto?.bio ?? null
   }
 }
