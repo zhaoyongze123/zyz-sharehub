@@ -21,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class RoadmapJdbcRepository {
 
-  private static final String DEFAULT_USER_KEY = "local-dev-user";
-
   private final JdbcTemplate jdbc;
   private final ObjectMapper objectMapper;
 
@@ -32,7 +30,7 @@ public class RoadmapJdbcRepository {
   }
 
   @Transactional
-  public RoadmapDto save(RoadmapDto dto) {
+  public RoadmapDto save(String ownerKey, RoadmapDto dto) {
     KeyHolder holder = new GeneratedKeyHolder();
     jdbc.update(
         (PreparedStatementCreator)
@@ -43,7 +41,7 @@ public class RoadmapJdbcRepository {
                       new String[] {"id"});
               statement.setString(1, dto.title());
               statement.setString(2, dto.description());
-              statement.setString(3, DEFAULT_USER_KEY);
+              statement.setString(3, ownerKey);
               statement.setString(4, dto.visibility());
               statement.setString(5, dto.status());
               return statement;
@@ -177,8 +175,8 @@ public class RoadmapJdbcRepository {
   }
 
   @Transactional
-  public List<RoadmapNodeDto> addNode(Long roadmapId, RoadmapNodeDto req) {
-    requireRoadmap(roadmapId);
+  public List<RoadmapNodeDto> addNode(String ownerKey, Long roadmapId, RoadmapNodeDto req) {
+    requireRoadmap(roadmapId, ownerKey);
     jdbc.update(
         (PreparedStatementCreator)
             connection -> {
@@ -201,8 +199,8 @@ public class RoadmapJdbcRepository {
   }
 
   @Transactional
-  public Map<String, Object> saveProgress(Long roadmapId, Map<String, Object> payload) {
-    requireRoadmap(roadmapId);
+  public Map<String, Object> saveProgress(String ownerKey, Long roadmapId, Map<String, Object> payload) {
+    requireRoadmap(roadmapId, ownerKey);
     String json = serialize(payload);
     int updated =
         jdbc.update(
@@ -210,24 +208,24 @@ public class RoadmapJdbcRepository {
             json,
             Timestamp.from(Instant.now()),
             roadmapId,
-            DEFAULT_USER_KEY);
+            ownerKey);
     if (updated == 0) {
       jdbc.update(
           "INSERT INTO roadmap_progress (roadmap_id, user_key, payload, updated_at) VALUES (?, ?, ?, ?)",
           roadmapId,
-          DEFAULT_USER_KEY,
+          ownerKey,
           json,
           Timestamp.from(Instant.now()));
     }
     return payload;
   }
 
-  public Map<String, Object> findProgress(Long roadmapId) {
+  public Map<String, Object> findProgress(Long roadmapId, String ownerKey) {
     return jdbc.query(
         "SELECT payload FROM roadmap_progress WHERE roadmap_id = ? AND user_key = ?",
         (ResultSet rs) -> rs.next() ? deserialize(rs.getString("payload")) : null,
         roadmapId,
-        DEFAULT_USER_KEY);
+        ownerKey);
   }
 
   public long countByOwner(String ownerKey) {
@@ -235,8 +233,13 @@ public class RoadmapJdbcRepository {
     return count == null ? 0L : count;
   }
 
-  private void requireRoadmap(Long roadmapId) {
-    Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE id = ?", Integer.class, roadmapId);
+  private void requireRoadmap(Long roadmapId, String ownerKey) {
+    Integer count =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM roadmaps WHERE id = ? AND owner_key = ?",
+            Integer.class,
+            roadmapId,
+            ownerKey);
     if (count == null || count == 0) {
       throw new NotFoundException("ROADMAP_NOT_FOUND");
     }
