@@ -2,6 +2,8 @@ package com.sharehub.roadmap;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileDto;
+import com.sharehub.auth.UserProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,9 @@ class RoadmapControllerIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private UserProfileRepository userProfileRepository;
 
     @BeforeEach
     void cleanUp() {
@@ -119,5 +124,91 @@ class RoadmapControllerIntegrationTest {
                     """))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldRejectAnonymousAccessToRoadmapMutations() throws Exception {
+        mockMvc.perform(post("/api/roadmaps")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点1","orderNo":1}
+                    """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"percent":75}
+                    """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+    }
+
+    @Test
+    void shouldRejectBannedUserAccessToRoadmapMutations() throws Exception {
+        UserProfileDto bannedUser = userProfileRepository.upsert("roadmap-banned-user", "roadmap-banned-user", null);
+        userProfileRepository.updateStatus(bannedUser.id(), "BANNED");
+
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点1","orderNo":1}
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"percent":75}
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
     }
 }
