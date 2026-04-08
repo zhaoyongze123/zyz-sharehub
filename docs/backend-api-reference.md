@@ -337,7 +337,7 @@
 真实行为：
 
 - 按文件 `id` 直接返回二进制内容
-- `Content-Type` 优先使用入库时的 `contentType`，缺省回落到 `application/octet-stream`
+- `Content-Type` 优先使用入库时的 `contentType`，若为空或非法则回落到 `application/octet-stream`
 - `Content-Disposition` 固定为 `attachment; filename="{原始文件名}"`
 - 文件不存在时返回空 body 的 `404`
 

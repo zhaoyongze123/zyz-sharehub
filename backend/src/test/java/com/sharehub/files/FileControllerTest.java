@@ -40,4 +40,23 @@ class FileControllerTest {
             .isEqualTo("attachment; filename=\"resume.pdf\"");
         assertThat(response.getBody()).containsExactly(1, 2);
     }
+
+    @Test
+    void downloadFallsBackToOctetStreamWhenContentTypeInvalid() {
+        UUID id = UUID.randomUUID();
+        FileRecord record = new FileRecord();
+        record.setId(id);
+        record.setFilename("resume.pdf");
+        record.setData(new byte[]{1, 2});
+        record.setContentType("invalid/type;");
+
+        when(storageService.load(id)).thenReturn(Optional.of(record));
+
+        ResponseEntity<byte[]> response = controller.download(id);
+
+        assertThat(response.getHeaders().getContentType()).hasToString("application/octet-stream");
+        assertThat(response.getHeaders().getFirst("Content-Disposition"))
+            .isEqualTo("attachment; filename=\"resume.pdf\"");
+        assertThat(response.getBody()).containsExactly(1, 2);
+    }
 }

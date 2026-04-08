@@ -1,6 +1,9 @@
 package com.sharehub;
 
 import com.sharehub.auth.RequestAccessService;
+import com.sharehub.files.FileCategory;
+import com.sharehub.files.FileRepository;
+import com.sharehub.files.FileStorageService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,12 @@ class FileStorageIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @Autowired
+    private FileRepository fileRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -286,5 +295,27 @@ class FileStorageIntegrationTest {
         mockMvc.perform(get(downloadUrl))
             .andExpect(status().isOk())
             .andExpect(header().string("Content-Type", MediaType.TEXT_PLAIN_VALUE));
+    }
+
+    @Test
+    void shouldFallbackToOctetStreamWhenStoredContentTypeInvalid() throws Exception {
+        var stored = fileStorageService.storeBytes(
+            "user-invalid",
+            FileCategory.RESOURCE_ATTACHMENT,
+            "RESOURCE",
+            "resource-invalid",
+            "broken.bin",
+            "application/json",
+            "broken".getBytes()
+        );
+
+        var record = fileRepository.findById(stored.id()).orElseThrow();
+        record.setContentType("invalid/type;");
+        fileRepository.save(record);
+
+        mockMvc.perform(get(stored.downloadUrl()))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"broken.bin\""));
     }
 }
