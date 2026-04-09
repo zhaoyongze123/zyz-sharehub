@@ -270,4 +270,35 @@ class RoadmapControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items.length()").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("路线B"));
     }
+
+    @Test
+    void shouldTrimOrDefaultRoadmapStatusOnCreate() throws Exception {
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线A","description":"desc-a","visibility":"PUBLIC","status":" DRAFT "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线B","description":"desc-b","visibility":"PUBLIC","status":"   "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        mockMvc.perform(get("/api/roadmaps")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线B"))
+            .andExpect(jsonPath("$.data.items[0].status").value("PUBLISHED"))
+            .andExpect(jsonPath("$.data.items[1].title").value("路线A"))
+            .andExpect(jsonPath("$.data.items[1].status").value("DRAFT"));
+    }
 }
