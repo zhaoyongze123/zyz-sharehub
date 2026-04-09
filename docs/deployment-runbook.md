@@ -70,10 +70,10 @@ npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 
 最近一次本地复核：
 
-- 复核时间：2026-04-10 04:54 +0800
+- 复核时间：2026-04-10 04:58 +0800
 - 复核环境：前端 `http://127.0.0.1:14173`，后端 `http://127.0.0.1:18080`
 - 复核命令：`npx playwright test tests/e2e/full-site-walkthrough.spec.ts`
-- 复核结果：`tests/e2e/full-site-walkthrough.spec.ts` 7/7 通过（13.0s）
+- 复核结果：`tests/e2e/full-site-walkthrough.spec.ts` 7/7 通过（13.1s）
 
 ## 夜间自动化
 
