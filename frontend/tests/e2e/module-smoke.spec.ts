@@ -66,8 +66,6 @@ test('资源模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('resources'))
   await page.goto('/resources')
   await expect(page.locator('main').getByRole('heading', { name: '资料广场' })).toBeVisible()
-  await page.getByPlaceholder('搜索资源（例如：RAG, Spring Boot）...').fill('Spring')
-  await expect(page.getByText('找到')).toBeVisible()
 
   const apiResponse = await browserFetch(page, '/api/resources?page=0&pageSize=5', {
     'X-User-Key': userKey
@@ -76,19 +74,46 @@ test('资源模块 smoke', async ({ page }) => {
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+  expect(apiResponse.json?.data?.items.length).toBeGreaterThan(0)
+
+  const resource = apiResponse.json.data.items[0] as {
+    id: number
+    title: string
+    downloadCount: number
+  }
+
+  await expect(page.locator('article', { hasText: resource.title }).first()).toBeVisible()
+  await page.locator('article', { hasText: resource.title }).first().getByRole('link', { name: '查看详情' }).click()
+  await expect(page.getByRole('heading', { name: resource.title })).toBeVisible()
+  await expect(page.getByText(`下载 ${resource.downloadCount}`)).toBeVisible()
 })
 
 test('路线模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('roadmaps'))
   await page.goto('/roadmaps')
   await expect(page.getByText('学习路线图')).toBeVisible()
-  await expect(page.getByPlaceholder('搜索阶段或技术...')).toBeVisible()
 
   const apiResponse = await browserFetch(page, '/api/roadmaps?page=1&pageSize=5')
   expect(apiResponse.ok).toBeTruthy()
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+  expect(apiResponse.json?.data?.items.length).toBeGreaterThan(0)
+
+  const roadmap = apiResponse.json.data.items[0] as {
+    id: number
+    title: string
+    description?: string | null
+  }
+
+  const roadmapCard = page.locator('article', { hasText: roadmap.title }).first()
+  await expect(roadmapCard).toBeVisible()
+  if (roadmap.description?.trim()) {
+    await expect(roadmapCard.getByText(roadmap.description.trim())).toBeVisible()
+  }
+  await roadmapCard.getByRole('link', { name: '进入路线' }).click()
+  await expect(page.getByRole('heading', { name: roadmap.title })).toBeVisible()
+  await expect(page.getByText('节点进度结构')).toBeVisible()
 })
 
 test('社区笔记模块 smoke', async ({ page }) => {
