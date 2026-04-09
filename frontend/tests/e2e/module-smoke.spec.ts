@@ -411,6 +411,22 @@ test('后台模块 smoke', async ({ page }) => {
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+
+  const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {
+    'X-User-Key': userKey
+  })
+  expect(resourceResponse.ok).toBeTruthy()
+  expect(resourceResponse.json?.success).toBeTruthy()
+  const firstResource = resourceResponse.json?.data?.items?.[0]
+  expect(firstResource).toBeTruthy()
+
+  await page.goto('/admin/taxonomy')
+  await expect(page.getByRole('heading', { name: '标签分类管理' })).toBeVisible()
+  await expect(page.getByTestId('admin-taxonomy-summary')).toContainText(
+    `已读取 ${resourceResponse.json?.data?.items?.length ?? 0} / ${resourceResponse.json?.data?.total ?? 0} 条真实资料`
+  )
+  await expect(page.getByRole('cell', { name: firstResource.category || firstResource.type || '未分类' }).first()).toBeVisible()
+  await expect(page.getByTestId('admin-taxonomy-readonly').first()).toBeVisible()
 })
 
 test('管理员拦截 smoke', async ({ page }) => {
