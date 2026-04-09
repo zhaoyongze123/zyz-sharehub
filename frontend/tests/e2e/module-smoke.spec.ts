@@ -137,7 +137,15 @@ test('社区笔记模块 smoke', async ({ page }) => {
 test('简历模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('resumes'))
   await loginAs(page, 'user')
+  const authMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
   await page.goto('/resume')
+  const authMeResponse = await authMeResponsePromise
+  expect(authMeResponse.ok()).toBeTruthy()
+  const authMeBody = await authMeResponse.json()
+  expect(authMeBody.success).toBeTruthy()
+  expect(authMeBody.data?.login).toBeTruthy()
   await expect(page.getByRole('button', { name: '导出 PDF' })).toBeVisible()
   const workbenchResponse = await browserFetch(page, '/api/resumes/workbench', {
     'X-User-Key': userKey
@@ -168,12 +176,63 @@ test('简历模块 smoke', async ({ page }) => {
       firstWorkbenchResume.fileName || `resume-${firstWorkbenchResume.id}.pdf`
     )
   }
+
+  const summary = page.getByTestId('resume-workbench-summary')
+  const summaryBefore = await summary.textContent()
+  const totalBefore = Number(summaryBefore?.match(/累计\s+(\d+)/)?.[1] ?? '0')
+
+  await page.getByRole('combobox').nth(1).selectOption('modern')
+
+  const generateResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resumes/generate') && response.request().method() === 'POST'
+  )
+  const reloadWorkbenchResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resumes/workbench') && response.request().method() === 'GET'
+  )
+  await page.getByTestId('resume-generate-button').click()
+
+  const generateResponse = await generateResponsePromise
+  expect(generateResponse.ok()).toBeTruthy()
+  const generateBody = await generateResponse.json()
+  expect(generateBody.success).toBeTruthy()
+  const generatedId = generateBody.data?.id as number
+  expect(Number.isFinite(generatedId)).toBeTruthy()
+
+  const reloadWorkbenchResponse = await reloadWorkbenchResponsePromise
+  expect(reloadWorkbenchResponse.ok()).toBeTruthy()
+  await expect(summary).toContainText(`累计 ${totalBefore + 1}`)
+  await expect(page.getByTestId(`resume-server-item-${generatedId}`)).toContainText('resume-modern.pdf')
+
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByTestId(`resume-download-${generatedId}`).click()
+  const browserDownload = await downloadPromise
+  expect(browserDownload.suggestedFilename()).toContain('resume-modern')
+
+  const deleteResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/resumes/${generatedId}`) && response.request().method() === 'DELETE'
+  )
+  const reloadListAfterDeletePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resumes?page=1&pageSize=10') && response.request().method() === 'GET'
+  )
+  await page.getByTestId(`resume-delete-${generatedId}`).click()
+  const deleteResponse = await deleteResponsePromise
+  expect(deleteResponse.ok()).toBeTruthy()
+  await reloadListAfterDeletePromise
+  await expect(page.getByTestId(`resume-server-item-${generatedId}`)).toHaveCount(0)
 })
 
 test('个人中心模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('profile'))
   await loginAs(page, 'user')
+  const authMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
   await page.goto('/me')
+  const authMeResponse = await authMeResponsePromise
+  expect(authMeResponse.ok()).toBeTruthy()
+  const authMeBody = await authMeResponse.json()
+  expect(authMeBody.success).toBeTruthy()
+  expect(authMeBody.data?.login).toBeTruthy()
   await expect(page.getByRole('heading', { name: '个人资料' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '个人帐户' })).toBeVisible()
 
@@ -185,6 +244,7 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(meResponse.json?.success).toBeTruthy()
   expect(meResponse.json?.data).toBeTruthy()
   expect(meResponse.json?.data?.profile?.login).toBeTruthy()
+  expect(meResponse.json?.data?.profile?.login).toBe(authMeBody.data.login)
   await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
   await expect(page.getByTestId('profile-avatar-upload')).toBeEnabled()
   const fileChooserPromise = page.waitForEvent('filechooser')
