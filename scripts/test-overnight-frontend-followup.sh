@@ -17,12 +17,14 @@ trap cleanup EXIT
 TEST_PROJECT="${TEST_ROOT}/project"
 TEST_REMOTE="${TEST_ROOT}/remote.git"
 RUN_DIR="${TEST_PROJECT}/output/overnight/20260408-frontend-followup"
+RUN_DIR_REBASE="${TEST_PROJECT}/output/overnight/20260408-frontend-followup-rebase"
 
 mkdir -p \
   "${TEST_PROJECT}/scripts" \
   "${TEST_PROJECT}/frontend" \
   "${TEST_PROJECT}/output/overnight/state" \
   "${RUN_DIR}/browser-smoke" \
+  "${RUN_DIR_REBASE}/browser-smoke" \
   "${TEST_ROOT}/bin"
 
 cp "${PROJECT_ROOT}/scripts/overnight-frontend-followup.sh" "${TEST_PROJECT}/scripts/overnight-frontend-followup.sh"
@@ -40,6 +42,10 @@ EOF
 
 cat > "${RUN_DIR}/browser-smoke/meta.env" <<'EOF'
 MODULES=resources,profile
+EOF
+
+cat > "${RUN_DIR_REBASE}/browser-smoke/meta.env" <<'EOF'
+MODULES=resources
 EOF
 
 cat > "${TEST_ROOT}/bin/fake-codex" <<'EOF'
@@ -108,5 +114,35 @@ git -C "${TEST_REMOTE}" show-ref --verify --quiet refs/heads/feature/frontend-re
   echo "frontend branch missing on remote"
   exit 1
 }
+
+REMOTE_CLONE="${TEST_ROOT}/remote-clone"
+git clone -q "${TEST_REMOTE}" "${REMOTE_CLONE}"
+git -C "${REMOTE_CLONE}" config user.name "ShareHub Remote"
+git -C "${REMOTE_CLONE}" config user.email "sharehub-remote@example.com"
+git -C "${REMOTE_CLONE}" checkout -q -b feature/frontend-real-api-resources origin/feature/frontend-real-api-resources
+echo "remote change" >> "${REMOTE_CLONE}/frontend/README.md"
+git -C "${REMOTE_CLONE}" add frontend/README.md
+git -C "${REMOTE_CLONE}" commit -q -m "remote update"
+git -C "${REMOTE_CLONE}" push -q origin feature/frontend-real-api-resources
+
+(
+  cd "${TEST_PROJECT}"
+  OVERNIGHT_CODEX_BIN="${TEST_ROOT}/bin/fake-codex" \
+  ./scripts/overnight-frontend-followup.sh "${RUN_DIR_REBASE}" "HEAD~0" "HEAD"
+) >"${TEST_ROOT}/frontend-followup-rebase.log" 2>&1 || {
+  KEEP_TEST_ROOT=1
+  cat "${TEST_ROOT}/frontend-followup-rebase.log" || true
+  exit 1
+}
+
+REBASE_LOG="${RUN_DIR_REBASE}/frontend-followup/codex-output.log"
+[[ -f "${REBASE_LOG}" ]] || { echo "rebase log missing"; exit 1; }
+grep -q '先执行 fetch + rebase' "${REBASE_LOG}" || { echo "fetch+rebase log missing"; exit 1; }
+grep -q '前端分支已完成 rebase' "${REBASE_LOG}" || { echo "rebase success log missing"; exit 1; }
+
+UPDATED_REMOTE_CLONE="${TEST_ROOT}/remote-clone-verify"
+git clone -q "${TEST_REMOTE}" "${UPDATED_REMOTE_CLONE}"
+git -C "${UPDATED_REMOTE_CLONE}" checkout -q feature/frontend-real-api-resources
+grep -q 'remote change' "${UPDATED_REMOTE_CLONE}/frontend/README.md" || { echo "remote change lost after rebase push"; exit 1; }
 
 echo "frontend followup test passed"
