@@ -79,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -170,6 +171,16 @@ function resetForm() {
   validationMessage.value = ''
 }
 
+function resolveSubmitError(error: unknown, fallbackMessage: string) {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.msg || error.response?.data?.message || fallbackMessage
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return fallbackMessage
+}
+
 async function saveDraft() {
   validationMessage.value = ''
   const message = validateForm()
@@ -201,6 +212,8 @@ async function saveDraft() {
 
     lastPublishedId.value = created.id
     appStore.showToast('草稿已保存', `资源 #${created.id} 已通过真实接口创建`)
+  } catch (error) {
+    validationMessage.value = resolveSubmitError(error, '草稿保存失败，请稍后重试')
   } finally {
     isSubmitting.value = false
   }
@@ -239,6 +252,8 @@ async function submitReview() {
     lastPublishedId.value = published.id
     appStore.showToast('提交成功', `资源 #${published.id} 已进入公开展示`)
     resetForm()
+  } catch (error) {
+    validationMessage.value = resolveSubmitError(error, '资料提交失败，请稍后重试')
   } finally {
     isSubmitting.value = false
   }

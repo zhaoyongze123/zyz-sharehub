@@ -77,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -130,6 +131,16 @@ function resetForm() {
   nodes.splice(0, nodes.length, { id: Date.now(), title: '阶段 1：协议与接入' })
 }
 
+function resolveSubmitError(error: unknown, fallbackMessage: string) {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.msg || error.response?.data?.message || fallbackMessage
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return fallbackMessage
+}
+
 async function submitRoadmap(status: 'DRAFT' | 'PUBLISHED') {
   validationMessage.value = ''
   const message = validateForm()
@@ -159,6 +170,11 @@ async function submitRoadmap(status: 'DRAFT' | 'PUBLISHED') {
     lastCreatedNodeCount.value = nodes.length
     appStore.showToast(status === 'DRAFT' ? '草稿已保存' : '发布成功', `路线 #${created.id} 已完成真实写入`)
     resetForm()
+  } catch (error) {
+    validationMessage.value = resolveSubmitError(
+      error,
+      status === 'DRAFT' ? '路线草稿保存失败，请稍后重试' : '路线发布失败，请稍后重试'
+    )
   } finally {
     isSubmitting.value = false
   }
