@@ -395,6 +395,7 @@ test('me 模块真接口联调', async ({ page, request }) => {
   const avatarBody = await avatarResponse.json()
   expect(avatarBody.data.downloadUrl).toContain('/api/files/')
   await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
+  await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
 
   const reloadAuthMeResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/auth/me') && response.request().method() === 'GET'
@@ -404,6 +405,7 @@ test('me 模块真接口联调', async ({ page, request }) => {
   expect(reloadAuthMeResponse.ok()).toBeTruthy()
   await expect(page.getByText(`@${authMeBody.data.login}`)).toBeVisible()
   await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
+  await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
 })
 
 test('admin 模块真接口联调', async ({ page, request }) => {

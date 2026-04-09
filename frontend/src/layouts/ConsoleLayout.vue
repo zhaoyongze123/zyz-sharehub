@@ -51,8 +51,15 @@
           <div class="account-menu-overlay" @click="menuOpen = false"></div>
           <div class="account-menu">
             <div class="account-menu-item top-profile" style="align-items: flex-start;">
-              <div class="avatar-circle" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--app-text-main); display: flex; align-items: center; justify-content: center; background: var(--app-bg-modal);">
-                <div class="i-carbon-logo-github" style="font-size: 28px; color: var(--app-text-main);"></div>
+              <div class="avatar-circle account-avatar account-avatar-lg">
+                <img
+                  v-if="authStore.profile?.avatarUrl"
+                  :src="authStore.profile.avatarUrl"
+                  alt="avatar"
+                  class="account-avatar-image"
+                  data-testid="console-avatar-image"
+                />
+                <span v-else class="account-avatar-fallback" data-testid="console-avatar-fallback">{{ avatarFallback }}</span>
               </div>
               <div class="profile-text" style="display: flex; flex-direction: column; margin-left: 12px; gap: 4px;">
                 <span class="profile-name" style="font-size: 16px; font-weight: 600; color: var(--app-text-main); line-height: 1;">{{ authStore.profile?.nickname || '未登录' }}</span>
@@ -65,8 +72,14 @@
             <div class="menu-section-title" style="padding: 8px 16px 4px; font-size: 16px; color: var(--app-text-sub);">个性化</div>
             
             <RouterLink to="/me" class="account-menu-item active-item" @click="menuOpen = false" style="background-color: var(--app-bg-hover); border-radius: 8px; margin: 4px 8px; width: auto; padding: 8px;">
-              <div class="avatar-circle" style="width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--app-text-main); display: flex; align-items: center; justify-content: center; background: var(--app-bg-modal); margin-right: 8px;">
-                <div class="i-carbon-logo-github" style="font-size: 18px; color: var(--app-text-main);"></div>
+              <div class="avatar-circle account-avatar account-avatar-sm">
+                <img
+                  v-if="authStore.profile?.avatarUrl"
+                  :src="authStore.profile.avatarUrl"
+                  alt="avatar"
+                  class="account-avatar-image"
+                />
+                <span v-else class="account-avatar-fallback">{{ avatarFallback }}</span>
               </div>
               <span style="font-weight: 500; color: var(--app-text-main); font-size: 15px;">个人资料</span>
             </RouterLink>
@@ -89,7 +102,14 @@
         </div>
 
         <div class="user-profile-mini" @click="menuOpen = !menuOpen">
-          <img src="https://avatars.githubusercontent.com/u/9919?s=64&v=4" alt="avatar" class="avatar" />
+          <img
+            v-if="authStore.profile?.avatarUrl"
+            :src="authStore.profile.avatarUrl"
+            alt="avatar"
+            class="avatar"
+            data-testid="console-sidebar-avatar"
+          />
+          <div v-else class="avatar" data-testid="console-sidebar-avatar-fallback">{{ avatarFallback }}</div>
           <div class="user-info">
             <span class="user-name">{{ authStore.profile?.nickname || '未登录' }}</span>
             <span class="user-role">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</span>
@@ -140,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -150,6 +170,7 @@ const authStore = useAuthStore()
 
 const menuOpen = ref(false)
 const searchModalOpen = ref(false)
+const avatarFallback = computed(() => authStore.profile?.nickname?.trim().slice(0, 1).toUpperCase() || '未')
 
 const handleSearch = () => {
   searchModalOpen.value = true
@@ -379,6 +400,41 @@ const handleLogout = () => {
   color: var(--app-text-muted);
 }
 
+.account-avatar {
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1.5px solid var(--app-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--app-bg-modal);
+  color: var(--app-text-main);
+  flex-shrink: 0;
+}
+
+.account-avatar-lg {
+  width: 40px;
+  height: 40px;
+  border-width: 2px;
+}
+
+.account-avatar-sm {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+}
+
+.account-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-avatar-fallback {
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .menu-icon {
   width: 18px;
   height: 18px;
@@ -423,6 +479,7 @@ const handleLogout = () => {
   justify-content: center;
   font-size: 13px;
   font-weight: 500;
+  object-fit: cover;
 }
 
 .user-info {
