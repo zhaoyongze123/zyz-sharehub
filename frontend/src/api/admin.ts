@@ -54,6 +54,7 @@ export interface AdminReportItem {
   target: string
   reporter: string
   status: string
+  rawStatus: string
 }
 
 export interface AdminUserItem {
@@ -86,7 +87,8 @@ function normalizeReport(dto: AdminReportDto): AdminReportItem {
     reason: dto.reason?.trim() || '未填写原因',
     target: `${targetType} #${targetId}`,
     reporter: dto.reporter?.trim() || '未知举报人',
-    status: normalizeReportStatus(dto.status)
+    status: normalizeReportStatus(dto.status),
+    rawStatus: dto.status?.trim() || 'UNKNOWN'
   }
 }
 
@@ -182,4 +184,9 @@ export async function banAdminUser(userId: number) {
 
 export async function unbanAdminUser(userId: number) {
   await apiClient.post(`/admin/users/${userId}/unban`)
+}
+
+export async function resolveAdminReport(reportId: number) {
+  const response = await apiClient.post<ApiResponse<AdminReportDto>>(`/admin/reports/${reportId}/resolve`)
+  return normalizeReport(response.data.data)
 }

@@ -527,6 +527,29 @@ test('admin 模块真接口联调', async ({ page, request }) => {
     await expect(page.getByText('暂无举报数据')).toBeVisible()
   }
 
+  await page.goto('/admin/reviews')
+  await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  if (firstReport) {
+    const reviewRow = page.getByTestId(`admin-reviews-row-${firstReport.id}`)
+    await expect(reviewRow).toContainText(firstReport.reason)
+    await expect(reviewRow).toContainText(firstReport.reporter)
+    await expect(reviewRow).toContainText(`${firstReport.targetType} #${firstReport.targetId}`)
+
+    if (firstReport.status === 'OPEN') {
+      const resolveResponsePromise = page.waitForResponse((response) =>
+        response.url().includes(`/api/admin/reports/${firstReport.id}/resolve`) && response.request().method() === 'POST'
+      )
+      await page.getByRole('button', { name: '完成处理' }).click()
+      const resolveResponse = await resolveResponsePromise
+      expect(resolveResponse.ok()).toBeTruthy()
+      await expect(reviewRow).toContainText('已处理')
+    } else {
+      await expect(page.getByRole('button', { name: '完成处理' })).toBeDisabled()
+    }
+  } else {
+    await expect(page.getByText('暂无审核数据')).toBeVisible()
+  }
+
   await page.goto('/admin/users')
   await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
   const userRow = page.locator('tbody tr', { hasText: managedUserLogin }).first()
