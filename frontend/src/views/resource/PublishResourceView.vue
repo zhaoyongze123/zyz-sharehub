@@ -163,7 +163,7 @@ function validateForm() {
 
 function resetForm() {
   form.title = ''
-  form.category = defaultCategory.value
+  form.category = defaultCategory
   form.tags = ''
   form.url = ''
   form.summary = ''

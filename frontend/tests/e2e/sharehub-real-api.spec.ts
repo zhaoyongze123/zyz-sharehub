@@ -238,6 +238,10 @@ test('publish-resource 页面真写入联调', async ({ page, request }) => {
 
   await expect(page.getByTestId('publish-resource-result')).toContainText(`资源 ID：${createdId}`)
   await expect(page.getByTestId('publish-resource-result')).toContainText('附件：guide.pdf')
+  await expect(page.getByTestId('publish-resource-title')).toHaveValue('')
+  await expect(page.getByTestId('publish-resource-tags')).toHaveValue('')
+  await expect(page.getByTestId('publish-resource-summary')).toHaveValue('')
+  await expect(page.getByLabel('资料分类')).toHaveValue('PDF')
   await page.getByRole('link', { name: '查看详情页' }).click()
   await expect(page).toHaveURL(new RegExp(`/resources/${createdId}$`))
   await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
