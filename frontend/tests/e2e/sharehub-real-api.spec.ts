@@ -78,7 +78,7 @@ async function createResume(request: Parameters<typeof test>[0]['request'], temp
 async function createPublicRoadmap(
   request: Parameters<typeof test>[0]['request'],
   title: string,
-  nodeTitles: string[] = []
+  nodes: Array<{ title: string, resourceId?: number | null }> = []
 ) {
   const createResponse = await request.post(`${apiBaseUrl}/api/roadmaps`, {
     headers: userHeaders(),
@@ -93,12 +93,13 @@ async function createPublicRoadmap(
   const createBody = await createResponse.json()
   const id = createBody.data.id as number
 
-  for (const [index, nodeTitle] of nodeTitles.entries()) {
+  for (const [index, node] of nodes.entries()) {
     const nodeResponse = await request.post(`${apiBaseUrl}/api/roadmaps/${id}/nodes`, {
       headers: userHeaders(),
       data: {
-        title: nodeTitle,
-        orderNo: index + 1
+        title: node.title,
+        orderNo: index + 1,
+        resourceId: node.resourceId ?? null
       }
     })
     expect(nodeResponse.ok()).toBeTruthy()
@@ -155,8 +156,13 @@ test('resources 模块真接口联调', async ({ page, request }) => {
 
 test('roadmaps 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('roadmaps'))
+  const linkedResourceTitle = `Roadmap Resource ${Date.now()}`
+  const linkedResourceId = await createPublishedResource(request, linkedResourceTitle)
   const roadmapTitle = `Playwright Roadmap ${Date.now()}`
-  const roadmapId = await createPublicRoadmap(request, roadmapTitle, ['阶段 1：接线', '阶段 2：验证'])
+  const roadmapId = await createPublicRoadmap(request, roadmapTitle, [
+    { title: '阶段 1：接线', resourceId: linkedResourceId },
+    { title: '阶段 2：验证' }
+  ])
 
   const listResponse = await request.get(`${apiBaseUrl}/api/roadmaps?page=1&pageSize=20`)
   expect(listResponse.ok()).toBeTruthy()
@@ -181,6 +187,13 @@ test('roadmaps 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
   await expect(page.getByText('节点进度结构')).toBeVisible()
   await expect(page.getByText('阶段 1：接线')).toBeVisible()
+  await page.locator('.timeline__item', { hasText: '阶段 1：接线' }).click()
+  await expect(page.getByRole('heading', { name: '阶段 1：接线 详情' })).toBeVisible()
+  const resourcePreview = page.locator('.resource-preview')
+  await expect(resourcePreview.getByText(linkedResourceTitle)).toBeVisible()
+  await resourcePreview.getByRole('button', { name: '查看' }).click()
+  await expect(page).toHaveURL(new RegExp(`/resources/${linkedResourceId}$`))
+  await expect(page.getByRole('heading', { name: linkedResourceTitle })).toBeVisible()
 })
 
 test('notes 模块真接口联调', async ({ page, request }) => {
