@@ -43,10 +43,10 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-// 直接复用真实接口的分类枚举，去重后过滤掉“全部”并清理空白
-const categoryOptions = Array.from(new Set(resourceCategoryOptions))
+// 直接复用真实接口的分类枚举，过滤空白与“全部”后去重
+const categoryOptions = resourceCategoryOptions
   .map((item) => item.trim())
-  .filter((item) => item && item !== '全部')
+  .filter((item, index, arr) => item && item !== '全部' && arr.indexOf(item) === index)
   .map((item) => ({ label: item, value: item }))
 const defaultCategory = categoryOptions[0]?.value || ''
 const form = reactive({
