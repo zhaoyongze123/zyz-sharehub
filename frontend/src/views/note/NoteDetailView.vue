@@ -160,7 +160,8 @@ async function submitReport() {
 
   try {
     const report = await createReport({
-      resourceId: note.value.id,
+      targetType: 'NOTE',
+      noteId: note.value.id,
       reason: reportReason.value
     })
     appStore.showToast('举报已提交', `举报 #${report.id} 已进入后台处理队列`)

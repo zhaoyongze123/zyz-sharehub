@@ -516,11 +516,11 @@
 当前边界：
 
 - 评论、收藏、点赞主要围绕 `RESOURCE`
-- 举报也主要围绕 `RESOURCE`
+- 举报支持 `RESOURCE` 与 `NOTE`
 - 还没有真正抽象成多内容类型互动模型
-- 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，用户被封禁时返回 `403/USER_BANNED`，目标资源不存在时返回 `404/RESOURCE_NOT_FOUND`
+- 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，用户被封禁时返回 `403/USER_BANNED`，举报目标不存在时返回 `404/RESOURCE_NOT_FOUND` 或 `404/NOTE_NOT_FOUND`
 - `POST /api/resources/{id}/comments` 和 `POST /api/comments/{id}/reply` 在 `content` 缺失、空字符串或仅空白字符时返回 `400 COMMENT_CONTENT_REQUIRED`
-- `POST /api/reports` 的 `reason` 缺失、空字符串或仅空白时回落为 `无`
+- `POST /api/reports` 的 `reason` 缺失、空字符串或仅空白时回落为 `无`；资源举报传 `resourceId`，笔记举报传 `targetType=NOTE` + `noteId`
 
 ## 11. 后台治理
 

@@ -187,6 +187,7 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
   expect(reportResponse.ok()).toBeTruthy()
   const reportBody = await reportResponse.json()
   expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetType).toBe('NOTE')
   expect(reportBody.data.targetId).toBe(noteId)
   expect(reportBody.data.reason).toBe('Smoke note detail report')
 
@@ -197,8 +198,8 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
   })
   expect(adminReportsResponse.ok()).toBeTruthy()
   const adminReportsBody = await adminReportsResponse.json()
-  const createdReport = (adminReportsBody.data.items as Array<{ targetId: number, reason: string }>).find((item) =>
-    item.targetId === noteId && item.reason === 'Smoke note detail report'
+  const createdReport = (adminReportsBody.data.items as Array<{ targetType: string, targetId: number, reason: string }>).find((item) =>
+    item.targetType === 'NOTE' && item.targetId === noteId && item.reason === 'Smoke note detail report'
   )
   expect(createdReport).toBeTruthy()
 })

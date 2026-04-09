@@ -342,6 +342,24 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.reason").value("无"));
     }
 
+    @Test
+    void reportEndpointShouldSupportNoteTarget() throws Exception {
+        long noteId = createNote("笔记举报校验");
+
+        mvc.perform(post("/api/reports")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of(
+                    "targetType", "NOTE",
+                    "noteId", String.valueOf(noteId),
+                    "reason", "note spam"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.targetType").value("NOTE"))
+            .andExpect(jsonPath("$.data.targetId").value(noteId))
+            .andExpect(jsonPath("$.data.reason").value("note spam"));
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {
         return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
@@ -367,6 +385,30 @@ public class InteractionControllerIntegrationTest {
         );
         if (id == null) {
             throw new IllegalStateException("FAILED_TO_CREATE_RESOURCE");
+        }
+        return id;
+    }
+
+    private long createNote(String title) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO notes (title, content_md, owner_key, visibility, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            title,
+            "# " + title,
+            USER_KEY,
+            "PUBLIC",
+            "PUBLISHED"
+        );
+        Long id = jdbcTemplate.queryForObject(
+            "SELECT MAX(id) FROM notes WHERE owner_key = ? AND title = ?",
+            Long.class,
+            USER_KEY,
+            title
+        );
+        if (id == null) {
+            throw new IllegalStateException("FAILED_TO_CREATE_NOTE");
         }
         return id;
     }

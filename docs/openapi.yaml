@@ -1161,12 +1161,12 @@ paths:
   /api/reports:
     post:
       summary: 举报内容
-      description: 需要当前用户身份；`reason` 未传、为空字符串或仅空白时回落为 `无`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；支持 `RESOURCE` 与 `NOTE` 两种目标，资源举报传 `resourceId`，笔记举报传 `targetType=NOTE` + `noteId`；`reason` 未传、为空字符串或仅空白时回落为 `无`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
         '404':
-          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+          description: 目标不存在（错误码 `RESOURCE_NOT_FOUND` / `NOTE_NOT_FOUND`）
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
         '403':

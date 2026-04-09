@@ -17,7 +17,9 @@ interface ReportDto {
 }
 
 export interface CreateReportPayload {
-  resourceId: number | string
+  targetType?: 'RESOURCE' | 'NOTE'
+  resourceId?: number | string
+  noteId?: number | string
   reason?: string
 }
 

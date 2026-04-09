@@ -127,6 +127,18 @@ public class NoteRepository {
         return count == null ? 0L : count;
     }
 
+    public boolean existsById(Long id) {
+        if (id == null) {
+            return false;
+        }
+        Boolean exists = jdbcTemplate.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM notes WHERE id = ?)",
+            Boolean.class,
+            id
+        );
+        return Boolean.TRUE.equals(exists);
+    }
+
     private Optional<NoteDto> findOptional(Long id, String ownerKey) {
         List<NoteDto> results = jdbcTemplate.query(
             "SELECT id, title, content_md, visibility, status FROM notes WHERE id = ? AND owner_key = ?",
