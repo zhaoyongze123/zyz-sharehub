@@ -224,6 +224,8 @@
 真实行为：
 
 - 未传 `status` 时，只返回 `PUBLISHED`
+- `status` 为空字符串、仅空白，或裁剪后没有有效状态项时，按未传处理
+- `status` 带前后空白时会先裁剪再参与筛选
 - `category` 当前映射到资源表的 `type`
 - `sortBy=latest` 按 `updatedAt DESC`
 - `sortBy=hot` 按点赞数降序，再按更新时间降序

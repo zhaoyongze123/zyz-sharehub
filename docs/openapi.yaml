@@ -389,6 +389,7 @@ paths:
   /api/resources:
     get:
       summary: 资料分页列表
+      description: 当前公开资料列表默认只返回 `PUBLISHED`；`status` 为空字符串、仅空白，或裁剪后没有有效状态项时按未传处理，带前后空白时会先裁剪再参与筛选；`category` 当前映射到资源 `type` 字段；`sortBy=latest` 按 `updatedAt DESC`，`sortBy=hot` 按点赞数降序再按更新时间降序
       parameters:
         - in: query
           name: page

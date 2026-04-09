@@ -226,10 +226,11 @@ public class ResourceController {
         if (status == null || status.isBlank()) {
             return List.of("PUBLISHED");
         }
-        return Arrays.stream(status.split(","))
+        List<String> parsed = Arrays.stream(status.split(","))
             .map(String::trim)
             .filter(s -> !s.isEmpty())
             .collect(Collectors.toList());
+        return parsed.isEmpty() ? List.of("PUBLISHED") : parsed;
     }
 
     private List<ResourceDto> enrichResources(List<ResourceEntity> resources) {
