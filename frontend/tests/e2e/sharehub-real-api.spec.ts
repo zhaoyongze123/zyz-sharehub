@@ -128,7 +128,10 @@ test('backend health', async ({ request }) => {
 
 test('resources 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('resources'))
-  const resourceTitle = `Playwright Resource ${Date.now()}`
+  const batchId = Date.now()
+  const relatedResourceTitle = `Playwright Related Resource ${batchId}`
+  const relatedResourceId = await createPublishedResource(request, relatedResourceTitle)
+  const resourceTitle = `Playwright Resource ${batchId}`
   const resourceId = await createPublishedResource(request, resourceTitle)
 
   const listResponse = await request.get(`${apiBaseUrl}/api/resources?page=0&pageSize=12`, {
@@ -144,6 +147,12 @@ test('resources 模块真接口联调', async ({ page, request }) => {
   const detailBody = await detailResponse.json()
   expect(detailBody.data.id).toBe(resourceId)
 
+  const relatedResponse = await request.get(`${apiBaseUrl}/api/resources/${resourceId}/related`)
+  expect(relatedResponse.ok()).toBeTruthy()
+  const relatedBody = await relatedResponse.json()
+  expect(Array.isArray(relatedBody.data)).toBeTruthy()
+  expect(relatedBody.data.some((item: { id: number }) => item.id === relatedResourceId)).toBeTruthy()
+
   await page.goto('/resources')
   await expect(page.locator('main').getByRole('heading', { name: '资料广场' })).toBeVisible()
   const resourceCard = page.locator('article', { hasText: resourceTitle }).first()
@@ -152,6 +161,11 @@ test('resources 模块真接口联调', async ({ page, request }) => {
   await resourceLink.click()
   await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
   await expect(page.getByText(`下载 ${detailBody.data.downloadCount}`)).toBeVisible()
+  const relatedCard = page.locator('.related-grid article', { hasText: relatedResourceTitle }).first()
+  await expect(relatedCard).toBeVisible()
+  await relatedCard.getByRole('link', { name: '查看详情' }).click()
+  await expect(page).toHaveURL(new RegExp(`/resources/${relatedResourceId}$`))
+  await expect(page.getByRole('heading', { name: relatedResourceTitle })).toBeVisible()
 })
 
 test('roadmaps 模块真接口联调', async ({ page, request }) => {
