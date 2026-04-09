@@ -25,12 +25,51 @@ const DEFAULT_SECTION_NAMES: Record<ResumeSectionKind, string> = {
   unclassified: '未识别内容'
 }
 
-function sortSections(sections: ResumeSection[]) {
-  return [...sections].sort((left, right) => {
-    const leftIndex = DEFAULT_SECTION_ORDER.indexOf(left.kind)
-    const rightIndex = DEFAULT_SECTION_ORDER.indexOf(right.kind)
-    return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex)
+const DEFAULT_BASIC_FIELDS = [
+  { key: 'name', label: '姓名' },
+  { key: 'intent', label: '求职意向' },
+  { key: 'phone', label: '联系电话' },
+  { key: 'email', label: '电子邮箱' },
+  { key: 'city', label: '意向城市' },
+  { key: 'currentCity', label: '现居地' },
+  { key: 'experience', label: '工作经验' },
+  { key: 'education', label: '最高学历' },
+  { key: 'gender', label: '性别' },
+  { key: 'age', label: '年龄' },
+  { key: 'avatar', label: '头像' }
+]
+
+function createDefaultBasicFields() {
+  return DEFAULT_BASIC_FIELDS.map((field) => ({
+    id: createId('field'),
+    key: field.key,
+    label: field.label,
+    value: '',
+    visible: true
+  }))
+}
+
+function ensureBasicSection(section: ResumeSection) {
+  if (section.kind !== 'basic') {
+    return section
+  }
+
+  const merged = createDefaultBasicFields()
+  section.fields.forEach((field) => {
+    const target = merged.find((entry) => entry.key === field.key)
+    if (target) {
+      target.value = field.value
+      target.visible = field.visible
+      target.label = field.label || target.label
+    } else {
+      merged.push(field)
+    }
   })
+
+  return {
+    ...section,
+    fields: merged
+  }
 }
 
 export function createEmptyDocument(templateKey: ResumeDocument['templateKey'] = 'classic'): ResumeDocument {
@@ -44,7 +83,7 @@ export function createEmptyDocument(templateKey: ResumeDocument['templateKey'] =
       name: DEFAULT_SECTION_NAMES[kind],
       visible: true,
       layout: kind === 'summary' ? 'text' : kind === 'basic' || kind === 'skills' ? 'fields' : 'items',
-      fields: [],
+      fields: kind === 'basic' ? createDefaultBasicFields() : [],
       items: [],
       text: ''
     }))
@@ -78,7 +117,9 @@ export function buildResumeDocumentFromLines(
     }
   })
 
-  const normalizedSections = sections.filter((section) => section.fields.length || section.items.length || section.text)
+  const normalizedSections = sections
+    .map((section) => ensureBasicSection(section))
+    .filter((section) => section.fields.length || section.items.length || section.text || section.kind === 'basic')
 
   if (!normalizedSections.length) {
     warnings.push('未识别出结构化模块，已保留原始文本到未识别内容。')
@@ -102,7 +143,8 @@ export function buildResumeDocumentFromLines(
       name: sourceFileName ? sourceFileName.replace(/\.pdf$/i, '') : '导入简历',
       templateKey,
       sourceFileName,
-      sections: sortSections(normalizedSections)
+      // 导入后的模块顺序严格保持 PDF 自上而下的原始顺序，不做二次重排。
+      sections: normalizedSections
     }
   }
 }

@@ -14,6 +14,11 @@
         <span v-else-if="saveTime" class="text-xs text-emerald-600">已自动保存 {{ saveTime }}</span>
       </div>
 
+      <div v-if="workbench" class="hidden items-center gap-3 text-xs text-slate-500 xl:flex" data-testid="resume-workbench-summary">
+        <span>累计 {{ workbench.total }}</span>
+        <span>已生成 {{ workbench.generatedCount }}</span>
+      </div>
+
       <div class="flex items-center gap-2">
         <select v-model="currentTemplate" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
           <option value="classic">经典基础</option>
@@ -27,9 +32,90 @@
         </BaseButton>
         <BaseButton variant="secondary" size="sm" @click="addSection">添加模块</BaseButton>
         <BaseButton variant="secondary" size="sm" @click="resetCurrentDraft">重置</BaseButton>
+        <BaseButton size="sm" :disabled="serverActionLoading" data-testid="resume-generate-button" @click="generateServerResume">
+          {{ serverActionLoading ? '提交中...' : '生成服务端简历' }}
+        </BaseButton>
         <BaseButton size="sm" :disabled="exporting" @click="exportPdf">{{ exporting ? '导出中...' : '导出 PDF' }}</BaseButton>
       </div>
     </header>
+
+    <section class="grid shrink-0 gap-4 border-b bg-white px-6 py-4 lg:grid-cols-[1.3fr_1fr]">
+      <div class="grid gap-3 sm:grid-cols-3">
+        <article class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-slate-400">工作台总数</p>
+          <p class="mt-2 text-2xl font-semibold text-slate-900">{{ workbench?.total ?? 0 }}</p>
+          <p class="mt-1 text-xs text-slate-500">来自 `/api/resumes/workbench`</p>
+        </article>
+        <article class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-slate-400">已生成</p>
+          <p class="mt-2 text-2xl font-semibold text-slate-900">{{ workbench?.generatedCount ?? 0 }}</p>
+          <p class="mt-1 text-xs text-slate-500">点击按钮触发 `/api/resumes/generate`</p>
+        </article>
+        <article class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-slate-400">当前模板</p>
+          <p class="mt-2 text-2xl font-semibold text-slate-900">{{ getTemplateLabel(currentTemplate) }}</p>
+          <p class="mt-1 text-xs text-slate-500">本地编辑器与服务端生成保持同模板键</p>
+        </article>
+      </div>
+
+      <article class="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm" data-testid="resume-server-list">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-900">服务端生成记录</h2>
+            <p class="text-xs text-slate-500">读取 `/api/resumes` 列表，并支持下载与删除。</p>
+          </div>
+          <button
+            type="button"
+            class="text-xs text-blue-600 disabled:text-slate-400"
+            :disabled="resumeLoading"
+            @click="reloadResumeWorkbench"
+          >
+            {{ resumeLoading ? '刷新中...' : '刷新记录' }}
+          </button>
+        </div>
+
+        <div v-if="resumeLoadError" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+          简历工作台加载失败，请确认登录态或后端服务状态。
+        </div>
+        <div v-else-if="resumeItems.length" class="mt-3 space-y-2">
+          <article
+            v-for="item in resumeItems"
+            :key="item.id"
+            class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-3 py-2"
+            :data-testid="`resume-server-item-${item.id}`"
+          >
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-slate-900">{{ item.fileName }}</p>
+              <p class="text-xs text-slate-500">
+                模板 {{ getTemplateLabel(item.templateKey) }} · 状态 {{ item.status }} · 更新 {{ item.updatedAt }}
+              </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                :data-testid="`resume-download-${item.id}`"
+                @click="downloadResumeFile(item)"
+              >
+                下载
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-rose-200 px-3 py-1 text-xs text-rose-600 hover:bg-rose-50 disabled:text-rose-300"
+                :disabled="serverActionLoading"
+                :data-testid="`resume-delete-${item.id}`"
+                @click="removeResume(item)"
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        </div>
+        <div v-else class="mt-3 rounded-2xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+          暂无服务端简历记录，先生成一份再继续验收。
+        </div>
+      </article>
+    </section>
 
     <main class="flex min-h-0 flex-1">
       <aside class="flex w-[280px] shrink-0 flex-col border-r bg-white">
@@ -97,7 +183,26 @@
               </div>
 
               <div v-if="section.layout === 'fields'" class="space-y-3">
-                <div v-for="field in section.fields" :key="field.id" class="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3">
+                <div v-if="section.kind === 'basic'" class="rounded-2xl border border-dashed border-slate-300 bg-white p-4">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <div class="text-sm font-semibold text-slate-800">头像</div>
+                      <p class="mt-1 text-xs text-slate-500">基础信息模块固定预留头像位，支持本地上传。</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <div class="flex h-[92px] w-[72px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                        <img v-if="getAvatarField(section)?.value" :src="getAvatarField(section)?.value" class="h-full w-full object-cover" />
+                        <span v-else class="text-xs text-slate-400">头像</span>
+                      </div>
+                      <div class="flex flex-col gap-2">
+                        <input :id="`avatar-upload-${section.id}`" type="file" accept="image/*" class="hidden" @change="handleAvatarUpload(section.id, $event)" />
+                        <BaseButton variant="secondary" size="sm" @click="triggerAvatarUpload(section.id)">上传头像</BaseButton>
+                        <BaseButton variant="secondary" size="sm" :disabled="!getAvatarField(section)?.value" @click="clearAvatar(section.id)">移除头像</BaseButton>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-for="field in editableFields(section)" :key="field.id" class="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3">
                   <div class="flex items-center gap-2">
                     <input
                       :id="getFieldFocusId(section.id, field.id)"
@@ -208,6 +313,14 @@ import ResumeProfessionalTemplate from '@/components/business/ResumeProfessional
 import ResumeModernTemplate from '@/components/business/ResumeModernTemplate.vue'
 import { useAppStore } from '@/stores/app'
 import {
+  deleteResume,
+  fetchResumes,
+  fetchResumeWorkbench,
+  generateResume,
+  type ResumeItem as ServerResumeItem,
+  type ResumeWorkbenchData
+} from '@/api/resumes'
+import {
   buildResumeDocumentFromLines,
   buildResumeDocumentFromText,
   createEmptyDocument,
@@ -243,11 +356,27 @@ const saving = ref(false)
 const saveTime = ref('')
 const exporting = ref(false)
 const parsing = ref(false)
+const workbench = ref<ResumeWorkbenchData | null>(null)
+const resumeItems = ref<ServerResumeItem[]>([])
+const resumeLoading = ref(false)
+const resumeLoadError = ref(false)
+const serverActionLoading = ref(false)
 
 const templateComponents: Record<TemplateKey, any> = {
   classic: ResumeClassicTemplate,
   professional: ResumeProfessionalTemplate,
   modern: ResumeModernTemplate
+}
+
+const templateLabelMap: Record<TemplateKey | 'default', string> = {
+  classic: '经典基础',
+  professional: '沉稳商务',
+  modern: '现代左右',
+  default: '默认模板'
+}
+
+function getTemplateLabel(templateKey: string) {
+  return templateLabelMap[templateKey as keyof typeof templateLabelMap] || templateKey
 }
 
 const currentDraft = computed(() => drafts.value.find((draft) => draft.id === currentDraftId.value) ?? null)
@@ -348,6 +477,17 @@ function getDescriptionFocusId(sectionId: string, descriptionId: string) {
 
 function getTextFocusId(sectionId: string) {
   return `resume-focus-text-${sectionId}`
+}
+
+function getAvatarField(section: ResumeSection) {
+  return section.fields.find((field) => field.key === 'avatar') ?? null
+}
+
+function editableFields(section: ResumeSection) {
+  if (section.kind !== 'basic') {
+    return section.fields
+  }
+  return section.fields.filter((field) => field.key !== 'avatar')
 }
 
 function migrateLegacyData() {
@@ -547,10 +687,41 @@ function addField(sectionId: string) {
   section?.fields.push(createField())
 }
 
+function triggerAvatarUpload(sectionId: string) {
+  document.getElementById(`avatar-upload-${sectionId}`)?.click()
+}
+
+function clearAvatar(sectionId: string) {
+  const section = currentDraft.value?.document.sections.find((entry) => entry.id === sectionId)
+  const avatarField = section?.fields.find((field) => field.key === 'avatar')
+  if (avatarField) {
+    avatarField.value = ''
+  }
+}
+
+function handleAvatarUpload(sectionId: string, event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) {
+    return
+  }
+  const section = currentDraft.value?.document.sections.find((entry) => entry.id === sectionId)
+  const avatarField = section?.fields.find((field) => field.key === 'avatar')
+  if (!avatarField) {
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (loadEvent) => {
+    avatarField.value = String(loadEvent.target?.result ?? '')
+  }
+  reader.readAsDataURL(file)
+  ;(event.target as HTMLInputElement).value = ''
+}
+
 function removeField(sectionId: string, fieldId: string) {
   const section = currentDraft.value?.document.sections.find((entry) => entry.id === sectionId)
   if (section) {
-    section.fields = section.fields.filter((field) => field.id !== fieldId)
+    section.fields = section.fields.filter((field) => field.id !== fieldId || field.key === 'avatar')
   }
 }
 
@@ -672,6 +843,59 @@ function reparseCurrentDraft() {
   }
 }
 
+async function reloadResumeWorkbench() {
+  resumeLoading.value = true
+  resumeLoadError.value = false
+
+  try {
+    const [workbenchData, listData] = await Promise.all([fetchResumeWorkbench(), fetchResumes(1, 10)])
+    workbench.value = workbenchData
+    resumeItems.value = listData.items
+  } catch {
+    resumeLoadError.value = true
+    workbench.value = null
+    resumeItems.value = []
+  } finally {
+    resumeLoading.value = false
+  }
+}
+
+async function generateServerResume() {
+  serverActionLoading.value = true
+  try {
+    const created = await generateResume(currentTemplate.value)
+    await reloadResumeWorkbench()
+    appStore.showToast('生成成功', `已生成 ${created.fileName}。`, 'success')
+  } catch (error: any) {
+    appStore.showToast('生成失败', error?.message || '服务端简历生成失败。', 'error')
+  } finally {
+    serverActionLoading.value = false
+  }
+}
+
+function downloadResumeFile(item: ServerResumeItem) {
+  const link = document.createElement('a')
+  link.href = item.fileUrl
+  link.download = item.fileName
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+async function removeResume(item: ServerResumeItem) {
+  serverActionLoading.value = true
+  try {
+    await deleteResume(item.id)
+    await reloadResumeWorkbench()
+    appStore.showToast('删除成功', `${item.fileName} 已删除。`, 'success')
+  } catch (error: any) {
+    appStore.showToast('删除失败', error?.message || '服务端简历删除失败。', 'error')
+  } finally {
+    serverActionLoading.value = false
+  }
+}
+
 async function exportPdf() {
   if (!resumeTemplateRef.value?.resumeRef) {
     return
@@ -726,5 +950,6 @@ watch(
 
 onMounted(() => {
   loadDrafts()
+  void reloadResumeWorkbench()
 })
 </script>

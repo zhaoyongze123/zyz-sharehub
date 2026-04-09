@@ -26,7 +26,10 @@ function looksLikeHeading(text: string) {
   if (!cleaned || cleaned.length > 16) {
     return false
   }
-  if (/[，。；？！]/.test(cleaned)) {
+  if (/[，。；？！:：]/.test(cleaned)) {
+    return false
+  }
+  if (/^(技术栈|项目描述|核心贡献|工作内容|职责|成果|角色|时间|项目一|项目二|项目三|项目四)$/i.test(cleaned)) {
     return false
   }
   return /[一-龥A-Za-z]/.test(cleaned)

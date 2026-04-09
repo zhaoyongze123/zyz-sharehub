@@ -9,7 +9,23 @@ const BASIC_FIELD_ALIASES: Array<{ key: string; label: string; aliases: string[]
   { key: 'city', label: '意向城市', aliases: ['意向城市', '目标城市'] },
   { key: 'currentCity', label: '现居地', aliases: ['现居地', '所在地', '当前城市'] },
   { key: 'experience', label: '工作经验', aliases: ['工作年限', '工作经验', '经验'] },
-  { key: 'education', label: '最高学历', aliases: ['学历', '最高学历'] }
+  { key: 'education', label: '最高学历', aliases: ['学历', '最高学历', '毕业院校'] },
+  { key: 'gender', label: '性别', aliases: ['性别'] },
+  { key: 'age', label: '年龄', aliases: ['年龄'] }
+]
+
+const DEFAULT_BASIC_FIELDS = [
+  { key: 'name', label: '姓名' },
+  { key: 'intent', label: '求职意向' },
+  { key: 'phone', label: '联系电话' },
+  { key: 'email', label: '电子邮箱' },
+  { key: 'city', label: '意向城市' },
+  { key: 'currentCity', label: '现居地' },
+  { key: 'experience', label: '工作经验' },
+  { key: 'education', label: '最高学历' },
+  { key: 'gender', label: '性别' },
+  { key: 'age', label: '年龄' },
+  { key: 'avatar', label: '头像' }
 ]
 
 function createField(label: string, value: string, key = label) {
@@ -94,9 +110,99 @@ function inferBasicField(line: string): ResumeField | null {
   return null
 }
 
+function upsertBasicField(fields: ResumeField[], key: string, value: string, label?: string) {
+  if (!value.trim()) {
+    return
+  }
+  const target = fields.find((field) => field.key === key)
+  if (target) {
+    target.value = value.trim()
+    if (label) {
+      target.label = label
+    }
+    return
+  }
+  fields.push(createField(label ?? key, value.trim(), key))
+}
+
+function inferBasicFieldByValue(line: string, fields: ResumeField[]) {
+  const text = line.trim()
+  const phone = text.match(/1[3-9]\d{9}/)?.[0]
+  if (phone) {
+    upsertBasicField(fields, 'phone', phone, '联系电话')
+  }
+
+  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]
+  if (email) {
+    upsertBasicField(fields, 'email', email, '电子邮箱')
+  }
+
+  const gender = text.match(/(^|\s)(男|女)(\s|$)/)?.[2]
+  if (gender) {
+    upsertBasicField(fields, 'gender', gender, '性别')
+  }
+
+  const age = text.match(/(\d{2})\s*岁/)?.[1]
+  if (age) {
+    upsertBasicField(fields, 'age', `${age}岁`, '年龄')
+  }
+
+  const intent = text.match(/(Java开发工程师|后端开发工程师|前端开发工程师|产品经理|运营|测试工程师|算法工程师|数据分析师|设计师)/)?.[1]
+  if (intent) {
+    upsertBasicField(fields, 'intent', intent, '求职意向')
+  }
+
+  const cities = text.match(/(上海|北京|深圳|广州|杭州|苏州|成都|南京|武汉|西安|长沙|天津|重庆)/g)
+  if (cities?.length) {
+    if (/现居|所在地|居住地/.test(text)) {
+      upsertBasicField(fields, 'currentCity', cities[0], '现居地')
+    } else if (/意向|目标/.test(text)) {
+      upsertBasicField(fields, 'city', cities[0], '意向城市')
+    } else {
+      if (!fields.find((field) => field.key === 'currentCity')?.value) {
+        upsertBasicField(fields, 'currentCity', cities[0], '现居地')
+      } else if (!fields.find((field) => field.key === 'city')?.value) {
+        upsertBasicField(fields, 'city', cities[0], '意向城市')
+      }
+    }
+  }
+
+  const education = text.match(/(博士|硕士|研究生|本科|大专|专科|高中)/)?.[1]
+  if (education) {
+    upsertBasicField(fields, 'education', education, '最高学历')
+  }
+
+  const school = text.match(/([\u4e00-\u9fa5]{2,20}(大学|学院))/)?.[1]
+  if (school) {
+    const existingEducation = fields.find((field) => field.key === 'education')?.value ?? ''
+    if (!existingEducation.includes(school)) {
+      upsertBasicField(fields, 'education', existingEducation ? `${school} ${existingEducation}`.trim() : school, '最高学历')
+    }
+  }
+
+  const experience = text.match(/(\d+\s*年(?:工作)?经验|应届生)/)?.[1]
+  if (experience) {
+    upsertBasicField(fields, 'experience', experience, '工作经验')
+  }
+
+  const arrival = text.match(/(一周内到岗|两周内到岗|一个月内到岗|随时到岗)/)?.[1]
+  if (arrival) {
+    upsertBasicField(fields, 'arrival', arrival, '到岗时间')
+  }
+}
+
 function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 'items' | 'text'> {
-  const fields: ResumeField[] = []
+  const fields = DEFAULT_BASIC_FIELDS.map((item) => createField(item.label, '', item.key))
   const leftovers: string[] = []
+
+  const upsertField = (nextField: ResumeField) => {
+    const target = fields.find((field) => field.key === nextField.key)
+    if (target) {
+      target.value = nextField.value
+      return
+    }
+    fields.push(nextField)
+  }
 
   for (const rawLine of lines) {
     const parts = splitInlinePairs(rawLine)
@@ -104,9 +210,10 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
     for (const part of parts) {
       const field = inferBasicField(part)
       if (field) {
-        fields.push(field)
+        upsertField(field)
         matchedInLine = true
       } else if (parts.length > 1) {
+        inferBasicFieldByValue(part, fields)
         leftovers.push(part)
       }
     }
@@ -114,15 +221,24 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
     if (!matchedInLine && parts.length === 1) {
       const fallback = inferBasicField(rawLine)
       if (fallback) {
-        fields.push(fallback)
+        upsertField(fallback)
       } else {
+        inferBasicFieldByValue(rawLine, fields)
         leftovers.push(rawLine)
       }
     }
   }
 
-  if (leftovers.length) {
-    fields.push(createField('补充信息', leftovers.join(' / '), 'extra'))
+  const consumedValues = new Set(
+    fields
+      .filter((field) => field.value)
+      .map((field) => field.value)
+  )
+
+  const unresolved = leftovers.filter((line) => ![...consumedValues].some((value) => value && line.includes(value)))
+
+  if (unresolved.length) {
+    fields.push(createField('补充信息', unresolved.join(' / '), 'extra'))
   }
 
   return {
@@ -136,11 +252,13 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
 function parseTimeline(lines: string[], kind: ResumeSectionKind): Pick<ResumeSection, 'layout' | 'fields' | 'items' | 'text'> {
   const items: ResumeItem[] = []
   let current = createItem()
+  let currentBlockLabel = ''
 
   const flush = () => {
     if (current.fields.length || current.descriptions.length) {
       items.push(current)
       current = createItem()
+      currentBlockLabel = ''
     }
   }
 
@@ -151,25 +269,40 @@ function parseTimeline(lines: string[], kind: ResumeSectionKind): Pick<ResumeSec
       continue
     }
 
+    if (kind === 'project' && /^项目[一二三四五六七八九十\d]+[:：]/.test(line)) {
+      flush()
+      current.fields.push(createField('项目', line.replace(/^项目[一二三四五六七八九十\d]+[:：]\s*/, '').trim(), 'projectName'))
+      continue
+    }
+
     const kv = parseKeyValueLine(line)
-    if (kv && /学校|专业|学历|时间|GPA|公司|职位|项目|角色|机构|等级|奖项/.test(kv.label)) {
-      current.fields.push(createField(kv.label, kv.value, kv.label))
+    if (kv && /学校|专业|学历|时间|GPA|公司|职位|项目|角色|机构|等级|奖项|技术栈|项目描述|核心贡献|链接|地址/.test(kv.label)) {
+      const normalizedKey = /项目/.test(kv.label) ? 'projectName' : /技术栈/.test(kv.label) ? 'stack' : /链接|地址/.test(kv.label) ? 'link' : kv.label
+      current.fields.push(createField(kv.label, kv.value, normalizedKey))
+      currentBlockLabel = ''
+      continue
+    }
+
+    if (/^(技术栈|项目描述|核心贡献|工作内容|职责|成果)[:：]?$/.test(line)) {
+      currentBlockLabel = line.replace(/[:：]/g, '')
       continue
     }
 
     if (/\d{4}[./-]\d{1,2}(\s*[-~至]\s*(今|\d{4}[./-]\d{1,2}))?/.test(line) && current.fields.length) {
       current.fields.push(createField('时间', line.match(/\d{4}[./-]\d{1,2}(\s*[-~至]\s*(今|\d{4}[./-]\d{1,2}))?/)?.[0] ?? line, 'time'))
+      currentBlockLabel = ''
       continue
     }
 
     if ((kind === 'education' && /(大学|学院|学校)/.test(line)) || (kind !== 'education' && /(.{2,30})(公司|项目|科技|中心|实验室)/.test(line))) {
       flush()
       current.fields.push(createField(kind === 'education' ? '学校' : kind === 'project' ? '项目' : '公司', line, kind === 'education' ? 'school' : kind === 'project' ? 'projectName' : 'company'))
+      currentBlockLabel = ''
       continue
     }
 
     if (/^(负责|参与|主导|完成|实现|优化|搭建|获得|荣获|证书|奖项)/.test(line) || current.fields.length) {
-      appendDescription(current, line)
+      appendDescription(current, currentBlockLabel ? `${currentBlockLabel}：${line}` : line)
       continue
     }
 

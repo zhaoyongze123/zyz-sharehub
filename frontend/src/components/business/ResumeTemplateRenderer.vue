@@ -40,6 +40,14 @@
                 </button>
               </div>
             </div>
+            <button
+              v-if="basicAvatarField?.value"
+              type="button"
+              class="resume-avatar-slot"
+              @click.stop="$emit('focus-field', section.id, basicAvatarField?.id || '')"
+            >
+              <img :src="basicAvatarField.value" alt="头像" class="resume-avatar-image" />
+            </button>
           </div>
         </template>
 
@@ -48,7 +56,7 @@
             <h2 :class="theme.headingClass">{{ section.name }}</h2>
           </div>
 
-          <div v-if="section.layout === 'fields'" class="grid gap-3 sm:grid-cols-2">
+          <div v-if="section.layout === 'fields'" class="space-y-2">
             <button
               v-for="field in visibleFields(section.fields)"
               :key="field.id"
@@ -56,13 +64,15 @@
               class="resume-field-card"
               @click.stop="$emit('focus-field', section.id, field.id)"
             >
-              <div class="resume-field-label">{{ field.label }}</div>
-              <div class="resume-field-value">{{ field.value }}</div>
+              <div class="resume-field-line">
+                <span class="resume-field-label">{{ field.label }}</span>
+                <span class="resume-field-value">{{ field.value }}</span>
+              </div>
             </button>
-            <div v-if="section.text" class="resume-text-block sm:col-span-2">{{ section.text }}</div>
+            <div v-if="section.text" class="resume-text-block">{{ section.text }}</div>
           </div>
 
-          <div v-else-if="section.layout === 'items'" class="space-y-4">
+          <div v-else-if="section.layout === 'items'" class="space-y-3">
             <article
               v-for="item in visibleItems(section)"
               :key="item.id"
@@ -92,7 +102,7 @@
                   <span>{{ field.value }}</span>
                 </button>
               </div>
-              <ul v-if="item.descriptions.length" class="mt-2 space-y-1">
+              <ul v-if="item.descriptions.length" class="mt-1.5 space-y-1">
                 <li
                   v-for="description in item.descriptions.filter((entry) => entry.visible)"
                   :key="description.id"
@@ -155,17 +165,24 @@ const basicPrimary = computed(() => {
   }
 })
 
-const basicMetaKeys = ['phone', 'email', 'city', 'currentCity', 'experience', 'education']
+const basicAvatarField = computed(() => {
+  const fields = basicSection.value?.fields ?? []
+  return fields.find((field) => field.visible && field.key === 'avatar') ?? null
+})
+
+const basicMetaKeys = ['phone', 'email', 'city', 'currentCity', 'experience', 'education', 'gender', 'age']
 
 const basicMetaFields = computed(() => {
   const fields = basicSection.value?.fields ?? []
-  return fields.filter((field) => field.visible && basicMetaKeys.includes(field.key))
+  return fields.filter((field) => field.visible && field.value.trim() && basicMetaKeys.includes(field.key))
 })
 
 const basicExtraFields = computed(() => {
   const fields = basicSection.value?.fields ?? []
-  const hiddenIds = new Set([basicPrimary.value.name?.id, basicPrimary.value.intent?.id, ...basicMetaFields.value.map((field) => field.id)].filter(Boolean))
-  return fields.filter((field) => field.visible && !hiddenIds.has(field.id))
+  const hiddenIds = new Set(
+    [basicPrimary.value.name?.id, basicPrimary.value.intent?.id, basicAvatarField.value?.id, ...basicMetaFields.value.map((field) => field.id)].filter(Boolean)
+  )
+  return fields.filter((field) => field.visible && field.value.trim() && !hiddenIds.has(field.id))
 })
 
 function visibleFields(fields: ResumeField[]) {
@@ -192,11 +209,11 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
 }
 
 .resume-wrapper {
-  padding: 40px 48px;
+  padding: 30px 36px;
 }
 
 .resume-module-block {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   cursor: pointer;
   transition: outline-color 0.2s ease, background-color 0.2s ease;
 }
@@ -223,6 +240,7 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
   gap: 6px;
   align-items: center;
   color: #475569;
+  font-size: 12px;
 }
 
 .resume-inline-label,
@@ -235,31 +253,64 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(241, 245, 249, 0.85);
+  font-size: 11px;
 }
 
+.resume-avatar-slot {
+  width: 86px;
+  min-width: 86px;
+  height: 112px;
+  overflow: hidden;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(248, 250, 252, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.resume-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
 .resume-field-card {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(248, 250, 252, 0.95);
+  display: block;
+  width: 100%;
+  padding: 4px 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.resume-field-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .resume-field-value {
-  margin-top: 4px;
   color: #0f172a;
   white-space: pre-wrap;
-  line-height: 1.5;
+  line-height: 1.45;
+  flex: 1;
 }
 
 .resume-item-card {
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 .resume-item-primary {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: #0f172a;
 }
@@ -267,15 +318,16 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
 .resume-item-secondary {
   display: inline-flex;
   gap: 6px;
-  font-size: 13px;
+  font-size: 11px;
   color: #475569;
 }
 
 .resume-description-item {
   position: relative;
-  padding-left: 12px;
+  padding-left: 10px;
   color: #334155;
-  line-height: 1.6;
+  line-height: 1.45;
+  font-size: 12px;
 }
 
 .resume-description-item::before {
@@ -287,7 +339,8 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
 .resume-text-block {
   white-space: pre-wrap;
   color: #334155;
-  line-height: 1.7;
+  line-height: 1.5;
+  font-size: 12px;
 }
 
 .exporting-pdf {
