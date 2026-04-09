@@ -229,11 +229,16 @@ modules = [item.strip() for item in sys.argv[1].split(",") if item.strip()]
 
 if modules == ["resources"]:
     print("""- 定向执行指令：
-  - `resources` 的公开读取链路已完成，本轮禁止回头重做列表页/详情页的大范围调研。
-  - 本轮只允许收口一个最小任务：`src/views/resource/PublishResourceView.vue` 去掉对 `@/mock/resources` 的直接依赖。
-  - 优先做法：把分类选项改为来自 `src/api/resources.ts` 的前端常量，或在不引入 mock 的前提下落到同一业务文件内。
-  - 不要再花时间讨论批次归属；直接改代码、跑最小验证、提交并 push。
-  - 如果 10 分钟内仍未形成代码改动，必须立即执行上述最小补丁，不允许继续调研。""")
+  - 当前进入固定补丁模式，禁止开放式调研，禁止讨论批次归属，禁止回头分析列表页/详情页。
+  - 本轮只允许修改 1 个业务文件：`src/views/resource/PublishResourceView.vue`。
+  - 本轮目标固定为：去掉 `import { resourceCategories } from '@/mock/resources'`，改成不依赖 mock 的分类选项来源。
+  - 优先实现：直接复用 `src/api/resources.ts` 中可导出的前端常量；如果确实不合适，也只能在 `PublishResourceView.vue` 内落一个本地常量，不允许再引入新的 mock。
+  - 除非为了修复编译报错，不允许修改其他业务页面；如需修复公共组件，只允许最小必要改动，并必须在最终说明里点名。
+  - 必须在开始后尽快直接编辑代码，不允许继续读取超过 2 个额外文件。
+  - 固定验证命令：`cd /Users/mac/Documents/New project/frontend && npx vite build`
+  - 如果固定验证失败，必须在最终结果里写明是新增问题还是仓库既有问题。
+  - 如果 10 分钟内仍未形成代码改动，或无法完成上述固定补丁，必须直接输出 `AUTOPILOT_BLOCKED:`，不要继续空转。
+  - 完成补丁后立即 commit、push 到 `feature/frontend-real-api-resources`。""")
 PY
 }
 
