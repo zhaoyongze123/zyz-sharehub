@@ -44,13 +44,11 @@ import { useAppStore } from '@/stores/app'
 const appStore = useAppStore()
 const uploadMode = ref('file')
 // 直接复用真实接口的分类枚举，过滤掉“全部”并清理空白
-const categoryOptions = computed(() =>
-  resourceCategoryOptions
-    .map((item) => item.trim())
-    .filter((item) => item && item !== '全部')
-    .map((item) => ({ label: item, value: item }))
+const cleanedCategories = computed(() =>
+  resourceCategoryOptions.map((item) => item.trim()).filter((item) => item && item !== '全部')
 )
-const defaultCategory = computed(() => categoryOptions.value[0]?.value || '')
+const categoryOptions = computed(() => cleanedCategories.value.map((item) => ({ label: item, value: item })))
+const defaultCategory = computed(() => cleanedCategories.value[0] || '')
 const form = reactive({
   title: '',
   category: defaultCategory.value,
