@@ -99,13 +99,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'resume',
         name: 'resume',
         component: () => import('@/views/resume/ResumeWorkbenchView.vue'),
-        meta: { title: '简历工作台', fullHeight: true }
+        meta: { title: '简历工作台', fullHeight: true, auth: true }
       },
       {
         path: 'me',
         name: 'me',
         component: () => import('@/views/user/ProfileView.vue'),
-        meta: { title: '个人帐户' }
+        meta: { title: '个人帐户', auth: true }
       }
     ]
   },
