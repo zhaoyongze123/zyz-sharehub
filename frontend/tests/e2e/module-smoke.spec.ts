@@ -184,6 +184,15 @@ test('个人中心模块 smoke', async ({ page }) => {
     await expect(page.getByRole('link', { name: resourcesResponse.json.data.items[0].title }).first()).toBeVisible()
   }
 
+  const notesResponse = await browserFetch(page, '/api/me/notes?page=1&pageSize=5', {
+    'X-User-Key': userKey
+  })
+  expect(notesResponse.ok).toBeTruthy()
+  expect(Array.isArray(notesResponse.json?.data?.items)).toBeTruthy()
+  if (notesResponse.json?.data?.items?.length) {
+    await expect(page.getByRole('link', { name: notesResponse.json.data.items[0].title }).first()).toBeVisible()
+  }
+
   const resumesResponse = await browserFetch(page, '/api/me/resumes?page=1&pageSize=5', {
     'X-User-Key': userKey
   })
