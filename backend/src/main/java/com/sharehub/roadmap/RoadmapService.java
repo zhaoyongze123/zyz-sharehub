@@ -18,7 +18,7 @@ public class RoadmapService {
 
   public RoadmapDto create(String ownerKey, RoadmapDto req) {
     RoadmapDto payload =
-        new RoadmapDto(null, req.title(), req.description(), req.visibility(), req.status() == null ? "PUBLISHED" : req.status());
+        new RoadmapDto(null, req.title(), req.description(), req.visibility(), normalizeStatus(req.status()));
     return repository.save(ownerKey, payload);
   }
 
@@ -45,6 +45,14 @@ public class RoadmapService {
 
   public Map<String, Object> updateProgress(String ownerKey, Long id, Map<String, Object> payload) {
     return repository.saveProgress(ownerKey, id, payload);
+  }
+
+  private String normalizeStatus(String status) {
+    if (status == null) {
+      return "PUBLISHED";
+    }
+    String trimmed = status.trim();
+    return trimmed.isEmpty() ? "PUBLISHED" : trimmed;
   }
 
   private List<RoadmapNodeTree> buildTree(List<RoadmapNodeDto> nodes) {

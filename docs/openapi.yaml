@@ -602,7 +602,7 @@ paths:
           description: 成功
     post:
       summary: 创建路线
-      description: 需要当前用户身份；创建记录的 owner 固定取请求用户，联调可通过 `X-User-Key` 指定用户；`status` 未传时默认补成 `PUBLISHED`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      description: 需要当前用户身份；创建记录的 owner 固定取请求用户，联调可通过 `X-User-Key` 指定用户；`status` 未传、为 `null`、空字符串或仅空白时默认补成 `PUBLISHED`，带前后空白时会先裁剪再保存；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
       responses:
         '200':
           description: 成功
