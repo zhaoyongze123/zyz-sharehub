@@ -363,6 +363,17 @@ test('me 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByText(`@${meBody.data.profile.login}`)).toBeVisible()
   await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
   await expect(page.getByText(String(meBody.data.myResourceCount)).first()).toBeVisible()
+  await expect(page.getByTestId('profile-stat-value-resources')).toHaveText(String(meBody.data.myResourceCount))
+  await expect(page.getByTestId('profile-stat-desc-resources')).toHaveText(
+    `近 7 天新增 ${meBody.data.recentResourceCount} 条，已发布 ${meBody.data.publishedResourceCount} 条`
+  )
+  await expect(page.getByTestId('profile-stat-value-notes')).toHaveText(String(meBody.data.myNoteCount))
+  await expect(page.getByTestId('profile-stat-desc-notes')).toHaveText(`当前草稿 ${meBody.data.draftNoteCount} 条`)
+  await expect(page.getByTestId('profile-stat-value-resumes')).toHaveText(String(meBody.data.myResumeCount))
+  await expect(page.getByTestId('profile-stat-desc-resumes')).toHaveText(`已生成 ${meBody.data.generatedResumeCount} 份`)
+  await expect(page.getByTestId('profile-stat-value-favorites-roadmaps')).toHaveText(
+    `${meBody.data.myFavoriteCount} / ${meBody.data.myRoadmapCount}`
+  )
   await expect(page.getByRole('button', { name: '资料编辑待接写接口' })).toBeDisabled()
   await expect(page.getByText('已移除页面内个人资料模拟保存动作，改为只读展示')).toBeVisible()
 

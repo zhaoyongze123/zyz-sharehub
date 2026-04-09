@@ -279,6 +279,21 @@ test('个人中心模块 smoke', async ({ page }) => {
   await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
   await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
   await expect(page.getByTestId('profile-avatar-upload')).toBeEnabled()
+  await expect(page.getByTestId('profile-stat-value-resources')).toHaveText(String(meResponse.json?.data?.myResourceCount ?? 0))
+  await expect(page.getByTestId('profile-stat-desc-resources')).toHaveText(
+    `近 7 天新增 ${meResponse.json?.data?.recentResourceCount ?? 0} 条，已发布 ${meResponse.json?.data?.publishedResourceCount ?? 0} 条`
+  )
+  await expect(page.getByTestId('profile-stat-value-notes')).toHaveText(String(meResponse.json?.data?.myNoteCount ?? 0))
+  await expect(page.getByTestId('profile-stat-desc-notes')).toHaveText(
+    `当前草稿 ${meResponse.json?.data?.draftNoteCount ?? 0} 条`
+  )
+  await expect(page.getByTestId('profile-stat-value-resumes')).toHaveText(String(meResponse.json?.data?.myResumeCount ?? 0))
+  await expect(page.getByTestId('profile-stat-desc-resumes')).toHaveText(
+    `已生成 ${meResponse.json?.data?.generatedResumeCount ?? 0} 份`
+  )
+  await expect(page.getByTestId('profile-stat-value-favorites-roadmaps')).toHaveText(
+    `${meResponse.json?.data?.myFavoriteCount ?? 0} / ${meResponse.json?.data?.myRoadmapCount ?? 0}`
+  )
   await expect(page.getByRole('button', { name: '资料编辑待接写接口' })).toBeDisabled()
 
   const avatarResponsePromise = page.waitForResponse((response) =>

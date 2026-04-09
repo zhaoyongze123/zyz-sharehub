@@ -63,11 +63,16 @@
         </div>
       </header>
 
-      <section class="stat-grid">
-        <article v-for="item in statCards" :key="item.label" class="stat-card">
+      <section class="stat-grid" data-testid="profile-stat-grid">
+        <article
+          v-for="item in statCards"
+          :key="item.label"
+          class="stat-card"
+          :data-testid="`profile-stat-${item.key}`"
+        >
           <p class="stat-label">{{ item.label }}</p>
-          <p class="stat-value">{{ item.value }}</p>
-          <p class="stat-desc">{{ item.description }}</p>
+          <p class="stat-value" :data-testid="`profile-stat-value-${item.key}`">{{ item.value }}</p>
+          <p class="stat-desc" :data-testid="`profile-stat-desc-${item.key}`">{{ item.description }}</p>
         </article>
       </section>
 
@@ -170,21 +175,25 @@ const statCards = computed(() => {
 
   return [
     {
+      key: 'resources',
       label: '资料工作台',
       value: dashboard.value.stats.resources,
       description: `近 7 天新增 ${dashboard.value.stats.recentResources} 条，已发布 ${dashboard.value.stats.publishedResources} 条`
     },
     {
+      key: 'notes',
       label: '社区笔记',
       value: dashboard.value.stats.notes,
       description: `当前草稿 ${dashboard.value.stats.draftNotes} 条`
     },
     {
+      key: 'resumes',
       label: '简历记录',
       value: dashboard.value.stats.resumes,
       description: `已生成 ${dashboard.value.stats.generatedResumes} 份`
     },
     {
+      key: 'favorites-roadmaps',
       label: '收藏与路线',
       value: `${dashboard.value.stats.favorites} / ${dashboard.value.stats.roadmaps}`,
       description: '左侧为收藏数，右侧为路线数'
