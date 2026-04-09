@@ -6,6 +6,7 @@
         <RouterLink to="/admin">概览</RouterLink>
         <RouterLink to="/admin/reviews">内容审核</RouterLink>
         <RouterLink to="/admin/reports">举报处理</RouterLink>
+        <RouterLink to="/admin/audit-logs">审计日志</RouterLink>
         <RouterLink to="/admin/users">用户管理</RouterLink>
         <RouterLink to="/admin/taxonomy">标签分类</RouterLink>
       </nav>

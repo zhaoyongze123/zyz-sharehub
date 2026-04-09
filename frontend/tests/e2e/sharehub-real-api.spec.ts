@@ -661,6 +661,20 @@ test('admin 模块真接口联调', async ({ page, request }) => {
     await expect(page.getByText('暂无举报数据')).toBeVisible()
   }
 
+  await page.goto('/admin/audit-logs')
+  await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
+  if (firstAuditLog) {
+    const auditRow = page.getByTestId(`admin-audit-row-${firstAuditLog.id}`)
+    await expect(auditRow).toContainText(firstAuditLog.action
+      .split('_')
+      .filter(Boolean)
+      .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+      .join(' '))
+    await expect(auditRow).toContainText(`${firstAuditLog.targetType} #${firstAuditLog.targetId}`)
+  } else {
+    await expect(page.getByText('暂无审计日志')).toBeVisible()
+  }
+
   await page.goto('/admin/reviews')
   await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
   if (firstReport) {
