@@ -8,6 +8,13 @@ const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:1808
 const userKey = process.env.PLAYWRIGHT_USER_KEY || 'playwright-user'
 const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
+function userHeaders(user = userKey) {
+  return {
+    'X-User-Key': user,
+    'Content-Type': 'application/json'
+  }
+}
+
 async function loginAs(page: Page, role: 'user' | 'admin') {
   await page.addInitScript((selectedRole) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
@@ -46,6 +53,21 @@ async function browserFetch(page: Page, path: string, headers: Record<string, st
     requestPath: path,
     requestHeaders: headers
   })
+}
+
+async function createPublishedNote(request: Parameters<typeof test>[0]['request'], title: string) {
+  const response = await request.post(`${apiBaseUrl}/api/notes`, {
+    headers: userHeaders(),
+    data: {
+      title,
+      contentMd: `# ${title}\n\n这是 smoke 用例写入的真实正文。\n\n## 第一节\nSmoke detail paragraph`,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED'
+    }
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body.data.id as number
 }
 
 test('backend health 可用', async ({ request }) => {
@@ -136,8 +158,11 @@ test('路线模块 smoke', async ({ page }) => {
   await expect(page.getByText('节点进度结构')).toBeVisible()
 })
 
-test('社区笔记模块 smoke', async ({ page }) => {
+test('社区笔记模块 smoke', async ({ page, request }) => {
   test.skip(!shouldRun('notes'))
+  const noteTitle = `Smoke Note ${Date.now()}`
+  const noteId = await createPublishedNote(request, noteTitle)
+  await loginAs(page, 'user')
   await page.goto('/community')
   await expect(page.getByText('AI 资源类别')).toBeVisible()
 
@@ -148,6 +173,20 @@ test('社区笔记模块 smoke', async ({ page }) => {
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+
+  const detailResponse = await browserFetch(page, `/api/notes/${noteId}`, userHeaders())
+  expect(detailResponse.ok).toBeTruthy()
+  expect(detailResponse.status).toBe(200)
+  expect(detailResponse.json?.success).toBeTruthy()
+  expect(detailResponse.json?.data?.title).toBe(noteTitle)
+
+  await page.goto(`/notes/${noteId}`)
+  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.locator('.markdown-panel')).toContainText('这是 smoke 用例写入的真实正文。')
+  await expect(page.locator('.outline')).toContainText('第一节')
+  await expect(page.getByTestId('note-detail-interaction-pending')).toContainText('当前页面已切到真实笔记详情读取')
+  await expect(page.getByRole('button', { name: '收藏笔记待接接口' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '举报待接接口' })).toBeDisabled()
 })
 
 test('简历模块 smoke', async ({ page }) => {
