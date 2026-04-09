@@ -214,11 +214,20 @@
         </div>
       </section>
   </main>
-  <section class="border-t bg-white px-6 py-8">
+  <section class="border-t bg-white px-6 py-4">
     <div class="mx-auto flex max-w-6xl flex-col gap-6">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">服务端简历工作台</p>
+          <div class="flex items-center gap-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">服务端简历工作台</p>
+            <button
+              type="button"
+              class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              @click="serverWorkbenchCollapsed = !serverWorkbenchCollapsed"
+            >
+              {{ serverWorkbenchCollapsed ? '展开' : '收起' }}
+            </button>
+          </div>
           <p
             class="text-lg font-semibold text-slate-900"
             data-testid="resume-workbench-summary"
@@ -232,9 +241,10 @@
             {{ templateBreakdownText }}
           </p>
         </div>
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div v-if="!serverWorkbenchCollapsed" class="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label class="text-xs font-semibold uppercase tracking-wide text-slate-400">生成模板</label>
           <select
+            data-testid="resume-server-template-select"
             class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
             v-model="serverTemplateKey"
           >
@@ -252,7 +262,7 @@
           </BaseButton>
         </div>
       </div>
-      <div class="space-y-3">
+      <div v-if="!serverWorkbenchCollapsed" class="space-y-3">
         <div v-if="resumeServerItems.length === 0" class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
           暂无服务端记录，点击“生成简历”体验真实链路。
         </div>
@@ -395,6 +405,7 @@ const templateLabels: Record<TemplateKey, string> = {
   professional: '沉稳商务',
   modern: '现代左右'
 }
+const serverWorkbenchCollapsed = ref(false)
 const serverTemplateKey = ref<TemplateKey>(templateKeys[0] ?? 'classic')
 const resumeWorkbenchSummary = ref<ResumeWorkbenchData | null>(null)
 const resumeServerItems = ref<ServerResumeItem[]>([])

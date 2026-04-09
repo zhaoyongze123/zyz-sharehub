@@ -236,7 +236,7 @@ test('简历模块 smoke', async ({ page }) => {
   const summaryBefore = await summary.textContent()
   const totalBefore = Number(summaryBefore?.match(/累计\s+(\d+)/)?.[1] ?? '0')
 
-  await page.getByRole('combobox').nth(1).selectOption('modern')
+  await page.getByTestId('resume-server-template-select').selectOption('modern')
 
   const generateResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/resumes/generate') && response.request().method() === 'POST'

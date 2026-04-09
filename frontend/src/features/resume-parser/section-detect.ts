@@ -26,6 +26,21 @@ function looksLikeHeading(text: string) {
   if (!cleaned || cleaned.length > 16) {
     return false
   }
+  if (/^\d{1,2}岁\s*(男|女)$/.test(cleaned)) {
+    return false
+  }
+  if (/1[3-9]\d{9}/.test(cleaned) || /@/.test(cleaned)) {
+    return false
+  }
+  if (/(求职意向|意向岗位|目标岗位|联系电话|手机|邮箱|电子邮箱|现居地|所在地|毕业院校|专业|学历|到岗)/.test(cleaned)) {
+    return false
+  }
+  if (/(大学|学院|学校|本科|硕士|博士|大专|专科|高中)/.test(cleaned)) {
+    return false
+  }
+  if (/\d{4}[./-]\d{1,2}\s*[~\-至]/.test(cleaned)) {
+    return false
+  }
   if (/[，。；？！:：]/.test(cleaned)) {
     return false
   }
@@ -33,6 +48,18 @@ function looksLikeHeading(text: string) {
     return false
   }
   return /[一-龥A-Za-z]/.test(cleaned)
+}
+
+function belongsToBasicSection(text: string) {
+  const cleaned = stripBullet(text)
+  return (
+    /^\d{1,2}岁\s*(男|女)$/.test(cleaned) ||
+    /1[3-9]\d{9}/.test(cleaned) ||
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(cleaned) ||
+    /(求职意向|意向岗位|目标岗位|联系电话|手机|邮箱|电子邮箱|现居地|所在地|毕业院校|专业|学历|到岗)/.test(cleaned) ||
+    /(大学|学院|学校|本科|硕士|博士|大专|专科|高中)/.test(cleaned) ||
+    /\d{4}[./-]\d{1,2}\s*[~\-至]\s*(?:\d{4}[./-]\d{1,2}|今|至今)/.test(cleaned)
+  )
 }
 
 function inferKindFromContent(lines: string[]): ResumeSectionKind {
@@ -96,6 +123,11 @@ export function detectSections(lines: NormalizedLine[]): SectionDraft[] {
         detectedKind: 'basic',
         lines: []
       }
+    }
+
+    if (current.detectedKind === 'basic' && belongsToBasicSection(line.text)) {
+      current.lines.push(line.text)
+      continue
     }
 
     if (heading && current.lines.length >= 2) {

@@ -438,7 +438,7 @@ test('resumes 模块真接口联调', async ({ page, request }) => {
   const totalBefore = Number(summaryBefore?.match(/累计\s+(\d+)/)?.[1] ?? '0')
   const firstItemBefore = await resumeRows.first().getAttribute('data-testid')
 
-  await page.getByRole('combobox').nth(1).selectOption('modern')
+  await page.getByTestId('resume-server-template-select').selectOption('modern')
   await page.getByTestId('resume-generate-button').click()
 
   await expect(summary).toContainText(`累计 ${totalBefore + 1}`)

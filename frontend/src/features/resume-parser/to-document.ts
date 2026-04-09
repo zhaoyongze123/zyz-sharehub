@@ -37,8 +37,50 @@ const DEFAULT_BASIC_FIELDS = [
   { key: 'gender', label: '性别' },
   { key: 'age', label: '年龄' },
   { key: 'arrival', label: '到岗时间' },
+  { key: 'school', label: '毕业院校' },
+  { key: 'major', label: '专业' },
+  { key: 'educationTime', label: '学制时间' },
   { key: 'avatar', label: '头像' }
 ]
+
+const REQUIRED_BASIC_KEYS = ['name', 'intent', 'city', 'arrival', 'age', 'gender', 'phone', 'email', 'school', 'major', 'education', 'educationTime'] as const
+
+function getSectionFieldValue(section: ResumeSection, key: string) {
+  return section.fields.find((field) => field.key === key)?.value.trim() ?? ''
+}
+
+function validateBasicSection(section: ResumeSection, warnings: string[]) {
+  if (section.kind !== 'basic') {
+    return
+  }
+
+  const missingKeys = REQUIRED_BASIC_KEYS.filter((key) => !getSectionFieldValue(section, key))
+  if (missingKeys.length) {
+    warnings.push(`基本信息关键字段缺失：${missingKeys.join('、')}。已保留现有解析结果，请在编辑区补全。`)
+  }
+
+  const suspiciousKeys = ['school', 'major', 'education', 'educationTime', 'phone', 'email'] as const
+  const suspiciousValues = suspiciousKeys.filter((key) => {
+    const value = getSectionFieldValue(section, key)
+    if (!value) {
+      return false
+    }
+    if (key === 'educationTime') {
+      return !/\d{4}[./-]\d{1,2}\s*(?:[~\-至]\s*(?:\d{4}[./-]\d{1,2}|今|至今))/.test(value)
+    }
+    if (key === 'phone') {
+      return !/1[3-9]\d{9}/.test(value)
+    }
+    if (key === 'email') {
+      return !/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value)
+    }
+    return /\s{2,}|[|｜]/.test(value) || (key !== 'major' && /[-–—].+[-–—]/.test(value))
+  })
+
+  if (suspiciousValues.length) {
+    warnings.push(`基本信息存在待确认字段：${suspiciousValues.join('、')}，可能仍包含整句或混合内容。`)
+  }
+}
 
 function createDefaultBasicFields() {
   return DEFAULT_BASIC_FIELDS.map((field) => ({
@@ -121,6 +163,8 @@ export function buildResumeDocumentFromLines(
   const normalizedSections = sections
     .map((section) => ensureBasicSection(section))
     .filter((section) => section.fields.length || section.items.length || section.text || section.kind === 'basic')
+
+  normalizedSections.forEach((section) => validateBasicSection(section, warnings))
 
   if (!normalizedSections.length) {
     warnings.push('未识别出结构化模块，已保留原始文本到未识别内容。')

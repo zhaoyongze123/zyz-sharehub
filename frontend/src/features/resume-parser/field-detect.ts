@@ -269,10 +269,44 @@ function parseBasicFirstLine(line: string, fields: ResumeField[]) {
   }
 }
 
+function parseIntentCompositeLine(line: string, fields: ResumeField[]) {
+  const text = normalizeBasicLine(line)
+  if (!text) {
+    return
+  }
+
+  const normalized = text.replace(/^(求职意向|意向岗位|目标岗位)\s*:\s*/i, '').trim()
+  if (!normalized) {
+    return
+  }
+
+  const arrival = normalized.match(BASIC_ARRIVAL_PATTERN)?.[1] ?? ''
+  const city = normalized.match(BASIC_CITY_PATTERN)?.[1] ?? ''
+  const intent = normalized
+    .replace(BASIC_ARRIVAL_PATTERN, '')
+    .replace(BASIC_CITY_PATTERN, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (intent) {
+    upsertBasicField(fields, 'intent', intent, '求职意向')
+  }
+  if (city) {
+    upsertBasicField(fields, 'city', city, '意向城市')
+  }
+  if (arrival) {
+    upsertBasicField(fields, 'arrival', arrival, '到岗时间')
+  }
+}
+
 function parseBasicContactLine(line: string, fields: ResumeField[]) {
   const text = normalizeBasicLine(line)
   if (!text) {
     return
+  }
+
+  if (/^(求职意向|意向岗位|目标岗位)\s*:/i.test(text)) {
+    parseIntentCompositeLine(text, fields)
   }
 
   inferBasicFieldByValue(text, fields)
@@ -361,7 +395,7 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
       return
     }
 
-    if (index <= 2) {
+    if (index <= 4) {
       parseBasicContactLine(line, fields)
     }
 
