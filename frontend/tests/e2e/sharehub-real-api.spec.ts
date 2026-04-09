@@ -267,6 +267,13 @@ test('resumes 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByText('导出 PDF')).toBeVisible()
   await expect(page.getByTestId('resume-workbench-summary')).toContainText('累计')
   await expect(page.getByTestId(`resume-server-item-${seedResumeId}`)).toBeVisible()
+  await expect(page.getByTestId('resume-workbench-summary')).toContainText(`累计 ${workbenchBody.data.total}`)
+
+  const recentWorkbenchItem = workbenchBody.data.recentItems.find((item: { id: number }) => item.id === seedResumeId)
+  expect(recentWorkbenchItem).toBeTruthy()
+  await expect(page.getByTestId(`resume-server-item-${recentWorkbenchItem.id}`)).toContainText(
+    recentWorkbenchItem.fileName || `resume-${recentWorkbenchItem.id}.pdf`
+  )
 
   const resumeRows = page.getByTestId('resume-server-list').locator('[data-testid^="resume-server-item-"]')
   const summary = page.getByTestId('resume-workbench-summary')

@@ -139,7 +139,14 @@ test('简历模块 smoke', async ({ page }) => {
   await loginAs(page, 'user')
   await page.goto('/resume')
   await expect(page.getByRole('button', { name: '导出 PDF' })).toBeVisible()
-  await expect(page.getByTestId('resume-workbench-summary')).toContainText('累计')
+  const workbenchResponse = await browserFetch(page, '/api/resumes/workbench', {
+    'X-User-Key': userKey
+  })
+  expect(workbenchResponse.ok).toBeTruthy()
+  expect(workbenchResponse.status).toBe(200)
+  expect(workbenchResponse.json?.success).toBeTruthy()
+  expect(Array.isArray(workbenchResponse.json?.data?.recentItems)).toBeTruthy()
+  await expect(page.getByTestId('resume-workbench-summary')).toContainText(`累计 ${workbenchResponse.json?.data?.total ?? 0}`)
 
   const apiResponse = await browserFetch(page, '/api/resumes?page=1&pageSize=5', {
     'X-User-Key': userKey
@@ -153,6 +160,13 @@ test('简历模块 smoke', async ({ page }) => {
   if (firstResume) {
     await expect(page.getByText(firstResume.fileName || `resume-${firstResume.id}.pdf`).first()).toBeVisible()
     await expect(page.getByTestId(`resume-server-item-${firstResume.id}`)).toBeVisible()
+  }
+
+  const firstWorkbenchResume = workbenchResponse.json?.data?.recentItems?.[0]
+  if (firstWorkbenchResume) {
+    await expect(page.getByTestId(`resume-server-item-${firstWorkbenchResume.id}`)).toContainText(
+      firstWorkbenchResume.fileName || `resume-${firstWorkbenchResume.id}.pdf`
+    )
   }
 })
 
