@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type Response } from '@playwright/test'
 
 const enabledModules = new Set(
   (process.env.PLAYWRIGHT_MODULES || 'public').split(',').map((item) => item.trim()).filter(Boolean)
@@ -45,6 +45,27 @@ async function browserFetch(page: Page, path: string, headers: Record<string, st
   }, {
     requestPath: path,
     requestHeaders: headers
+  })
+}
+
+async function waitForResponses(
+  page: Page,
+  predicate: (response: Response) => boolean,
+  count: number
+) {
+  return new Promise<Response[]>((resolve) => {
+    const responses: Response[] = []
+    const handler = (response: Response) => {
+      if (!predicate(response)) {
+        return
+      }
+      responses.push(response)
+      if (responses.length >= count) {
+        page.off('response', handler)
+        resolve(responses)
+      }
+    }
+    page.on('response', handler)
   })
 }
 
@@ -134,6 +155,130 @@ test('路线模块 smoke', async ({ page }) => {
   await roadmapCard.getByRole('link', { name: '进入路线' }).click()
   await expect(page.getByRole('heading', { name: roadmap.title })).toBeVisible()
   await expect(page.getByText('节点进度结构')).toBeVisible()
+})
+
+test('资料发布真实写入 smoke', async ({ page, request }) => {
+  test.skip(!shouldRun('resources'))
+  const resourceTitle = `Smoke Publish Resource ${Date.now()}`
+
+  await loginAs(page, 'user')
+  await page.goto('/publish/resource')
+  await expect(page.locator('main').getByRole('heading', { name: '发布资料' })).toBeVisible()
+
+  await page.getByTestId('publish-resource-title').fill(resourceTitle)
+  await page.getByTestId('publish-resource-tags').fill('smoke,resource')
+  await page.getByTestId('publish-resource-summary').fill('通过 smoke 用例验证资料发布真实写入。')
+  await page.getByTestId('publish-resource-file').setInputFiles({
+    name: 'smoke-guide.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('smoke-resource-pdf')
+  })
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/publish') &&
+    !response.url().includes('/attachment')
+  )
+  const attachmentResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources/') &&
+    response.url().includes('/attachment') &&
+    response.request().method() === 'POST'
+  )
+  const publishResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources/') &&
+    response.url().includes('/publish') &&
+    response.request().method() === 'POST'
+  )
+
+  await page.getByTestId('publish-resource-submit').click()
+
+  const createResponse = await createResponsePromise
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const resourceId = createBody.data.id as number
+
+  const attachmentResponse = await attachmentResponsePromise
+  expect(attachmentResponse.ok()).toBeTruthy()
+  const attachmentBody = await attachmentResponse.json()
+  expect(attachmentBody.data.resourceId).toBe(resourceId)
+  expect(attachmentBody.data.file.filename).toBe('smoke-guide.pdf')
+
+  const publishResponse = await publishResponsePromise
+  expect(publishResponse.ok()).toBeTruthy()
+  const publishBody = await publishResponse.json()
+  expect(publishBody.data.id).toBe(resourceId)
+
+  await expect(page.getByTestId('publish-resource-result')).toContainText(`资源 ID：${resourceId}`)
+  await expect(page.getByTestId('publish-resource-result')).toContainText('附件：smoke-guide.pdf')
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/resources/${resourceId}$`))
+  await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/resources/${resourceId}`)
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.id).toBe(resourceId)
+  expect(detailBody.data.title).toBe(resourceTitle)
+  expect(detailBody.data.status).toBe('PUBLISHED')
+  expect(detailBody.data.objectKey).toBeTruthy()
+})
+
+test('路线发布真实写入 smoke', async ({ page, request }) => {
+  test.skip(!shouldRun('roadmaps'))
+  const roadmapTitle = `Smoke Publish Roadmap ${Date.now()}`
+
+  await loginAs(page, 'user')
+  await page.goto('/publish/roadmap')
+  await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
+
+  await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
+  await page.getByTestId('publish-roadmap-summary').fill('通过 smoke 用例验证路线创建与节点追加真实写入。')
+  await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')
+  await page.getByTestId('publish-roadmap-node-summary-0').fill('先完成路线主体创建。')
+  await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：写入节点')
+  await page.getByTestId('publish-roadmap-node-summary-1').fill('再完成真实节点写入。')
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/nodes')
+  )
+  const nodeResponsesPromise = waitForResponses(page, (response) =>
+    response.url().includes('/api/roadmaps/') &&
+    response.url().includes('/nodes') &&
+    response.request().method() === 'POST'
+  , 2)
+
+  await page.getByTestId('publish-roadmap-submit').click()
+
+  const createResponse = await createResponsePromise
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const roadmapId = createBody.data.id as number
+
+  const nodeResponses = await nodeResponsesPromise
+  expect(nodeResponses).toHaveLength(2)
+  for (const nodeResponse of nodeResponses) {
+    expect(nodeResponse.ok()).toBeTruthy()
+    expect(nodeResponse.url()).toContain(`/api/roadmaps/${roadmapId}/nodes`)
+  }
+
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${roadmapId}`)
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/roadmaps/${roadmapId}$`))
+  await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
+  await expect(page.getByText('阶段 1：创建主体')).toBeVisible()
+  await expect(page.getByText('阶段 2：写入节点')).toBeVisible()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${roadmapId}`)
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.roadmap.id).toBe(roadmapId)
+  expect(detailBody.data.roadmap.title).toBe(roadmapTitle)
+  expect(detailBody.data.roadmap.status).toBe('PUBLISHED')
+  expect(detailBody.data.nodes).toHaveLength(2)
 })
 
 test('社区笔记模块 smoke', async ({ page }) => {
