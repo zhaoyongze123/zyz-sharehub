@@ -133,6 +133,14 @@ class ResourceControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].id").value(publishedSpring))
             .andExpect(jsonPath("$.data.items[0].title").value("Spring 指南"));
+
+        mockMvc.perform(get("/api/resources")
+                .param("status", " ,  ")
+                .param("visibility", ""))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].id").value(publishedSpring))
+            .andExpect(jsonPath("$.data.items[0].title").value("Spring 指南"));
     }
 
     @Test
