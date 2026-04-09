@@ -407,11 +407,14 @@ test('notes 模块真接口联调', async ({ page, request }) => {
 
   await loginAs(page, 'user')
   await page.goto(`/notes/${noteId}`)
-  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
-  await expect(page.locator('.markdown-panel')).toContainText('这是用于详情页验收的真实正文。')
-  await expect(page.locator('.markdown-panel')).toContainText('Playwright detail paragraph')
-  await expect(page.locator('.outline')).toContainText('第一节')
-  await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
+  await expect(page.getByTestId('note-detail-page')).toBeVisible()
+  await expect(page.getByTestId('note-detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.getByText('这是用于详情页验收的真实正文。').first()).toBeVisible()
+  await expect(page.getByText('Playwright detail paragraph').first()).toBeVisible()
+  await expect(page.getByTestId('note-detail-content')).toContainText('这是用于详情页验收的真实正文。')
+  await expect(page.getByTestId('note-detail-content')).toContainText('Playwright detail paragraph')
+  await expect(page.getByTestId('note-outline')).toContainText('第一节')
+  await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
 })
 
 test('resumes 模块真接口联调', async ({ page, request }) => {

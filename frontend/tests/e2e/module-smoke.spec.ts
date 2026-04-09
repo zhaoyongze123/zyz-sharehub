@@ -171,11 +171,14 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
 
   await loginAs(page, 'user')
   await page.goto(`/notes/${noteId}`)
-  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
-  await expect(page.locator('.markdown-panel')).toContainText('这是 smoke 用例写入的真实正文。')
-  await expect(page.locator('.markdown-panel')).toContainText('Smoke detail paragraph')
-  await expect(page.locator('.outline')).toContainText('小节')
-  await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
+  await expect(page.getByTestId('note-detail-page')).toBeVisible()
+  await expect(page.getByTestId('note-detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.getByText('这是 smoke 用例写入的真实正文。').first()).toBeVisible()
+  await expect(page.getByText('Smoke detail paragraph').first()).toBeVisible()
+  await expect(page.getByTestId('note-detail-content')).toContainText('这是 smoke 用例写入的真实正文。')
+  await expect(page.getByTestId('note-detail-content')).toContainText('Smoke detail paragraph')
+  await expect(page.getByTestId('note-outline')).toContainText('小节')
+  await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
 
   const reportResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/reports') && response.request().method() === 'POST'

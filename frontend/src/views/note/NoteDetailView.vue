@@ -1,5 +1,5 @@
 <template>
-  <div v-if="loading" class="page-shell detail-grid">
+  <div v-if="loading" class="page-shell detail-grid" data-testid="note-detail-loading">
     <section class="detail-main">
       <BaseSkeleton height="14rem" />
       <BaseSkeleton height="12rem" />
@@ -10,8 +10,8 @@
     </aside>
   </div>
 
-  <div class="page-shell detail-grid" v-else-if="note">
-    <section class="detail-main">
+  <div class="page-shell detail-grid" v-else-if="note" data-testid="note-detail-page">
+    <section class="detail-main" data-testid="note-detail-main">
       <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
         <template #actions>
           <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
@@ -21,9 +21,9 @@
 
       <InteractionBar :likes="likes" :favorites="favorites" @like="likeNote" @favorite="favoriteNote" @report="reportVisible = true" />
 
-      <article class="glass-panel markdown-panel" v-html="renderedHtml"></article>
+      <article class="glass-panel markdown-panel" data-testid="note-detail-content" v-html="renderedHtml"></article>
 
-      <div class="glass-panel panel">
+      <div class="glass-panel panel" data-testid="note-detail-related">
         <div class="section-heading">
           <h2>相关推荐</h2>
           <p>当前接口尚未返回相关推荐，后续可继续补齐关联笔记能力。</p>
@@ -39,7 +39,7 @@
       </div>
     </section>
 
-    <aside class="detail-side">
+    <aside class="detail-side" data-testid="note-detail-side">
       <NoteOutline :items="noteOutline" />
       <BaseEmpty title="笔记状态" :description="noteStatusDescription" />
     </aside>
@@ -52,13 +52,13 @@
     />
   </div>
 
-  <div v-else-if="notFound" class="page-shell">
+  <div v-else-if="notFound" class="page-shell" data-testid="note-detail-not-found">
     <BaseErrorState title="笔记不存在" description="可能已删除、当前账号不可见，或你访问了他人的笔记。">
       <BaseButton @click="router.push('/community')">返回社区</BaseButton>
     </BaseErrorState>
   </div>
 
-  <div v-else class="page-shell">
+  <div v-else class="page-shell" data-testid="note-detail-error">
     <BaseErrorState title="笔记加载失败" description="服务暂时不可用，请稍后刷新重试。" />
   </div>
 </template>
