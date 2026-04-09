@@ -26,6 +26,14 @@ function adminHeaders() {
   }
 }
 
+function normalizeAuditAction(action: string) {
+  return action
+    .split('_')
+    .filter(Boolean)
+    .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+    .join(' ')
+}
+
 async function createAdminUser(request: Parameters<typeof test>[0]['request'], login: string) {
   const response = await request.get(`${apiBaseUrl}/api/auth/me`, {
     headers: {
@@ -659,6 +667,16 @@ test('admin 模块真接口联调', async ({ page, request }) => {
     await expect(page.getByText(`${firstReport.targetType} #${firstReport.targetId}`).first()).toBeVisible()
   } else {
     await expect(page.getByText('暂无举报数据')).toBeVisible()
+  }
+
+  await page.goto('/admin/audit-logs')
+  await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
+  if (firstAuditLog) {
+    const auditRow = page.getByTestId(`admin-audit-log-row-${firstAuditLog.id}`)
+    await expect(auditRow).toContainText(normalizeAuditAction(firstAuditLog.action))
+    await expect(auditRow).toContainText(`${firstAuditLog.targetType} #${firstAuditLog.targetId}`)
+  } else {
+    await expect(page.getByText('暂无审计日志')).toBeVisible()
   }
 
   await page.goto('/admin/reviews')
