@@ -434,26 +434,29 @@ function setupRevealObserver() {
 }
 
 function startFocusAnimation() {
-  const cursor = document.getElementById("focusCursor");
-  const titleText = document.getElementById("focusTitleText");
-  const subtitle = document.getElementById("focusSubtitle");
+  const cursor = document.getElementById("focusCursor") as HTMLElement | null;
+  const titleText = document.getElementById("focusTitleText") as HTMLElement | null;
+  const subtitle = document.getElementById("focusSubtitle") as HTMLElement | null;
   const textToType = "为前沿技术而生。";
 
   if (!cursor || !titleText) return;
+  const cursorEl = cursor;
+  const titleTextEl = titleText;
+  const subtitleEl = subtitle;
 
   setTimeout(() => {
-    cursor.classList.add("dropped");
+    cursorEl.classList.add("dropped");
     setTimeout(() => {
-      cursor.classList.add("blinking");
+      cursorEl.classList.add("blinking");
       let i = 0;
       function typeNext() {
         if (i < textToType.length) {
-          titleText.textContent += textToType.charAt(i);
+          titleTextEl.textContent += textToType.charAt(i);
           i += 1;
           setTimeout(typeNext, 40);
         } else {
-          cursor.classList.remove("blinking");
-          if (subtitle) subtitle.classList.add("is-visible");
+          cursorEl.classList.remove("blinking");
+          if (subtitleEl) subtitleEl.classList.add("is-visible");
         }
       }
       typeNext();
