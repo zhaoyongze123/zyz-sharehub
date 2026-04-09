@@ -2,7 +2,7 @@
   <div class="admin-view">
     <div class="section-heading">
       <h1>内容审核</h1>
-      <p>当前复用真实举报队列完成治理闭环；驳回待后端专门接口补齐后再开放。</p>
+      <p>当前复用真实举报队列完成治理闭环；仅开放已接通的“完成处理”动作。</p>
     </div>
 
     <section v-if="loading" class="glass-panel panel panel-state">
@@ -45,11 +45,10 @@
       <ReviewActionPanel
         v-model:reason="reason"
         approve-label="完成处理"
-        reject-label="驳回待接"
+        reject-label="驳回未开放"
         :approve-disabled="!selectedItem || resolving || selectedItem.rawStatus !== 'OPEN'"
         :reject-disabled="true"
         @approve="approve"
-        @reject="reject"
       />
     </div>
 
@@ -128,10 +127,6 @@ async function approve() {
   } finally {
     resolving.value = false
   }
-}
-
-function reject() {
-  appStore.showToast('驳回待接后端', '当前仅开放真实“完成处理”动作，驳回接口尚未提供', 'info')
 }
 
 onMounted(() => {

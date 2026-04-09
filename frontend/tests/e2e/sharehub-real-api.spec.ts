@@ -652,12 +652,14 @@ test('admin 模块真接口联调', async ({ page, request }) => {
         id: number
         reason: string
         reporter: string
+        status: string
         targetType: string
         targetId: number
       }>
     }
   }
   const firstReport = reportsBody.data.items[0] ?? null
+  const firstOpenReport = reportsBody.data.items.find((item) => item.status === 'OPEN') ?? null
 
   const auditLogsResponse = await request.get(`${apiBaseUrl}/api/admin/audit-logs?page=1&pageSize=20`, {
     headers: adminHeaders()
@@ -699,11 +701,13 @@ test('admin 模块真接口联调', async ({ page, request }) => {
     reportsBody.data.items.filter((item) => item.status === 'OPEN').length
   ))
   await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(String(usersBody.data.items.length))
-  if (firstReport) {
+  if (firstOpenReport) {
     await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
-      `${firstReport.targetType} #${firstReport.targetId}`
+      `${firstOpenReport.targetType} #${firstOpenReport.targetId}`
     )
-    await expect(page.getByTestId(`admin-dashboard-task-report-${firstReport.id}`)).toContainText(firstReport.reason)
+    await expect(page.getByTestId(`admin-dashboard-task-report-${firstOpenReport.id}`)).toContainText(firstOpenReport.reason)
+  } else {
+    await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText('暂无')
   }
   if (firstAuditLog) {
     await expect(page.getByTestId(`admin-dashboard-activity-${firstAuditLog.id}`)).toContainText(
@@ -733,6 +737,7 @@ test('admin 模块真接口联调', async ({ page, request }) => {
 
   await page.goto('/admin/reviews')
   await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '驳回未开放' })).toBeDisabled()
   if (firstReport) {
     const reviewRow = page.getByTestId(`admin-reviews-row-${firstReport.id}`)
     await expect(reviewRow).toContainText(firstReport.reason)

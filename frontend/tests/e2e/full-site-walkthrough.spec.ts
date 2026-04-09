@@ -197,6 +197,7 @@ test('后台模块走查', async ({ page, request }) => {
 
   await page.goto('/admin/reviews')
   await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '驳回未开放' })).toBeDisabled()
   await expect(page.getByTestId(`admin-reviews-row-${reportId}`)).toContainText(reportReason)
   const resolveResponsePromise = page.waitForResponse((response) =>
     response.url().includes(`/api/admin/reports/${reportId}/resolve`) &&
