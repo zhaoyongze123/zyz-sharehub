@@ -24,12 +24,12 @@ PLAYWRIGHT_ADMIN_TOKEN='dev-admin-token' \
 npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 ```
 
-- 若机器上已经有可用前端 dev server，也可把 `PLAYWRIGHT_BASE_URL` 覆盖成对应地址；2026-04-10 03:56 +0800 最近一次复核使用的是默认地址 `http://127.0.0.1:14173`
+- 若机器上已经有可用前端 dev server，也可把 `PLAYWRIGHT_BASE_URL` 覆盖成对应地址；2026-04-10 04:50 +0800 最近一次复核使用的是默认地址 `http://127.0.0.1:14173`
 
 - 已确认走查账号与权限上下文：
   - 普通用户：`PLAYWRIGHT_USER_KEY`
   - 后台管理员透传头：`PLAYWRIGHT_ADMIN_TOKEN`
-- 已知走查会创建真实笔记、资料、路线测试数据，发布前后需允许这类验证写入
+- 已知走查会创建真实笔记、资料、路线与节点测试数据，发布前后需允许这类验证写入
 
 ## 发布中
 
