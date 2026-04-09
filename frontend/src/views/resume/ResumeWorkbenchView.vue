@@ -13,6 +13,10 @@
       </div>
       
       <div class="flex items-center gap-4">
+        <div v-if="workbench" class="hidden xl:flex items-center gap-3 mr-2 text-xs text-gray-500" data-testid="resume-workbench-summary">
+          <span>累计 {{ workbench.total }}</span>
+          <span>已生成 {{ workbench.generatedCount }}</span>
+        </div>
         <div class="text-sm flex items-center gap-1 min-w-[80px] justify-end mr-4">
           <span v-if="saving" class="text-gray-400 text-xs">保存中...</span>
           <span v-else-if="saveTime" class="text-green-500 text-xs">已自动保存 {{ saveTime }}</span>
@@ -26,11 +30,94 @@
           </select>
         </div>
         <BaseButton variant="secondary" @click="resetToDefault" class="text-sm">重置</BaseButton>
+        <BaseButton @click="generateServerResume" :disabled="serverActionLoading" class="text-sm" data-testid="resume-generate-button">
+          {{ serverActionLoading ? '提交中...' : '生成服务端简历' }}
+        </BaseButton>
         <BaseButton @click="exportPdf" :disabled="exporting" class="text-sm shadow-md bg-gray-800 hover:bg-gray-900 border-none text-white">
           {{ exporting ? '生成中...' : '导出 PDF' }}
         </BaseButton>
       </div>
     </header>
+
+    <section class="bg-white border-b px-6 py-4 grid gap-4 lg:grid-cols-[1.4fr_1fr] shrink-0">
+      <div class="grid gap-3 sm:grid-cols-3">
+        <article class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-gray-400">工作台总数</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ workbench?.total ?? 0 }}</p>
+          <p class="mt-1 text-xs text-gray-500">来自 `/api/resumes/workbench`</p>
+        </article>
+        <article class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-gray-400">已生成</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ workbench?.generatedCount ?? 0 }}</p>
+          <p class="mt-1 text-xs text-gray-500">点击按钮触发 `/api/resumes/generate`</p>
+        </article>
+        <article class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-gray-400">当前模板</p>
+          <p class="mt-2 text-2xl font-semibold text-gray-900">{{ templateLabelMap[currentTemplate] }}</p>
+          <p class="mt-1 text-xs text-gray-500">本地编辑器与服务端生成保持同模板键</p>
+        </article>
+      </div>
+
+      <article class="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm" data-testid="resume-server-list">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-semibold text-gray-900">服务端生成记录</h2>
+            <p class="text-xs text-gray-500">读取 `/api/resumes` 列表，并支持下载与删除。</p>
+          </div>
+          <button
+            type="button"
+            class="text-xs text-blue-600 hover:text-blue-800"
+            @click="reloadResumeWorkbench"
+            :disabled="resumeLoading"
+          >
+            {{ resumeLoading ? '刷新中...' : '刷新记录' }}
+          </button>
+        </div>
+
+        <div v-if="resumeLoadError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+          简历工作台加载失败，请确认登录态或后端服务状态。
+        </div>
+
+        <div v-else-if="resumeItems.length" class="mt-3 space-y-2">
+          <article
+            v-for="item in resumeItems"
+            :key="item.id"
+            class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2"
+            :data-testid="`resume-server-item-${item.id}`"
+          >
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-gray-900">{{ item.fileName }}</p>
+              <p class="text-xs text-gray-500">
+                模板 {{ templateLabelMap[item.templateKey] || item.templateKey }} · 状态 {{ item.status }} · 更新 {{ item.updatedAt }}
+              </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-gray-200 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                @click="downloadResumeFile(item)"
+                :data-testid="`resume-download-${item.id}`"
+              >
+                下载
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-red-200 px-3 py-1 text-xs text-red-600 hover:bg-red-50"
+                @click="removeResume(item)"
+                :disabled="serverActionLoading"
+                :data-testid="`resume-delete-${item.id}`"
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <div v-else class="mt-3 rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-500">
+          暂无服务端简历记录，先生成一份再继续验收。
+        </div>
+      </article>
+    </section>
 
     <!-- Main Content -->
     <main class="flex-1 flex overflow-hidden relative">
@@ -295,6 +382,7 @@ import ResumeClassicTemplate from '@/components/business/ResumeClassicTemplate.v
 import ResumeProfessionalTemplate from '@/components/business/ResumeProfessionalTemplate.vue'
 import ResumeModernTemplate from '@/components/business/ResumeModernTemplate.vue'
 import html2pdf from 'html2pdf.js'
+import { deleteResume, fetchResumes, fetchResumeWorkbench, generateResume, type ResumeItem, type ResumeWorkbenchData } from '@/api/resumes'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
@@ -307,6 +395,17 @@ const saving = ref(false)
 const saveTime = ref('')
 const currentTemplate = ref('classic')
 const templateComponents: Record<string, any> = { classic: ResumeClassicTemplate, professional: ResumeProfessionalTemplate, modern: ResumeModernTemplate }
+const templateLabelMap: Record<string, string> = {
+  classic: '经典基础',
+  professional: '沉稳商务',
+  modern: '现代左右',
+  default: '默认模板'
+}
+const workbench = ref<ResumeWorkbenchData | null>(null)
+const resumeItems = ref<ResumeItem[]>([])
+const resumeLoading = ref(false)
+const resumeLoadError = ref(false)
+const serverActionLoading = ref(false)
 
 const defaultModules = [
   {
@@ -496,6 +595,60 @@ watch([modules, currentTemplate], () => {
   }, 1000)
 }, { deep: true })
 
+async function reloadResumeWorkbench() {
+  resumeLoading.value = true
+  resumeLoadError.value = false
+
+  try {
+    const [workbenchData, listData] = await Promise.all([
+      fetchResumeWorkbench(),
+      fetchResumes(1, 10)
+    ])
+    workbench.value = workbenchData
+    resumeItems.value = listData.items
+  } catch {
+    resumeLoadError.value = true
+    workbench.value = null
+    resumeItems.value = []
+  } finally {
+    resumeLoading.value = false
+  }
+}
+
+function downloadResumeFile(item: ResumeItem) {
+  const link = document.createElement('a')
+  link.href = item.fileUrl
+  link.download = item.fileName
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+async function generateServerResume() {
+  serverActionLoading.value = true
+
+  try {
+    const created = await generateResume(currentTemplate.value)
+    await reloadResumeWorkbench()
+    appStore.showToast('生成完成', `${created.fileName} 已写入服务端列表`, 'success')
+  } finally {
+    serverActionLoading.value = false
+  }
+}
+
+async function removeResume(item: ResumeItem) {
+  serverActionLoading.value = true
+
+  try {
+    await deleteResume(item.id)
+    await reloadResumeWorkbench()
+    appStore.showToast('删除完成', `${item.fileName} 已移出服务端列表`, 'success')
+  } finally {
+    serverActionLoading.value = false
+  }
+}
+
 onMounted(() => {
   const saved = localStorage.getItem('resume_versions')
   if (saved) {
@@ -507,6 +660,8 @@ onMounted(() => {
     versions.value = [{ id: 'v1', name: '默认简历', data: JSON.parse(JSON.stringify(defaultModules)) }]
     localStorage.setItem('resume_versions', JSON.stringify(versions.value))
   }
+
+  void reloadResumeWorkbench()
 })
 
 const switchVersion = () => {

@@ -237,21 +237,25 @@ test('notes 模块真接口联调', async ({ page, request }) => {
 
 test('resumes 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('resumes'))
-  const resumeId = await createResume(request)
+  const batchId = Date.now()
+  const seedResumeId = await createResume(request, 'classic')
 
   const workbenchResponse = await request.get(`${apiBaseUrl}/api/resumes/workbench`, {
     headers: userHeaders()
   })
   expect(workbenchResponse.ok()).toBeTruthy()
+  const workbenchBody = await workbenchResponse.json()
+  expect(workbenchBody.data.total).toBeGreaterThan(0)
+  expect(Array.isArray(workbenchBody.data.recentItems)).toBeTruthy()
 
   const listResponse = await request.get(`${apiBaseUrl}/api/resumes?page=1&pageSize=10`, {
     headers: userHeaders()
   })
   expect(listResponse.ok()).toBeTruthy()
   const listBody = await listResponse.json()
-  expect(listBody.data.items.some((item: { id: number }) => item.id === resumeId)).toBeTruthy()
+  expect(listBody.data.items.some((item: { id: number }) => item.id === seedResumeId)).toBeTruthy()
 
-  const downloadResponse = await request.get(`${apiBaseUrl}/api/resumes/${resumeId}/download`, {
+  const downloadResponse = await request.get(`${apiBaseUrl}/api/resumes/${seedResumeId}/download`, {
     headers: {
       'X-User-Key': 'playwright-user'
     }
@@ -261,6 +265,31 @@ test('resumes 模块真接口联调', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/resume')
   await expect(page.getByText('导出 PDF')).toBeVisible()
+  await expect(page.getByTestId('resume-workbench-summary')).toContainText('累计')
+  await expect(page.getByTestId(`resume-server-item-${seedResumeId}`)).toBeVisible()
+
+  const resumeRows = page.getByTestId('resume-server-list').locator('[data-testid^="resume-server-item-"]')
+  const summary = page.getByTestId('resume-workbench-summary')
+  const summaryBefore = await summary.textContent()
+  const totalBefore = Number(summaryBefore?.match(/累计\s+(\d+)/)?.[1] ?? '0')
+  const firstItemBefore = await resumeRows.first().getAttribute('data-testid')
+
+  await page.getByRole('combobox').nth(1).selectOption('modern')
+  await page.getByTestId('resume-generate-button').click()
+
+  await expect(summary).toContainText(`累计 ${totalBefore + 1}`)
+  const generatedItem = resumeRows.first()
+  const generatedTestId = await generatedItem.getAttribute('data-testid')
+  expect(generatedTestId).toBeTruthy()
+  expect(generatedTestId).not.toBe(firstItemBefore)
+  const generatedId = Number(generatedTestId?.replace('resume-server-item-', ''))
+  expect(Number.isFinite(generatedId)).toBeTruthy()
+  await expect(generatedItem).toContainText('resume-modern.pdf')
+
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByTestId(`resume-download-${generatedId}`).click()
+  const browserDownload = await downloadPromise
+  expect(browserDownload.suggestedFilename()).toContain('resume-modern')
 })
 
 test('me 模块真接口联调', async ({ page, request }) => {
