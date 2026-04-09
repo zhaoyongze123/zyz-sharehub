@@ -8,7 +8,7 @@
 
       <div class="form-stack">
         <BaseInput v-model="form.title" label="资料标题" placeholder="例如：RAG 评测 checklist" />
-        <BaseSelect v-model="form.category" label="资料分类" :options="categoryOptions" />
+        <BaseSelect v-model="form.category" label="资料分类" :options="publishCategoryOptions" />
         <BaseInput v-model="form.tags" label="标签" placeholder="用逗号分隔多个标签" />
         <BaseTabs v-model="uploadMode" :items="uploadModeItems" />
         <BaseUploader v-if="uploadMode === 'file'" hint="上传资料文件、压缩包或封面图" />
@@ -44,11 +44,11 @@ import { useAppStore } from '@/stores/app'
 const appStore = useAppStore()
 const uploadMode = ref('file')
 // 直接复用真实接口的分类枚举，过滤空白与“全部”
-const categoryOptions = resourceCategoryOptions
+const publishCategoryOptions = resourceCategoryOptions
   .map((item) => item.trim())
   .filter((item) => item && item !== '全部')
   .map((item) => ({ label: item, value: item }))
-const defaultCategory = categoryOptions[0]?.value || ''
+const defaultCategory = publishCategoryOptions[0]?.value || ''
 const form = reactive({
   title: '',
   category: defaultCategory,
