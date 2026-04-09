@@ -16,6 +16,7 @@
     "html2pdf.js": "^0.14.0",
     "marked": "^18.0.0",
     "pinia": "^3.0.3",
+    "pdfjs-dist": "^5.6.205",
     "vue": "^3.5.12",
     "vue-router": "^4.5.1",
     "vuedraggable": "^4.1.0"
