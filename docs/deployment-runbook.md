@@ -70,8 +70,9 @@ npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 
 最近一次本地复核：
 
-- 复核时间：2026-04-10 03:27 +0800
-- 复核环境：前端 `http://127.0.0.1:5173`，后端 `http://127.0.0.1:18080`
+- 复核时间：2026-04-10 03:33 +0800
+- 复核环境：前端 `http://127.0.0.1:14173`，后端 `http://127.0.0.1:18080`
+- 复核命令：`npm run test:e2e -- full-site-walkthrough.spec.ts`
 - 复核结果：`tests/e2e/full-site-walkthrough.spec.ts` 7/7 通过
 
 ## 夜间自动化
