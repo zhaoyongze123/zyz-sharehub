@@ -35,6 +35,7 @@
         <div class="content-scroll">
           <header class="content-header">
             <h3>{{ currentTabLabel }}</h3>
+            <span v-if="isLoading" class="loading-text">同步中...</span>
           </header>
 
           <!-- 个人资料 -->
@@ -202,6 +203,7 @@ const currentTabLabel = computed(() => {
 })
 
 const avatarSrc = computed(() => authStore.profile?.avatarUrl || defaultAvatar)
+const isLoading = computed(() => authStore.loading)
 
 // 个人资料相关
 const profileForm = reactive({
@@ -410,8 +412,8 @@ onMounted(async () => {
 }
 
 .user-avatar-img {
-  width: 48px;
-  height: 48px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
@@ -502,6 +504,9 @@ onMounted(async () => {
   border-bottom: 1px solid var(--app-border);
   padding-bottom: 16px;
   margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .content-header h3 {
@@ -509,6 +514,11 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--app-text-main);
   margin: 0;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--app-text-muted);
 }
 
 .setting-block {
