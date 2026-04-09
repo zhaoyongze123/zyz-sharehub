@@ -93,12 +93,11 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-const categoryOptions = computed(() =>
-  resourceCategoryOptions
-    .filter((item) => item !== '全部')
-    .map((item) => ({ label: item, value: item }))
-)
-const defaultCategory = computed(() => categoryOptions.value[0]?.value || '')
+// 分类选项改用真实接口的前端常量，避免依赖 mock 资源
+const categoryOptions = resourceCategoryOptions
+  .filter((item) => item !== '全部')
+  .map((item) => ({ label: item, value: item }))
+const defaultCategory = categoryOptions[0]?.value || ''
 const selectedFile = ref<File | null>(null)
 const isSubmitting = ref(false)
 const validationMessage = ref('')
@@ -106,7 +105,7 @@ const lastPublishedId = ref<number | null>(null)
 const uploadedFileName = ref('')
 const form = reactive({
   title: '',
-  category: defaultCategory.value,
+  category: defaultCategory,
   tags: '',
   url: '',
   summary: ''
