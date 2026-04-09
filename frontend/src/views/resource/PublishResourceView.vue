@@ -13,7 +13,7 @@
           placeholder="例如：RAG 评测 checklist"
           data-testid="publish-resource-title"
         />
-        <BaseSelect v-model="form.category" label="资料分类" :options="categoryOptions" />
+        <BaseSelect v-model="form.category" label="资料分类" :options="publishCategoryOptions" />
         <BaseInput
           v-model="form.tags"
           label="标签"
@@ -93,10 +93,10 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-const categoryOptions = resourceCategoryOptions
+const publishCategoryOptions = resourceCategoryOptions
   .filter((item) => item !== '全部')
   .map((item) => ({ label: item, value: item }))
-const defaultCategory = computed(() => categoryOptions[0]?.value || '')
+const defaultCategory = computed(() => publishCategoryOptions[0]?.value || '')
 const selectedFile = ref<File | null>(null)
 const isSubmitting = ref(false)
 const validationMessage = ref('')
