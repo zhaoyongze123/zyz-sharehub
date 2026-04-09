@@ -528,6 +528,7 @@
 
 - `GET /api/admin/reports`
 - `GET /api/admin/audit-logs`
+- `GET /api/admin/users`
 - `POST /api/admin/reports/{id}/resolve`
 - `POST /api/admin/resources/{id}/block`
 - `POST /api/admin/resources/{id}/restore`

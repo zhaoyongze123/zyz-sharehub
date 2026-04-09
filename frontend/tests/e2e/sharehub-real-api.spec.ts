@@ -26,6 +26,17 @@ function adminHeaders() {
   }
 }
 
+async function createAdminUser(request: Parameters<typeof test>[0]['request'], login: string) {
+  const response = await request.get(`${apiBaseUrl}/api/auth/me`, {
+    headers: {
+      'X-User-Key': login
+    }
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body.data.id as number
+}
+
 async function createPublishedResource(request: Parameters<typeof test>[0]['request'], title: string) {
   const createResponse = await request.post(`${apiBaseUrl}/api/resources`, {
     headers: userHeaders(),
@@ -434,6 +445,8 @@ test('me 模块真接口联调', async ({ page, request }) => {
 test('admin 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('admin'))
   await createPublishedResource(request, `Admin Resource ${Date.now()}`)
+  const managedUserLogin = `admin-user-${Date.now()}`
+  const managedUserId = await createAdminUser(request, managedUserLogin)
 
   const reportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
     headers: adminHeaders()
@@ -457,6 +470,23 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   })
   expect(auditLogsResponse.ok()).toBeTruthy()
 
+  const usersResponse = await request.get(`${apiBaseUrl}/api/admin/users?page=1&pageSize=20`, {
+    headers: adminHeaders()
+  })
+  expect(usersResponse.ok()).toBeTruthy()
+  const usersBody = await usersResponse.json() as {
+    data: {
+      items: Array<{
+        id: number
+        login: string
+        name: string | null
+        status: string
+      }>
+    }
+  }
+  const targetUser = usersBody.data.items.find((item) => item.id === managedUserId)
+  expect(targetUser).toBeTruthy()
+
   await loginAs(page, 'admin')
   await page.goto('/admin')
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
@@ -470,4 +500,26 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   } else {
     await expect(page.getByText('暂无举报数据')).toBeVisible()
   }
+
+  await page.goto('/admin/users')
+  await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
+  const userRow = page.locator('tbody tr', { hasText: managedUserLogin }).first()
+  await expect(userRow).toBeVisible()
+  await expect(userRow).toContainText(managedUserLogin)
+  await expect(userRow).toContainText('正常')
+
+  const banResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/admin/users/${managedUserId}/ban`) && response.request().method() === 'POST'
+  )
+  await userRow.getByRole('button', { name: '封禁' }).click()
+  const banResponse = await banResponsePromise
+  expect(banResponse.ok()).toBeTruthy()
+  await expect(userRow).toContainText('已封禁')
+
+  const listAfterBan = await request.get(`${apiBaseUrl}/api/admin/users?page=1&pageSize=20`, {
+    headers: adminHeaders()
+  })
+  expect(listAfterBan.ok()).toBeTruthy()
+  const listAfterBanBody = await listAfterBan.json()
+  expect(listAfterBanBody.data.items.some((item: { id: number, status: string }) => item.id === managedUserId && item.status === 'BANNED')).toBeTruthy()
 })

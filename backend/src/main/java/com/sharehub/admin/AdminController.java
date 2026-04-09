@@ -51,6 +51,14 @@ public class AdminController {
         return ApiResponse.ok(interactionRepository.listAuditLogs(page, pageSize, action, targetType));
     }
 
+    @GetMapping("/users")
+    public ApiResponse<PageResponse<UserProfileDto>> users(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "20") int pageSize
+    ) {
+        return ApiResponse.ok(userProfileRepository.listUsers(page, pageSize));
+    }
+
     @PostMapping("/reports/{id}/resolve")
     @Transactional
     public ApiResponse<InteractionRepository.ReportRecord> resolve(@PathVariable Long id) {

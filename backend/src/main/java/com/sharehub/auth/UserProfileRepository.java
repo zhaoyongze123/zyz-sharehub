@@ -1,6 +1,7 @@
 package com.sharehub.auth;
 
 import com.sharehub.common.NotFoundException;
+import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -97,6 +98,25 @@ public class UserProfileRepository {
             throw new NotFoundException("USER_NOT_FOUND");
         }
         return findById(id);
+    }
+
+    public PageResponse<UserProfileDto> listUsers(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Long.class);
+        int offset = (safePage - 1) * safePageSize;
+        List<UserProfileDto> items = jdbcTemplate.query(
+            """
+                SELECT id, login, name, avatar_file_id, status
+                FROM users
+                ORDER BY id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> mapUser(resultSet),
+            safePageSize,
+            offset
+        );
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
     public void ensureActive(String login) {

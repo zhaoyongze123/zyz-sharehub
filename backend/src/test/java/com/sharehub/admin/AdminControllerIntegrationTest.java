@@ -95,6 +95,39 @@ public class AdminControllerIntegrationTest {
         mvc.perform(get("/api/admin/audit-logs"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+
+        mvc.perform(get("/api/admin/users"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    @Test
+    void usersSupportsPaginationAndStatusMutation() throws Exception {
+        long firstUserId = insertUser("admin-list-alpha");
+        long secondUserId = insertUser("admin-list-beta");
+
+        mvc.perform(adminGet("/api/admin/users")
+                .param("page", "1")
+                .param("pageSize", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("OK"))
+            .andExpect(jsonPath("$.data.items.length()").value(1))
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].id").value(secondUserId))
+            .andExpect(jsonPath("$.data.items[0].login").value("admin-list-beta"))
+            .andExpect(jsonPath("$.data.items[0].status").value("ACTIVE"));
+
+        mvc.perform(adminPost("/api/admin/users/" + firstUserId + "/ban"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("BANNED"));
+
+        mvc.perform(adminGet("/api/admin/users")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[1].id").value(firstUserId))
+            .andExpect(jsonPath("$.data.items[1].status").value("BANNED"));
     }
 
     @Test
