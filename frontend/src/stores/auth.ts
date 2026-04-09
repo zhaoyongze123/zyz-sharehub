@@ -50,33 +50,38 @@ export const useAuthStore = defineStore('auth', {
     isAdmin: (state) => state.profile?.role === 'admin'
   },
   actions: {
+    async syncProfileFromServer() {
+      const response = await axios.get<AuthMeResponse>('/api/auth/me', {
+        headers: buildDevHeaders()
+      })
+      const currentUser = response.data?.data
+
+      if (response.data?.success && currentUser?.login) {
+        const nickname = currentUser.name?.trim() || currentUser.login
+        const role = getSavedRole()
+        this.profile = {
+          id: currentUser.id ?? 0,
+          nickname,
+          role,
+          headline: window.localStorage.getItem('sharebase.headline') || 'ShareHub 用户',
+          avatarUrl: currentUser.avatarUrl || undefined
+        }
+        window.localStorage.setItem('sharebase.nickname', nickname)
+        window.localStorage.setItem('sharebase.userKey', currentUser.login)
+        window.localStorage.setItem('sharebase.role', role)
+        return this.profile
+      }
+
+      this.profile = null
+      return null
+    },
     async bootstrap() {
       if (this.initialized) {
         return
       }
 
       try {
-        const response = await axios.get<AuthMeResponse>('/api/auth/me', {
-          headers: buildDevHeaders()
-        })
-        const currentUser = response.data?.data
-        if (response.data?.success && currentUser?.login) {
-          const nickname = currentUser.name?.trim() || currentUser.login
-          this.profile = {
-            id: currentUser.id ?? 0,
-            nickname,
-            role: getSavedRole(),
-            headline: window.localStorage.getItem('sharebase.headline') || 'ShareHub 用户',
-            avatarUrl: currentUser.avatarUrl || undefined
-          }
-          window.localStorage.setItem('sharebase.nickname', nickname)
-          window.localStorage.setItem('sharebase.userKey', currentUser.login)
-          if (!window.localStorage.getItem('sharebase.role')) {
-            window.localStorage.setItem('sharebase.role', 'user')
-          }
-        } else {
-          this.profile = null
-        }
+        await this.syncProfileFromServer()
       } catch (error) {
         this.profile = null
       } finally {

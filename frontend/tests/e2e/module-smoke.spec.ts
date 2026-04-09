@@ -66,6 +66,22 @@ test('公开页 smoke', async ({ page }) => {
   await expect(page.locator('main').getByRole('heading', { name: '资料广场' })).toBeVisible()
 })
 
+test('登录回调页通过 auth/me 恢复真实身份', async ({ page }) => {
+  test.skip(!shouldRun('profile'))
+  await loginAs(page, 'user')
+  const authMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
+  await page.goto('/auth/callback?redirect=/me')
+  const authMeResponse = await authMeResponsePromise
+  expect(authMeResponse.ok()).toBeTruthy()
+  const authMeBody = await authMeResponse.json()
+  expect(authMeBody.success).toBeTruthy()
+  expect(authMeBody.data?.login).toBeTruthy()
+  await expect(page).toHaveURL(/\/me$/)
+  await expect(page.getByText(`@${authMeBody.data.login}`)).toBeVisible()
+})
+
 test('资源模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('resources'))
   await page.goto('/resources')
