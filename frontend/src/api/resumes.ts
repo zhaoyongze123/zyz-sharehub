@@ -105,3 +105,19 @@ export async function generateResume(templateKey: string) {
 export async function deleteResume(id: number) {
   await apiClient.delete<ApiResponse<string>>(`/resumes/${id}`)
 }
+
+export async function downloadResume(id: number, fallbackName?: string) {
+  const response = await apiClient.get<Blob>(`/resumes/${id}/download`, {
+    responseType: 'blob'
+  })
+
+  const disposition = (response.headers['content-disposition'] || response.headers['Content-Disposition']) as string | undefined
+  const matchedFileName = disposition?.match(/filename\*?=([^;]+)/i)?.[1]
+  const sanitizedName = matchedFileName?.replace(/UTF-8''/i, '').replace(/['"]/g, '')
+  const fileName = decodeURIComponent(sanitizedName ?? '').trim() || fallbackName?.trim() || `resume-${id}.pdf`
+
+  return {
+    blob: response.data,
+    fileName
+  }
+}

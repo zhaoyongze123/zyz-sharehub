@@ -93,11 +93,12 @@
             <div class="flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                class="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                class="rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:text-slate-400"
+                :disabled="downloadingId === item.id"
                 :data-testid="`resume-download-${item.id}`"
                 @click="downloadResumeFile(item)"
               >
-                下载
+                {{ downloadingId === item.id ? '下载中...' : '下载' }}
               </button>
               <button
                 type="button"
@@ -314,6 +315,7 @@ import ResumeModernTemplate from '@/components/business/ResumeModernTemplate.vue
 import { useAppStore } from '@/stores/app'
 import {
   deleteResume,
+  downloadResume,
   fetchResumes,
   fetchResumeWorkbench,
   generateResume,
@@ -361,6 +363,7 @@ const resumeItems = ref<ServerResumeItem[]>([])
 const resumeLoading = ref(false)
 const resumeLoadError = ref(false)
 const serverActionLoading = ref(false)
+const downloadingId = ref<number | null>(null)
 
 const templateComponents: Record<TemplateKey, any> = {
   classic: ResumeClassicTemplate,
@@ -873,14 +876,24 @@ async function generateServerResume() {
   }
 }
 
-function downloadResumeFile(item: ServerResumeItem) {
-  const link = document.createElement('a')
-  link.href = item.fileUrl
-  link.download = item.fileName
-  link.rel = 'noopener'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
+async function downloadResumeFile(item: ServerResumeItem) {
+  downloadingId.value = item.id
+  try {
+    const { blob, fileName } = await downloadResume(item.id, item.fileName)
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.rel = 'noopener'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (error: any) {
+    appStore.showToast('下载失败', error?.message || '简历下载失败，请确认登录态或文件仍存在。', 'error')
+  } finally {
+    downloadingId.value = null
+  }
 }
 
 async function removeResume(item: ServerResumeItem) {
