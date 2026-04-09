@@ -117,7 +117,7 @@ async function loadDetail(id: number) {
 async function loadRelated(currentId: number) {
   try {
     const data = await fetchNotes({ page: 1, pageSize: 4, status: 'PUBLISHED' })
-    relatedNotes.value = (data.items || data.list || []).filter((item) => item.id !== currentId).slice(0, 2)
+    relatedNotes.value = (data.list || []).filter((item: NoteDTO) => item.id !== currentId).slice(0, 2)
   } catch (e) {
     relatedNotes.value = []
   }
