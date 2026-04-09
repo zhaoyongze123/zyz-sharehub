@@ -43,9 +43,13 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
+const categoryOptions = resourceCategoryOptions
+  .filter((item) => item !== '全部')
+  .map((item) => ({ label: item, value: item }))
+const defaultCategory = categoryOptions[0]?.value || ''
 const form = reactive({
   title: '',
-  category: '资料包',
+  category: defaultCategory,
   tags: '',
   url: '',
   summary: ''
@@ -56,7 +60,6 @@ const uploadModeItems = [
   { label: '外链引用', value: 'link' }
 ]
 
-const categoryOptions = resourceCategoryOptions.filter((item) => item !== '全部').map((item) => ({ label: item, value: item }))
 const previewText = computed(() => form.title ? `${form.title} · ${form.category} · ${form.tags || '未填标签'}` : '填写标题后，这里会展示发布预览摘要。')
 
 function saveDraft() {
