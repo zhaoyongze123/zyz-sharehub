@@ -62,7 +62,7 @@
                 <span v-else class="account-avatar-fallback" data-testid="console-avatar-fallback">{{ avatarFallback }}</span>
               </div>
               <div class="profile-text" style="display: flex; flex-direction: column; margin-left: 12px; gap: 4px;">
-                <span class="profile-name" style="font-size: 16px; font-weight: 600; color: var(--app-text-main); line-height: 1;">{{ authStore.profile?.nickname || '未登录' }}</span>
+                <span class="profile-name" style="font-size: 16px; font-weight: 600; color: var(--app-text-main); line-height: 1;" data-testid="console-menu-name">{{ authStore.profile?.nickname || '未登录' }}</span>
                 <span class="profile-type" style="font-size: 14px; color: var(--app-text-muted); line-height: 1;">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</span>
               </div>
             </div>
@@ -111,7 +111,7 @@
           />
           <div v-else class="avatar" data-testid="console-sidebar-avatar-fallback">{{ avatarFallback }}</div>
           <div class="user-info">
-            <span class="user-name">{{ authStore.profile?.nickname || '未登录' }}</span>
+            <span class="user-name" data-testid="console-sidebar-name">{{ authStore.profile?.nickname || '未登录' }}</span>
             <span class="user-role">{{ authStore.profile?.role === 'admin' ? '管理员' : '个人帐户' }}</span>
           </div>
         </div>

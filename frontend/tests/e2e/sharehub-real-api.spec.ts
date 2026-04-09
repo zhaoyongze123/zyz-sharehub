@@ -358,8 +358,10 @@ test('me 模块真接口联调', async ({ page, request }) => {
   const authMeBody = await authMeResponse.json()
   expect(authMeBody.success).toBeTruthy()
   expect(authMeBody.data?.login).toBeTruthy()
+  const expectedDisplayName = meBody.data.profile.name?.trim() || meBody.data.profile.login
   await expect(page.getByRole('heading', { name: '个人资料' })).toBeVisible()
   await expect(page.getByText(`@${meBody.data.profile.login}`)).toBeVisible()
+  await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
   await expect(page.getByText(String(meBody.data.myResourceCount)).first()).toBeVisible()
   await expect(page.getByRole('button', { name: '资料编辑待接写接口' })).toBeDisabled()
   await expect(page.getByText('已移除页面内个人资料模拟保存动作，改为只读展示')).toBeVisible()
@@ -404,6 +406,7 @@ test('me 模块真接口联调', async ({ page, request }) => {
   const reloadAuthMeResponse = await reloadAuthMeResponsePromise
   expect(reloadAuthMeResponse.ok()).toBeTruthy()
   await expect(page.getByText(`@${authMeBody.data.login}`)).toBeVisible()
+  await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
   await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
   await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
 })

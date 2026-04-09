@@ -275,7 +275,9 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(meResponse.json?.data).toBeTruthy()
   expect(meResponse.json?.data?.profile?.login).toBeTruthy()
   expect(meResponse.json?.data?.profile?.login).toBe(authMeBody.data.login)
+  const expectedDisplayName = meResponse.json?.data?.profile?.name?.trim() || meResponse.json?.data?.profile?.login
   await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
+  await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
   await expect(page.getByTestId('profile-avatar-upload')).toBeEnabled()
   const fileChooserPromise = page.waitForEvent('filechooser')
   await page.getByTestId('profile-avatar-upload').click()

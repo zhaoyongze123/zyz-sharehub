@@ -198,6 +198,10 @@ async function loadDashboard() {
 
   try {
     dashboard.value = await fetchMeDashboard()
+    authStore.updateProfile({
+      nickname: dashboard.value.profile.displayName,
+      avatarUrl: dashboard.value.profile.avatarUrl
+    })
   } catch {
     dashboard.value = null
     loadError.value = true
