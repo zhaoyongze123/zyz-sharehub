@@ -44,14 +44,16 @@ import { useAppStore } from '@/stores/app'
 const appStore = useAppStore()
 const uploadMode = ref('file')
 // 分类选项直接复用资源 API 暴露的常量，彻底去掉 mock 依赖。
-const publishCategoryOptions = resourceCategoryOptions
-  .map((item) => item?.trim())
-  .filter((item) => item && item !== '全部')
-  .map((item) => ({ label: item, value: item }))
+const publishCategoryOptions = computed(() =>
+  resourceCategoryOptions
+    .map((item) => item?.trim())
+    .filter((item) => item && item !== '全部')
+    .map((item) => ({ label: item, value: item }))
+)
 
 const form = reactive({
   title: '',
-  category: publishCategoryOptions[0]?.value || '',
+  category: publishCategoryOptions.value[0]?.value || '',
   tags: '',
   url: '',
   summary: ''
