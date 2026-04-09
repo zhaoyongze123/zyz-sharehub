@@ -34,6 +34,24 @@ async function apiFetch(request: APIRequestContext, path: string, headers: Recor
   }
 }
 
+async function createPublishedNote(request: APIRequestContext, title: string) {
+  const response = await request.post(`${apiBaseUrl}/api/notes`, {
+    headers: {
+      'X-User-Key': userKey,
+      'Content-Type': 'application/json'
+    },
+    data: {
+      title,
+      contentMd: `# ${title}\n\n这是 walkthrough 创建的真实正文。\n\n## 小节\nWalkthrough detail paragraph`,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED'
+    }
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body.data.id as number
+}
+
 test.describe.configure({ mode: 'serial' })
 
 test('公开页走查', async ({ page }) => {
@@ -96,21 +114,7 @@ test('路线模块走查', async ({ page, request }) => {
 
 test('笔记模块走查', async ({ page, request }) => {
   const noteTitle = `Walkthrough Note ${Date.now()}`
-  const createResponse = await request.post(`${apiBaseUrl}/api/notes`, {
-    headers: {
-      'X-User-Key': userKey,
-      'Content-Type': 'application/json'
-    },
-    data: {
-      title: noteTitle,
-      contentMd: `# ${noteTitle}\n\n这是 walkthrough 创建的真实正文。\n\n## 小节\nWalkthrough detail paragraph`,
-      visibility: 'PUBLIC',
-      status: 'PUBLISHED'
-    }
-  })
-  expect(createResponse.ok()).toBeTruthy()
-  const createBody = await createResponse.json()
-  const noteId = createBody.data.id as number
+  const noteId = await createPublishedNote(request, noteTitle)
 
   await loginAs(page, 'user')
   await page.goto('/community')
@@ -142,22 +146,54 @@ test('个人中心走查', async ({ page }) => {
   await expect(page.getByTestId('resume-generate-button')).toBeVisible()
 })
 
-test('后台模块走查', async ({ page }) => {
+test('后台模块走查', async ({ page, request }) => {
+  const reportNoteTitle = `Walkthrough Admin Note ${Date.now()}`
+  const reportReason = `Walkthrough 举报 ${Date.now()}`
+  const noteId = await createPublishedNote(request, reportNoteTitle)
+  const reportResponse = await request.post(`${apiBaseUrl}/api/reports`, {
+    headers: {
+      'X-User-Key': userKey,
+      'Content-Type': 'application/json'
+    },
+    data: {
+      targetType: 'NOTE',
+      noteId,
+      reason: reportReason
+    }
+  })
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  const reportId = reportBody.data.id as number
+
   await loginAs(page, 'admin')
   await page.goto('/admin')
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
   await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toBeVisible()
   await expect(page.getByTestId('admin-dashboard-stat-users')).toBeVisible()
+  await expect(page.locator('main')).toContainText(`NOTE #${noteId}`)
 
   await page.goto('/admin/reports')
   await expect(page.getByRole('heading', { name: '举报处理' })).toBeVisible()
+  await expect(page.locator('tbody')).toContainText(reportReason)
+  await expect(page.locator('tbody')).toContainText(`NOTE #${noteId}`)
+
+  await page.goto('/admin/reviews')
+  await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  await expect(page.getByTestId(`admin-reviews-row-${reportId}`)).toContainText(reportReason)
+  const resolveResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/admin/reports/${reportId}/resolve`) &&
+    response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '完成处理' }).click()
+  const resolveResponse = await resolveResponsePromise
+  expect(resolveResponse.ok()).toBeTruthy()
+  await expect(page.getByTestId(`admin-reviews-row-${reportId}`)).toContainText('已处理')
 
   await page.goto('/admin/audit-logs')
   await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
   await expect(page.locator('main')).toContainText('关联对象')
-
-  await page.goto('/admin/reviews')
-  await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  await expect(page.locator('tbody')).toContainText(`REPORT #${reportId}`)
+  await expect(page.locator('tbody')).toContainText('Resolve Report')
 
   await page.goto('/admin/users')
   await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
