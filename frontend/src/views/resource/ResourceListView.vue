@@ -73,7 +73,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BasePagination from '@/components/base/BasePagination.vue'

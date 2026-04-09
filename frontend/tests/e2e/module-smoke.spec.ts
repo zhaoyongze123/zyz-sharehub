@@ -219,6 +219,20 @@ test('简历模块 smoke', async ({ page }) => {
   expect(deleteResponse.ok()).toBeTruthy()
   await reloadListAfterDeletePromise
   await expect(page.getByTestId(`resume-server-item-${generatedId}`)).toHaveCount(0)
+
+  const reloadAuthMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
+  await page.reload()
+  const reloadAuthMeResponse = await reloadAuthMeResponsePromise
+  expect(reloadAuthMeResponse.ok()).toBeTruthy()
+  const reloadAuthMeBody = await reloadAuthMeResponse.json()
+  expect(reloadAuthMeBody.success).toBeTruthy()
+  expect(reloadAuthMeBody.data?.login).toBe(authMeBody.data.login)
+  await expect(page.getByTestId('resume-workbench-summary')).toContainText('累计')
+  if (firstResume) {
+    await expect(page.getByTestId(`resume-server-item-${firstResume.id}`)).toBeVisible()
+  }
 })
 
 test('个人中心模块 smoke', async ({ page }) => {
