@@ -107,6 +107,10 @@ function hasBasicValue(fields: ResumeField[], key: string) {
 }
 
 function inferBasicField(line: string): ResumeField | null {
+  if (/^(求职意向|意向岗位|目标岗位)\s*:/i.test(line)) {
+    return null
+  }
+
   const kv = parseKeyValueLine(line)
   if (kv) {
     const alias = matchBasicAlias(kv.label)
@@ -405,7 +409,14 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
   })
 
   for (const [index, rawLine] of lines.entries()) {
+    const normalizedLine = normalizeBasicLine(rawLine)
+
     if (index === 0 && hasBasicValue(fields, 'name') && hasBasicValue(fields, 'intent') && hasBasicValue(fields, 'city')) {
+      continue
+    }
+
+    if (/^(求职意向|意向岗位|目标岗位)\s*:/i.test(normalizedLine)) {
+      parseIntentCompositeLine(normalizedLine, fields)
       continue
     }
 
@@ -428,7 +439,6 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
         upsertField(fallback)
       } else {
         inferBasicFieldByValue(rawLine, fields)
-        const normalizedLine = normalizeBasicLine(rawLine)
         const isConsumed =
           (hasBasicValue(fields, 'name') && normalizedLine.includes(fields.find((field) => field.key === 'name')?.value ?? '')) ||
           (hasBasicValue(fields, 'intent') && normalizedLine.includes(fields.find((field) => field.key === 'intent')?.value ?? '')) ||

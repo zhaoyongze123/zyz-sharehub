@@ -29,6 +29,9 @@ function looksLikeHeading(text: string) {
   if (/^\d{1,2}岁\s*(男|女)$/.test(cleaned)) {
     return false
   }
+  if (/^\d{4}年(?:出生)?\s*(男|女)$/.test(cleaned)) {
+    return false
+  }
   if (/1[3-9]\d{9}/.test(cleaned) || /@/.test(cleaned)) {
     return false
   }
@@ -54,6 +57,8 @@ function belongsToBasicSection(text: string) {
   const cleaned = stripBullet(text)
   return (
     /^\d{1,2}岁\s*(男|女)$/.test(cleaned) ||
+    /^\d{4}年(?:出生)?\s*(男|女)$/.test(cleaned) ||
+    /^(求职意向|意向岗位|目标岗位)\s*:/.test(cleaned) ||
     /1[3-9]\d{9}/.test(cleaned) ||
     /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(cleaned) ||
     /(求职意向|意向岗位|目标岗位|联系电话|手机|邮箱|电子邮箱|现居地|所在地|毕业院校|专业|学历|到岗)/.test(cleaned) ||

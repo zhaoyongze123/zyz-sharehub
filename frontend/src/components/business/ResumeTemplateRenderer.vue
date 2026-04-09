@@ -56,7 +56,7 @@
             <h2 :class="theme.headingClass">{{ section.name }}</h2>
           </div>
 
-          <div v-if="section.layout === 'fields'" class="space-y-2">
+          <div v-if="section.layout === 'fields'" class="space-y-1">
             <button
               v-for="field in visibleFields(section.fields)"
               :key="field.id"
@@ -72,7 +72,7 @@
             <div v-if="section.text" class="resume-text-block">{{ section.text }}</div>
           </div>
 
-          <div v-else-if="section.layout === 'items'" class="space-y-3">
+          <div v-else-if="section.layout === 'items'" class="space-y-2">
             <article
               v-for="item in visibleItems(section)"
               :key="item.id"
@@ -102,7 +102,7 @@
                   <span>{{ field.value }}</span>
                 </button>
               </div>
-              <ul v-if="item.descriptions.length" class="mt-1.5 space-y-1">
+              <ul v-if="item.descriptions.length" class="mt-1 space-y-0.5">
                 <li
                   v-for="description in item.descriptions.filter((entry) => entry.visible)"
                   :key="description.id"
@@ -294,18 +294,18 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
   align-items: flex-start;
   gap: 8px;
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.3;
 }
 
 .resume-field-value {
   color: #0f172a;
   white-space: pre-wrap;
-  line-height: 1.45;
+  line-height: 1.3;
   flex: 1;
 }
 
 .resume-item-card {
-  padding-bottom: 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.35);
 }
 
@@ -326,7 +326,7 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
   position: relative;
   padding-left: 10px;
   color: #334155;
-  line-height: 1.45;
+  line-height: 1.3;
   font-size: 12px;
 }
 
