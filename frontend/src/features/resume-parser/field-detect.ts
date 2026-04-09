@@ -11,7 +11,8 @@ const BASIC_FIELD_ALIASES: Array<{ key: string; label: string; aliases: string[]
   { key: 'experience', label: '工作经验', aliases: ['工作年限', '工作经验', '经验'] },
   { key: 'education', label: '最高学历', aliases: ['学历', '最高学历', '毕业院校'] },
   { key: 'gender', label: '性别', aliases: ['性别'] },
-  { key: 'age', label: '年龄', aliases: ['年龄'] }
+  { key: 'age', label: '年龄', aliases: ['年龄'] },
+  { key: 'arrival', label: '到岗时间', aliases: ['到岗时间', '到岗情况', '入职时间'] }
 ]
 
 const DEFAULT_BASIC_FIELDS = [
@@ -25,6 +26,7 @@ const DEFAULT_BASIC_FIELDS = [
   { key: 'education', label: '最高学历' },
   { key: 'gender', label: '性别' },
   { key: 'age', label: '年龄' },
+  { key: 'arrival', label: '到岗时间' },
   { key: 'avatar', label: '头像' }
 ]
 
@@ -147,7 +149,7 @@ function inferBasicFieldByValue(line: string, fields: ResumeField[]) {
     upsertBasicField(fields, 'age', `${age}岁`, '年龄')
   }
 
-  const intent = text.match(/(Java开发工程师|后端开发工程师|前端开发工程师|产品经理|运营|测试工程师|算法工程师|数据分析师|设计师)/)?.[1]
+  const intent = text.match(/(Java开发工程师|Java|后端开发工程师|后端开发|前端开发工程师|前端开发|产品经理|运营|测试工程师|算法工程师|数据分析师|设计师)/)?.[1]
   if (intent) {
     upsertBasicField(fields, 'intent', intent, '求职意向')
   }
@@ -189,6 +191,119 @@ function inferBasicFieldByValue(line: string, fields: ResumeField[]) {
   if (arrival) {
     upsertBasicField(fields, 'arrival', arrival, '到岗时间')
   }
+
+  if (!fields.find((field) => field.key === 'name')?.value) {
+    const leadingName = text.match(/^([\u4e00-\u9fa5]{2,4})(?=\s|$)/)?.[1]
+    if (leadingName && !/(上海|北京|深圳|广州)/.test(leadingName)) {
+      upsertBasicField(fields, 'name', leadingName, '姓名')
+    }
+  }
+}
+
+function inferBasicFieldFromDenseLine(line: string, fields: ResumeField[]) {
+  const text = line.replace(/\s+/g, ' ').trim()
+  if (!text) {
+    return
+  }
+
+  const parts = text.split(' ').filter(Boolean)
+  if (parts.length < 2) {
+    return
+  }
+
+  const nameCandidate = parts[0]
+  if (/^[\u4e00-\u9fa5]{2,4}$/.test(nameCandidate)) {
+    upsertBasicField(fields, 'name', nameCandidate, '姓名')
+  }
+
+  const rest = parts.slice(1).join(' ')
+  inferBasicFieldByValue(rest, fields)
+}
+
+function parseTopSummaryLine(line: string, fields: ResumeField[]) {
+  const text = line.replace(/\s+/g, ' ').trim()
+  if (!text) {
+    return
+  }
+
+  const tokens = text.split(' ').filter(Boolean)
+  if (!tokens.length) {
+    return
+  }
+
+  const [first, ...restTokens] = tokens
+  if (/^[\u4e00-\u9fa5]{2,4}$/.test(first)) {
+    upsertBasicField(fields, 'name', first, '姓名')
+  }
+
+  const cityToken = restTokens.find((token) => /(上海|北京|深圳|广州|杭州|苏州|成都|南京|武汉|西安|长沙|天津|重庆)/.test(token))
+  if (cityToken) {
+    upsertBasicField(fields, 'currentCity', cityToken, '现居地')
+  }
+
+  const arrivalToken = restTokens.find((token) => /(一周内到岗|两周内到岗|一个月内到岗|随时到岗)/.test(token))
+  if (arrivalToken) {
+    upsertBasicField(fields, 'arrival', arrivalToken, '到岗时间')
+  }
+
+  const intentTokens = restTokens.filter((token) => token !== cityToken && token !== arrivalToken)
+  if (intentTokens.length) {
+    upsertBasicField(fields, 'intent', intentTokens.join(' '), '求职意向')
+  }
+}
+
+function parseProfileLine(line: string, fields: ResumeField[]) {
+  const text = line.replace(/\s+/g, ' ').trim()
+  if (!text) {
+    return
+  }
+
+  inferBasicFieldByValue(text, fields)
+
+  const phone = text.match(/1[3-9]\d{9}/)?.[0]
+  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]
+
+  if (phone) {
+    upsertBasicField(fields, 'phone', phone, '联系电话')
+  }
+  if (email) {
+    upsertBasicField(fields, 'email', email, '电子邮箱')
+  }
+}
+
+function parseEducationProfileLine(line: string, fields: ResumeField[]) {
+  const text = line.replace(/\s+/g, ' ').trim()
+  if (!text) {
+    return
+  }
+
+  const school = text.match(/([\u4e00-\u9fa5]{2,30}(大学|学院))/)?.[1]
+  const degree = text.match(/(博士|硕士|研究生|本科|大专|专科|高中)/)?.[1]
+  const time = text.match(/\d{4}[./-]\d{1,2}\s*[~\-至]\s*(?:\d{4}[./-]\d{1,2}|今)/)?.[0]
+
+  let major = ''
+  if (school) {
+    const afterSchool = text.slice(text.indexOf(school) + school.length)
+    major = afterSchool
+      .replace(/^[\s\-–—]+/, '')
+      .replace(/\b(博士|硕士|研究生|本科|大专|专科|高中)\b/, '')
+      .replace(/\d{4}[./-]\d{1,2}\s*[~\-至]\s*(?:\d{4}[./-]\d{1,2}|今)/, '')
+      .replace(/[\s\-–—]+$/g, '')
+      .trim()
+  }
+
+  if (school) {
+    upsertBasicField(fields, 'school', school, '毕业院校')
+  }
+  if (major) {
+    upsertBasicField(fields, 'major', major, '专业')
+  }
+  if (degree) {
+    upsertBasicField(fields, 'education', degree, '最高学历')
+  }
+  if (time) {
+    upsertBasicField(fields, 'educationTime', time, '学制时间')
+  }
 }
 
 function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 'items' | 'text'> {
@@ -204,7 +319,23 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
     fields.push(nextField)
   }
 
+  lines.forEach((line, index) => {
+    if (index === 0) {
+      parseTopSummaryLine(line, fields)
+      return
+    }
+
+    if (index <= 2) {
+      parseProfileLine(line, fields)
+    }
+
+    if (/大学|学院|本科|硕士|博士|专科|高中/.test(line)) {
+      parseEducationProfileLine(line, fields)
+    }
+  })
+
   for (const rawLine of lines) {
+    inferBasicFieldFromDenseLine(rawLine, fields)
     const parts = splitInlinePairs(rawLine)
     let matchedInLine = false
     for (const part of parts) {
