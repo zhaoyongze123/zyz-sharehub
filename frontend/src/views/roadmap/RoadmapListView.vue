@@ -50,17 +50,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
-import { roadmaps } from '@/mock/roadmaps'
+import { fetchRoadmaps, type RoadmapItem } from '@/api/roadmaps'
 
 const route = useRoute()
 const keyword = ref(String(route.query.keyword || ''))
 const category = ref('全部')
+const roadmaps = ref<RoadmapItem[]>([])
+const loading = ref(true)
+const loadError = ref(false)
 
 const categoryOptions = [
   { label: '全部路线', value: '全部' },
@@ -70,19 +73,40 @@ const categoryOptions = [
 ]
 
 const filteredRoadmaps = computed(() => {
-  return roadmaps.filter((item) => {
-    const matchKeyword = !keyword.value || `${item.title}${item.description}`.toLowerCase().includes(keyword.value.toLowerCase())
+  return roadmaps.value.filter((item) => {
+    const matchKeyword = !keyword.value || `${item.title}${item.summary}`.toLowerCase().includes(keyword.value.toLowerCase())
     const matchCategory = category.value === '全部' || item.category === category.value
     return matchKeyword && matchCategory
   })
 })
 
 const status = computed(() => {
-  if (keyword.value === 'error') return 'error'
-  if (keyword.value === 'loading') return 'loading'
+  if (loading.value) return 'loading'
+  if (loadError.value) return 'error'
   if (!filteredRoadmaps.value.length) return 'empty'
   return 'ready'
 })
+
+async function loadRoadmaps() {
+  loading.value = true
+  loadError.value = false
+
+  try {
+    const response = await fetchRoadmaps({ page: 1, pageSize: 50 })
+    roadmaps.value = response.items
+  } catch {
+    roadmaps.value = []
+    loadError.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(() => route.query.keyword, (value) => {
+  keyword.value = String(value || '')
+})
+
+void loadRoadmaps()
 </script>
 
 <style scoped lang="scss">
