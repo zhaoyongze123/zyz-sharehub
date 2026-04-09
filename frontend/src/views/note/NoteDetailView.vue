@@ -1,11 +1,11 @@
 <template>
   <div class="page-shell" v-if="loading">
-    <BaseEmpty title="加载中" description="正在获取笔记详情，请稍候..." />
+    <BaseEmpty title="笔记加载中" description="正在从云端获取内容，请稍候" />
   </div>
 
   <div class="page-shell detail-grid" v-else-if="note">
     <section class="detail-main">
-      <HeroBanner kicker="笔记详情" :title="note.title" :description="summary">
+      <HeroBanner kicker="笔记详情" :title="noteTitle" :description="noteSummary">
         <template #actions>
           <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
           <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
@@ -21,14 +21,15 @@
           <h2>相关推荐</h2>
           <p>继续阅读相关的工程笔记。</p>
         </div>
-        <div class="related-grid">
-          <NoteCard v-for="item in relatedNotes" :key="item.id" :item="item" />
+        <div v-if="relatedNoteCards.length" class="related-grid">
+          <NoteCard v-for="item in relatedNoteCards" :key="item.id" :item="item" />
         </div>
+        <BaseEmpty v-else title="暂无更多笔记" description="发布更多内容后会在此展示推荐" />
       </div>
     </section>
 
     <aside class="detail-side">
-      <NoteOutline :items="outline" />
+      <NoteOutline :items="outlineItems" />
       <BaseEmpty title="关联资料" description="联调后可展示引用资料与路线的精确关系。" />
     </aside>
 
@@ -36,12 +37,12 @@
   </div>
 
   <div v-else class="page-shell">
-    <BaseErrorState title="笔记不存在" description="可能已删除或当前账号不可见。" />
+    <BaseErrorState title="笔记不存在" :description="errorMessage || '可能已删除或当前账号不可见。'" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
@@ -52,16 +53,9 @@ import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
 import ReportDialog from '@/components/business/ReportDialog.vue'
 import { useAppStore } from '@/stores/app'
-import { fetchNoteDetail, type NoteDto } from '@/api/notes'
-
-type RelatedNote = {
-  id: number
-  title: string
-  summary: string
-  updatedAt: string
-  status: string
-  tags: string[]
-}
+import { fetchNoteDetail, fetchNotes, type NoteDTO } from '@/api/notes'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const route = useRoute()
 const appStore = useAppStore()
@@ -70,47 +64,77 @@ const reportReason = ref('')
 const likes = ref(86)
 const favorites = ref(112)
 
-const loading = ref(true)
-const note = ref<NoteDto | null>(null)
-const relatedNotes = ref<RelatedNote[]>([])
-const summary = computed(() => {
-  if (!note.value) return ''
-  const text = note.value.contentMd.replace(/[#>*`]/g, '').trim()
-  return text.slice(0, 120) || '暂无摘要'
-})
-const outline = computed(() => {
-  if (!note.value) return []
-  return note.value.contentMd
-    .split('\n')
-    .filter((line) => line.startsWith('#'))
-    .map((line) => line.replace(/^#+\s*/, '').trim())
-})
-const renderedHtml = computed(() => {
-  if (!note.value) return ''
-  return note.value.contentMd
-    .split('\n')
-    .map((line) => {
-      if (line.startsWith('# ')) return `<h1>${line.slice(2)}</h1>`
-      if (line.startsWith('## ')) return `<h2>${line.slice(3)}</h2>`
-      if (!line.trim()) return '<br />'
-      return `<p>${line}</p>`
-    })
-    .join('')
+const note = ref<NoteDTO | null>(null)
+const relatedNotes = ref<NoteDTO[]>([])
+const loading = ref(false)
+const errorMessage = ref('')
+
+const noteTitle = computed(() => note.value?.title || '未命名笔记')
+const noteSummary = computed(() => {
+  if (!note.value?.contentMd) return ''
+  return note.value.contentMd.replace(/\s+/g, ' ').slice(0, 120)
 })
 
-async function loadNote() {
+const renderedHtml = computed(() => {
+  if (!note.value?.contentMd) return ''
+  return DOMPurify.sanitize(marked.parse(note.value.contentMd) as string)
+})
+
+const outlineItems = computed(() => {
+  if (!note.value?.contentMd) return []
+  return note.value.contentMd
+    .split('\n')
+    .filter((line) => /^#{1,6}\s+/.test(line))
+    .map((line) => line.replace(/^#{1,6}\s+/, '').trim())
+})
+
+const relatedNoteCards = computed(() =>
+  relatedNotes.value.map((item) => ({
+    id: item.id,
+    title: item.title || '未命名笔记',
+    summary: (item.contentMd || '').replace(/\s+/g, ' ').slice(0, 80) || '暂无摘要',
+    updatedAt: '',
+    status: item.status || 'DRAFT',
+    tags: [] as string[]
+  }))
+)
+
+async function loadDetail(id: number) {
+  if (!id) return
   loading.value = true
+  errorMessage.value = ''
   try {
-    note.value = await fetchNoteDetail(route.params.id as string)
-  } catch (err: any) {
+    note.value = await fetchNoteDetail(id)
+    await loadRelated(id)
+  } catch (e: any) {
+    errorMessage.value = e?.response?.data?.msg || '笔记加载失败'
     note.value = null
-    appStore.showToast('加载笔记失败', err?.message || '服务暂时不可用，请稍后再试', 'error')
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadNote)
+async function loadRelated(currentId: number) {
+  try {
+    const data = await fetchNotes({ page: 1, pageSize: 4, status: 'PUBLISHED' })
+    relatedNotes.value = (data.items || data.list || []).filter((item) => item.id !== currentId).slice(0, 2)
+  } catch (e) {
+    relatedNotes.value = []
+  }
+}
+
+onMounted(() => {
+  const id = Number(route.params.id)
+  void loadDetail(id)
+})
+
+watch(
+  () => route.params.id,
+  (newId) => {
+    const idNum = Number(newId)
+    void loadDetail(idNum)
+  }
+)
 
 function likeNote() {
   likes.value += 1
