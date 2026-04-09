@@ -95,7 +95,8 @@ test('backend health', async ({ request }) => {
 
 test('resources 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('resources'))
-  const resourceId = await createPublishedResource(request, `Playwright Resource ${Date.now()}`)
+  const resourceTitle = `Playwright Resource ${Date.now()}`
+  const resourceId = await createPublishedResource(request, resourceTitle)
 
   const listResponse = await request.get(`${apiBaseUrl}/api/resources?page=0&pageSize=12`, {
     headers: userHeaders()
@@ -112,6 +113,12 @@ test('resources 模块真接口联调', async ({ page, request }) => {
 
   await page.goto('/resources')
   await expect(page.locator('main').getByRole('heading', { name: '资料广场' })).toBeVisible()
+  const resourceCard = page.locator('article', { hasText: resourceTitle }).first()
+  await expect(resourceCard).toBeVisible()
+  const resourceLink = resourceCard.getByRole('link', { name: '查看详情' })
+  await resourceLink.click()
+  await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
+  await expect(page.getByText(`下载 ${detailBody.data.downloadCount}`)).toBeVisible()
 })
 
 test('roadmaps 模块真接口联调', async ({ page, request }) => {
