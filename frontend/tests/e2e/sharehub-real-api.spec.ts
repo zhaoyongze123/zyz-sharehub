@@ -113,6 +113,10 @@ async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
+    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
+    if (selectedRole === 'admin') {
+      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+    }
   }, role)
 }
 
@@ -269,25 +273,48 @@ test('me 模块真接口联调', async ({ page, request }) => {
     headers: userHeaders()
   })
   expect(meResponse.ok()).toBeTruthy()
+  const meBody = await meResponse.json()
 
   const resourcesResponse = await request.get(`${apiBaseUrl}/api/me/resources?page=1&pageSize=10`, {
     headers: userHeaders()
   })
   expect(resourcesResponse.ok()).toBeTruthy()
+  const resourcesBody = await resourcesResponse.json()
 
   const notesResponse = await request.get(`${apiBaseUrl}/api/me/notes?page=1&pageSize=10`, {
     headers: userHeaders()
   })
   expect(notesResponse.ok()).toBeTruthy()
+  const notesBody = await notesResponse.json()
 
   const resumesResponse = await request.get(`${apiBaseUrl}/api/me/resumes?page=1&pageSize=10`, {
     headers: userHeaders()
   })
   expect(resumesResponse.ok()).toBeTruthy()
+  const resumesBody = await resumesResponse.json()
 
   await loginAs(page, 'user')
   await page.goto('/me')
   await expect(page.getByRole('heading', { name: '个人资料' })).toBeVisible()
+  await expect(page.getByText(`@${meBody.data.profile.login}`)).toBeVisible()
+  await expect(page.getByText(String(meBody.data.myResourceCount)).first()).toBeVisible()
+
+  const firstResource = resourcesBody.data.items[0]
+  if (firstResource) {
+    await expect(page.getByRole('link', { name: firstResource.title }).first()).toBeVisible()
+  }
+
+  const firstNote = notesBody.data.items[0]
+  if (firstNote) {
+    await expect(page.getByRole('link', { name: firstNote.title }).first()).toBeVisible()
+  }
+
+  const firstResume = resumesBody.data.items[0]
+  if (firstResume) {
+    await expect(page.getByText(firstResume.fileName || `resume-${firstResume.id}.pdf`).first()).toBeVisible()
+  }
+
+  await expect(page.getByRole('button', { name: '头像上传待接后端' })).toBeDisabled()
 })
 
 test('admin 模块真接口联调', async ({ page, request }) => {

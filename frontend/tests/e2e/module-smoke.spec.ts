@@ -13,6 +13,10 @@ async function loginAs(page: Page, role: 'user' | 'admin') {
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
+    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
+    if (selectedRole === 'admin') {
+      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+    }
   }, role)
 }
 
@@ -159,12 +163,17 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(meResponse.status).toBe(200)
   expect(meResponse.json?.success).toBeTruthy()
   expect(meResponse.json?.data).toBeTruthy()
+  expect(meResponse.json?.data?.profile?.login).toBeTruthy()
+  await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
 
   const resourcesResponse = await browserFetch(page, '/api/me/resources?page=1&pageSize=5', {
     'X-User-Key': userKey
   })
   expect(resourcesResponse.ok).toBeTruthy()
   expect(Array.isArray(resourcesResponse.json?.data?.items)).toBeTruthy()
+  if (resourcesResponse.json?.data?.items?.length) {
+    await expect(page.getByRole('link', { name: resourcesResponse.json.data.items[0].title }).first()).toBeVisible()
+  }
 })
 
 test('后台模块 smoke', async ({ page }) => {
