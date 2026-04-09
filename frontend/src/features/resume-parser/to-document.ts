@@ -36,6 +36,7 @@ const DEFAULT_BASIC_FIELDS = [
   { key: 'education', label: '最高学历' },
   { key: 'gender', label: '性别' },
   { key: 'age', label: '年龄' },
+  { key: 'arrival', label: '到岗时间' },
   { key: 'avatar', label: '头像' }
 ]
 

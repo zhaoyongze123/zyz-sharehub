@@ -11,7 +11,8 @@ const BASIC_FIELD_ALIASES: Array<{ key: string; label: string; aliases: string[]
   { key: 'experience', label: '工作经验', aliases: ['工作年限', '工作经验', '经验'] },
   { key: 'education', label: '最高学历', aliases: ['学历', '最高学历', '毕业院校'] },
   { key: 'gender', label: '性别', aliases: ['性别'] },
-  { key: 'age', label: '年龄', aliases: ['年龄'] }
+  { key: 'age', label: '年龄', aliases: ['年龄'] },
+  { key: 'arrival', label: '到岗时间', aliases: ['到岗时间', '到岗情况', '入职时间'] }
 ]
 
 const DEFAULT_BASIC_FIELDS = [
@@ -25,8 +26,24 @@ const DEFAULT_BASIC_FIELDS = [
   { key: 'education', label: '最高学历' },
   { key: 'gender', label: '性别' },
   { key: 'age', label: '年龄' },
+  { key: 'arrival', label: '到岗时间' },
   { key: 'avatar', label: '头像' }
 ]
+
+const BASIC_CITY_PATTERN = /(上海|北京|深圳|广州|杭州|苏州|成都|南京|武汉|西安|长沙|天津|重庆|宁波|无锡|青岛|厦门|合肥|郑州|福州|济南|珠海|佛山|东莞)/
+const BASIC_INTENT_PATTERN =
+  /(Java开发工程师|Java后端开发工程师|Java后端|Java开发|Java|后端开发工程师|后端开发|前端开发工程师|前端开发|全栈开发工程师|全栈开发|产品经理|运营|测试工程师|算法工程师|数据分析师|设计师|UI设计师|视觉设计师|会计|销售|市场专员)/
+const BASIC_ARRIVAL_PATTERN = /(一周内到岗|两周内到岗|一个月内到岗|随时到岗|即可到岗|尽快到岗|暂不考虑|可立即到岗)/
+const BASIC_EDUCATION_PATTERN = /(博士研究生|硕士研究生|研究生|博士|硕士|本科|大专|专科|高中)/
+const BASIC_TIME_RANGE_PATTERN = /\d{4}[./-]\d{1,2}\s*(?:[~\-至]\s*(?:\d{4}[./-]\d{1,2}|今|至今))/
+
+function normalizeBasicLine(line: string) {
+  return line
+    .replace(/[|｜]/g, ' ')
+    .replace(/[•·▪◦●]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 function createField(label: string, value: string, key = label) {
   return {
@@ -67,12 +84,12 @@ function matchBasicAlias(label: string) {
 function parseKeyValueLine(line: string) {
   const colonMatch = line.match(/^([^:]{1,20}):\s*(.+)$/)
   if (colonMatch) {
-    return { label: colonMatch[1].trim(), value: colonMatch[2].trim() }
+    return { label: colonMatch[1].trim(), value: colonMatch[2].trim(), separator: 'colon' as const }
   }
 
   const spacedMatch = line.match(/^([一-龥A-Za-z]{2,12})\s+(.+)$/)
   if (spacedMatch) {
-    return { label: spacedMatch[1].trim(), value: spacedMatch[2].trim() }
+    return { label: spacedMatch[1].trim(), value: spacedMatch[2].trim(), separator: 'space' as const }
   }
 
   return null
@@ -85,10 +102,17 @@ function splitInlinePairs(line: string) {
     .filter(Boolean)
 }
 
+function hasBasicValue(fields: ResumeField[], key: string) {
+  return Boolean(fields.find((field) => field.key === key)?.value.trim())
+}
+
 function inferBasicField(line: string): ResumeField | null {
   const kv = parseKeyValueLine(line)
   if (kv) {
     const alias = matchBasicAlias(kv.label)
+    if (kv.separator === 'space' && !alias) {
+      return null
+    }
     return createField(alias?.label ?? kv.label, kv.value, alias?.key ?? kv.label)
   }
 
@@ -126,7 +150,7 @@ function upsertBasicField(fields: ResumeField[], key: string, value: string, lab
 }
 
 function inferBasicFieldByValue(line: string, fields: ResumeField[]) {
-  const text = line.trim()
+  const text = normalizeBasicLine(line)
   const phone = text.match(/1[3-9]\d{9}/)?.[0]
   if (phone) {
     upsertBasicField(fields, 'phone', phone, '联系电话')
@@ -147,37 +171,40 @@ function inferBasicFieldByValue(line: string, fields: ResumeField[]) {
     upsertBasicField(fields, 'age', `${age}岁`, '年龄')
   }
 
-  const intent = text.match(/(Java开发工程师|后端开发工程师|前端开发工程师|产品经理|运营|测试工程师|算法工程师|数据分析师|设计师)/)?.[1]
+  const intent = text.match(BASIC_INTENT_PATTERN)?.[1]
   if (intent) {
     upsertBasicField(fields, 'intent', intent, '求职意向')
   }
 
-  const cities = text.match(/(上海|北京|深圳|广州|杭州|苏州|成都|南京|武汉|西安|长沙|天津|重庆)/g)
+  const cities = text.match(new RegExp(BASIC_CITY_PATTERN, 'g'))
   if (cities?.length) {
+    const schoolLikeText = /大学|学院|学校/.test(text)
+    const cityOnlyComesFromSchoolName = schoolLikeText && cities.length === 1 && !/现居|所在地|居住地|意向|目标/.test(text)
+    if (cityOnlyComesFromSchoolName) {
+      return
+    }
+
     if (/现居|所在地|居住地/.test(text)) {
       upsertBasicField(fields, 'currentCity', cities[0], '现居地')
     } else if (/意向|目标/.test(text)) {
       upsertBasicField(fields, 'city', cities[0], '意向城市')
     } else {
-      if (!fields.find((field) => field.key === 'currentCity')?.value) {
-        upsertBasicField(fields, 'currentCity', cities[0], '现居地')
-      } else if (!fields.find((field) => field.key === 'city')?.value) {
+      if (!fields.find((field) => field.key === 'city')?.value) {
         upsertBasicField(fields, 'city', cities[0], '意向城市')
+      } else if (!fields.find((field) => field.key === 'currentCity')?.value) {
+        upsertBasicField(fields, 'currentCity', cities[0], '现居地')
       }
     }
   }
 
-  const education = text.match(/(博士|硕士|研究生|本科|大专|专科|高中)/)?.[1]
+  const education = text.match(BASIC_EDUCATION_PATTERN)?.[1]
   if (education) {
     upsertBasicField(fields, 'education', education, '最高学历')
   }
 
   const school = text.match(/([\u4e00-\u9fa5]{2,20}(大学|学院))/)?.[1]
   if (school) {
-    const existingEducation = fields.find((field) => field.key === 'education')?.value ?? ''
-    if (!existingEducation.includes(school)) {
-      upsertBasicField(fields, 'education', existingEducation ? `${school} ${existingEducation}`.trim() : school, '最高学历')
-    }
+    upsertBasicField(fields, 'school', school, '毕业院校')
   }
 
   const experience = text.match(/(\d+\s*年(?:工作)?经验|应届生)/)?.[1]
@@ -185,9 +212,133 @@ function inferBasicFieldByValue(line: string, fields: ResumeField[]) {
     upsertBasicField(fields, 'experience', experience, '工作经验')
   }
 
-  const arrival = text.match(/(一周内到岗|两周内到岗|一个月内到岗|随时到岗)/)?.[1]
+  const arrival = text.match(BASIC_ARRIVAL_PATTERN)?.[1]
   if (arrival) {
     upsertBasicField(fields, 'arrival', arrival, '到岗时间')
+  }
+}
+
+function parseBasicFirstLine(line: string, fields: ResumeField[]) {
+  const text = normalizeBasicLine(line)
+  if (!text) {
+    return
+  }
+
+  const parts = text
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (!parts.length) {
+    return
+  }
+
+  const [first] = parts
+  if (/^[\u4e00-\u9fa5]{2,4}$/.test(first) && !BASIC_CITY_PATTERN.test(first)) {
+    upsertBasicField(fields, 'name', first, '姓名')
+  }
+
+  const arrivalToken = parts.find((part) => BASIC_ARRIVAL_PATTERN.test(part))
+  if (arrivalToken) {
+    upsertBasicField(fields, 'arrival', arrivalToken.match(BASIC_ARRIVAL_PATTERN)?.[1] ?? arrivalToken, '到岗时间')
+  }
+
+  const cityToken = parts.find((part) => BASIC_CITY_PATTERN.test(part))
+  if (cityToken) {
+    upsertBasicField(fields, 'city', cityToken.match(BASIC_CITY_PATTERN)?.[1] ?? cityToken, '意向城市')
+  }
+
+  const intentToken = parts.find((part, index) => {
+    if (index === 0) {
+      return false
+    }
+    return BASIC_INTENT_PATTERN.test(part)
+  })
+
+  if (intentToken) {
+    upsertBasicField(fields, 'intent', intentToken.match(BASIC_INTENT_PATTERN)?.[1] ?? intentToken, '求职意向')
+  } else {
+    const fallbackIntent = parts
+      .slice(1)
+      .filter((part) => part !== arrivalToken && part !== cityToken && !/^\d/.test(part))
+      .join(' ')
+      .trim()
+    if (fallbackIntent) {
+      upsertBasicField(fields, 'intent', fallbackIntent, '求职意向')
+    }
+  }
+}
+
+function parseBasicContactLine(line: string, fields: ResumeField[]) {
+  const text = normalizeBasicLine(line)
+  if (!text) {
+    return
+  }
+
+  inferBasicFieldByValue(text, fields)
+}
+
+function splitEducationFragments(text: string) {
+  return text
+    .split(/\s+[–—-]\s+|\s*[|｜/]\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function parseEducationFragment(fragment: string, fields: ResumeField[]) {
+  const time = fragment.match(BASIC_TIME_RANGE_PATTERN)?.[0]
+  if (time) {
+    upsertBasicField(fields, 'educationTime', time, '学制时间')
+  }
+
+  const school = fragment.match(/([\u4e00-\u9fa5A-Za-z]{2,40}(大学|学院|学校))/)?.[1]
+  if (school) {
+    upsertBasicField(fields, 'school', school, '毕业院校')
+  }
+
+  const education = fragment.match(BASIC_EDUCATION_PATTERN)?.[1]
+  if (education) {
+    upsertBasicField(fields, 'education', education, '最高学历')
+  }
+
+  if (!school && !education && !time && /[\u4e00-\u9fa5A-Za-z]{2,30}/.test(fragment)) {
+    const major = fragment
+      .replace(BASIC_TIME_RANGE_PATTERN, '')
+      .replace(BASIC_EDUCATION_PATTERN, '')
+      .trim()
+    if (major) {
+      upsertBasicField(fields, 'major', major, '专业')
+    }
+  }
+}
+
+function parseBasicEducationLine(line: string, fields: ResumeField[]) {
+  const text = normalizeBasicLine(line)
+  if (!text) {
+    return
+  }
+
+  const fragments = splitEducationFragments(text)
+  if (fragments.length > 1) {
+    fragments.forEach((fragment) => parseEducationFragment(fragment, fields))
+  } else {
+    parseEducationFragment(text, fields)
+  }
+
+  if (!hasBasicValue(fields, 'major')) {
+    const school = fields.find((field) => field.key === 'school')?.value ?? ''
+    const education = fields.find((field) => field.key === 'education')?.value ?? ''
+    const time = fields.find((field) => field.key === 'educationTime')?.value ?? ''
+    const major = text
+      .replace(school, '')
+      .replace(education, '')
+      .replace(time, '')
+      .replace(/^[\s\-–—|｜/]+|[\s\-–—|｜/]+$/g, '')
+      .trim()
+
+    if (major) {
+      upsertBasicField(fields, 'major', major, '专业')
+    }
   }
 }
 
@@ -204,7 +355,26 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
     fields.push(nextField)
   }
 
-  for (const rawLine of lines) {
+  lines.forEach((line, index) => {
+    if (index === 0) {
+      parseBasicFirstLine(line, fields)
+      return
+    }
+
+    if (index <= 2) {
+      parseBasicContactLine(line, fields)
+    }
+
+    if (/(大学|学院|学校|本科|硕士|博士|大专|专科|高中|\d{4}[./-]\d{1,2})/.test(line)) {
+      parseBasicEducationLine(line, fields)
+    }
+  })
+
+  for (const [index, rawLine] of lines.entries()) {
+    if (index === 0 && hasBasicValue(fields, 'name') && hasBasicValue(fields, 'intent') && hasBasicValue(fields, 'city')) {
+      continue
+    }
+
     const parts = splitInlinePairs(rawLine)
     let matchedInLine = false
     for (const part of parts) {
@@ -224,7 +394,17 @@ function parseBasic(lines: string[]): Pick<ResumeSection, 'layout' | 'fields' | 
         upsertField(fallback)
       } else {
         inferBasicFieldByValue(rawLine, fields)
-        leftovers.push(rawLine)
+        const normalizedLine = normalizeBasicLine(rawLine)
+        const isConsumed =
+          (hasBasicValue(fields, 'name') && normalizedLine.includes(fields.find((field) => field.key === 'name')?.value ?? '')) ||
+          (hasBasicValue(fields, 'intent') && normalizedLine.includes(fields.find((field) => field.key === 'intent')?.value ?? '')) ||
+          (hasBasicValue(fields, 'currentCity') && normalizedLine.includes(fields.find((field) => field.key === 'currentCity')?.value ?? '')) ||
+          (hasBasicValue(fields, 'arrival') && normalizedLine.includes(fields.find((field) => field.key === 'arrival')?.value ?? '')) ||
+          /大学|学院|学校|本科|硕士|博士|大专|专科|高中|\d{4}[./-]\d{1,2}/.test(normalizedLine)
+
+        if (!isConsumed) {
+          leftovers.push(rawLine)
+        }
       }
     }
   }
