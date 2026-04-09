@@ -152,6 +152,10 @@ test('后台模块走查', async ({ page }) => {
   await page.goto('/admin/reports')
   await expect(page.getByRole('heading', { name: '举报处理' })).toBeVisible()
 
+  await page.goto('/admin/audit-logs')
+  await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
+  await expect(page.locator('main')).toContainText('关联对象')
+
   await page.goto('/admin/reviews')
   await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
 
@@ -165,4 +169,96 @@ test('后台模块走查', async ({ page }) => {
   await loginAs(page, 'user')
   await page.goto('/admin')
   await expect(page.getByText('当前账号无权限访问')).toBeVisible()
+})
+
+test('发布页走查', async ({ page, request }) => {
+  await loginAs(page, 'user')
+
+  const resourceTitle = `Walkthrough Resource ${Date.now()}`
+  await page.goto('/publish/resource')
+  await page.getByTestId('publish-resource-title').fill(resourceTitle)
+  await page.getByTestId('publish-resource-tags').fill('walkthrough,resource')
+  await page.getByTestId('publish-resource-summary').fill('通过全站走查验证资料真实发布闭环。')
+  await page.getByTestId('publish-resource-file').setInputFiles({
+    name: 'walkthrough-guide.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('walkthrough resource file')
+  })
+
+  const resourceCreateResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/publish') &&
+    !response.url().includes('/attachment')
+  )
+  const resourceAttachmentResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/attachment') &&
+    response.request().method() === 'POST'
+  )
+  const resourcePublishResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/publish') &&
+    response.request().method() === 'POST'
+  )
+
+  await page.getByTestId('publish-resource-submit').click()
+
+  const resourceCreateResponse = await resourceCreateResponsePromise
+  expect(resourceCreateResponse.ok()).toBeTruthy()
+  const resourceCreateBody = await resourceCreateResponse.json()
+  const resourceId = resourceCreateBody.data.id as number
+
+  const resourceAttachmentResponse = await resourceAttachmentResponsePromise
+  expect(resourceAttachmentResponse.ok()).toBeTruthy()
+
+  const resourcePublishResponse = await resourcePublishResponsePromise
+  expect(resourcePublishResponse.ok()).toBeTruthy()
+
+  await expect(page.getByTestId('publish-resource-result')).toContainText(`资源 ID：${resourceId}`)
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/resources/${resourceId}$`))
+  await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
+
+  const roadmapTitle = `Walkthrough Roadmap ${Date.now()}`
+  await page.goto('/publish/roadmap')
+  await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
+  await page.getByTestId('publish-roadmap-summary').fill('通过全站走查验证路线创建与节点追加闭环。')
+  await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')
+  await page.getByTestId('publish-roadmap-node-summary-0').fill('先完成路线主体创建。')
+  await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：追加节点')
+  await page.getByTestId('publish-roadmap-node-summary-1').fill('再写入真实节点。')
+
+  const roadmapCreateResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/nodes')
+  )
+  const firstNodeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/nodes') &&
+    response.request().method() === 'POST'
+  )
+  const secondNodeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/nodes') &&
+    response.request().method() === 'POST'
+  )
+
+  await page.getByTestId('publish-roadmap-submit').click()
+
+  const roadmapCreateResponse = await roadmapCreateResponsePromise
+  expect(roadmapCreateResponse.ok()).toBeTruthy()
+  const roadmapCreateBody = await roadmapCreateResponse.json()
+  const roadmapId = roadmapCreateBody.data.id as number
+
+  const firstNodeResponse = await firstNodeResponsePromise
+  const secondNodeResponse = await secondNodeResponsePromise
+  expect(firstNodeResponse.ok()).toBeTruthy()
+  expect(secondNodeResponse.ok()).toBeTruthy()
+
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${roadmapId}`)
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/roadmaps/${roadmapId}$`))
+  await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
+
+  const roadmapDetailResponse = await apiFetch(request, `/api/roadmaps/${roadmapId}`)
+  expect(roadmapDetailResponse.ok).toBeTruthy()
+  expect(roadmapDetailResponse.json?.data?.nodes?.length).toBeGreaterThan(0)
 })
