@@ -361,6 +361,39 @@ public class NoteControllerIntegrationTest {
     }
 
     @Test
+    void shouldTrimStatusOnCreateAndUpdate() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Trimmed Status Note","contentMd":"# content","visibility":"PUBLIC","status":" PUBLISHED "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> created = mapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) created.get("data");
+        Long id = Long.valueOf(data.get("id").toString());
+
+        mvc.perform(put("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Trimmed Status Note","contentMd":"# updated","visibility":"PUBLIC","status":" DRAFT "}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        mvc.perform(get("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("DRAFT"));
+    }
+
+    @Test
     void shouldTreatBlankVisibilityAsNullOnCreateAndUpdate() throws Exception {
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
