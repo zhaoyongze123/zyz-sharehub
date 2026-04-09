@@ -31,6 +31,23 @@ interface AdminUserPageData {
   pageSize: number
 }
 
+interface AdminAuditLogDto {
+  id: number
+  action: string | null
+  targetType: string | null
+  targetId: string | null
+  operatorKey: string | null
+  details: string | null
+  createdAt: string | null
+}
+
+interface AdminAuditLogPageData {
+  items: AdminAuditLogDto[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface AdminReportItem {
   id: number
   reason: string
@@ -44,6 +61,14 @@ export interface AdminUserItem {
   nickname: string
   login: string
   status: string
+}
+
+export interface AdminAuditLogItem {
+  id: number
+  action: string
+  target: string
+  operatorKey: string
+  createdAt: string
 }
 
 function normalizeReportStatus(status: string | null) {
@@ -80,6 +105,29 @@ function normalizeUser(dto: AdminUserDto): AdminUserItem {
   }
 }
 
+function normalizeAuditAction(action: string | null) {
+  if (!action?.trim()) return '未知操作'
+
+  return action
+    .split('_')
+    .filter(Boolean)
+    .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+    .join(' ')
+}
+
+function normalizeAuditLog(dto: AdminAuditLogDto): AdminAuditLogItem {
+  const targetType = dto.targetType?.trim() || 'UNKNOWN'
+  const targetId = dto.targetId?.trim() || '-'
+
+  return {
+    id: dto.id,
+    action: normalizeAuditAction(dto.action),
+    target: `${targetType} #${targetId}`,
+    operatorKey: dto.operatorKey?.trim() || 'system',
+    createdAt: dto.createdAt?.trim() || ''
+  }
+}
+
 export async function fetchAdminReports(page = 1, pageSize = 20) {
   const response = await apiClient.get<ApiResponse<AdminReportPageData>>('/admin/reports', {
     params: {
@@ -106,6 +154,22 @@ export async function fetchAdminUsers(page = 1, pageSize = 20) {
 
   return {
     items: response.data.data.items.map(normalizeUser),
+    total: response.data.data.total,
+    page: response.data.data.page,
+    pageSize: response.data.data.pageSize
+  }
+}
+
+export async function fetchAdminAuditLogs(page = 1, pageSize = 20) {
+  const response = await apiClient.get<ApiResponse<AdminAuditLogPageData>>('/admin/audit-logs', {
+    params: {
+      page,
+      pageSize
+    }
+  })
+
+  return {
+    items: response.data.data.items.map(normalizeAuditLog),
     total: response.data.data.total,
     page: response.data.data.page,
     pageSize: response.data.data.pageSize

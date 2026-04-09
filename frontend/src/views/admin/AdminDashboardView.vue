@@ -1,128 +1,396 @@
 <template>
-  <div class="admin-dashboard-shell pb-8">
-    <div class="mb-8">
-      <h1 class="text-2xl font-bold text-gray-800 tracking-tight">管理中心仪表盘</h1>
-      <p class="text-gray-500 text-sm mt-1">网站数据实时概览与快捷操作入口。</p>
-    </div>
-
-    <!-- 顶层核心指标卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-      <div v-for="stat in coreStats" :key="stat.title" class="bg-white rounded-xl shadow-sm border p-5 flex items-center justify-between transition hover:-translate-y-1 hover:shadow-md cursor-default">
-        <div>
-          <div class="text-gray-500 text-xs font-medium mb-1 uppercase tracking-wider">{{ stat.title }}</div>
-          <div class="text-2xl font-bold text-gray-800">{{ stat.value }}</div>
-          <div class="mt-1 text-xs" :class="stat.trend > 0 ? 'text-green-500' : 'text-red-500'">
-            <span class="inline-block" :class="stat.trend > 0 ? 'i-carbon-arrow-up' : 'i-carbon-arrow-down'"></span> 
-            {{ Math.abs(stat.trend) }}% 较昨日
-          </div>
-        </div>
-        <div class="h-10 w-10 min-w-10 rounded-full flex items-center justify-center bg-gray-50 text-gray-500 text-xl" :class="stat.icon"></div>
+  <div class="admin-dashboard-shell">
+    <div class="hero">
+      <div>
+        <h1 class="hero__title">管理中心仪表盘</h1>
+        <p class="hero__subtitle">复用真实举报、审计日志和用户列表，汇总当前治理面板的待办与风险。</p>
+      </div>
+      <div class="hero__meta" data-testid="admin-dashboard-meta">
+        <span>{{ dashboardMeta }}</span>
       </div>
     </div>
 
-    <!-- 中间两列栏目 -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <!-- 待办任务流 -->
-      <div class="bg-white rounded-xl shadow-sm border flex flex-col col-span-2">
-        <div class="px-5 py-4 border-b flex items-center justify-between">
-          <h2 class="font-bold text-gray-800 flex items-center gap-2">
-            <span class="i-carbon-task text-blue-500 text-lg"></span> 关键待办
-          </h2>
-          <span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">3 项紧急</span>
-        </div>
-        <div class="flex-1 overflow-auto divide-y">
-          <div v-for="task in pendingTasks" :key="task.id" class="p-4 hover:bg-gray-50 transition flex items-start gap-4">
-            <div class="mt-0.5 flex-shrink-0" :class="task.type === 'report' ? 'text-red-500 i-carbon-warning-alt' : 'text-orange-500 i-carbon-review'"></div>
-            <div class="flex-1 min-w-0">
-              <div class="font-medium text-sm text-gray-800 mb-0.5 flex items-center gap-2">
-                {{ task.title }} 
-                <span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{{ task.time }}</span>
+    <section v-if="loading" class="glass-panel panel panel-state">
+      <BaseSkeleton height="18rem" />
+    </section>
+
+    <BaseErrorState
+      v-else-if="error"
+      title="仪表盘加载失败"
+      description="暂时无法读取真实治理数据，请稍后重试。"
+    />
+
+    <template v-else>
+      <div class="stats-grid">
+        <article
+          v-for="stat in coreStats"
+          :key="stat.title"
+          class="glass-panel stat-card"
+          :data-testid="stat.testId"
+        >
+          <div class="stat-card__label">{{ stat.title }}</div>
+          <div class="stat-card__value">{{ stat.value }}</div>
+          <div class="stat-card__detail">{{ stat.detail }}</div>
+        </article>
+      </div>
+
+      <div class="content-grid">
+        <section class="glass-panel panel todo-panel">
+          <div class="panel__header">
+            <div>
+              <h2>关键待办</h2>
+              <p>优先展示真实未处理举报，其次回落到最新治理动作。</p>
+            </div>
+            <RouterLink class="panel__link" to="/admin/reports">查看队列</RouterLink>
+          </div>
+
+          <BaseEmpty
+            v-if="!pendingTasks.length"
+            title="暂无待办"
+            description="当前真实举报和治理动作都已处理完。"
+          />
+
+          <div v-else class="todo-list">
+            <article
+              v-for="task in pendingTasks"
+              :key="task.id"
+              class="todo-item"
+              :data-testid="`admin-dashboard-task-${task.id}`"
+            >
+              <div class="todo-item__type">{{ task.typeLabel }}</div>
+              <div class="todo-item__body">
+                <div class="todo-item__title">{{ task.title }}</div>
+                <p class="todo-item__description">{{ task.description }}</p>
               </div>
-              <p class="text-xs text-gray-500 truncate">{{ task.description }}</p>
-            </div>
-            <button class="shrink-0 text-sm bg-white border shadow-sm px-3 py-1 rounded text-gray-600 hover:text-blue-600 hover:border-blue-200 transition">
-              处理
-            </button>
+              <RouterLink class="todo-item__link" :to="task.link">{{ task.linkLabel }}</RouterLink>
+            </article>
           </div>
-        </div>
-        <div class="p-3 border-t bg-gray-50 rounded-b-xl text-center">
-          <button class="text-xs text-blue-600 hover:underline">查看所有待办</button>
-        </div>
-      </div>
+        </section>
 
-      <!-- 快捷工具 & 系统状态 -->
-      <div class="space-y-6">
-        <!-- 快捷操作 -->
-        <div class="bg-white rounded-xl shadow-sm border p-5">
-          <h2 class="font-bold text-gray-800 mb-4 pb-2 border-b">快捷导航</h2>
-          <div class="grid grid-cols-2 gap-3">
-            <button class="flex flex-col items-center justify-center p-3 rounded-lg border bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition group">
-              <div class="i-carbon-user-multiple text-xl text-gray-500 group-hover:text-blue-600 mb-1"></div>
-              <span class="text-xs font-medium text-gray-600 group-hover:text-blue-700">用户管理</span>
-            </button>
-            <button class="flex flex-col items-center justify-center p-3 rounded-lg border bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition group">
-              <div class="i-carbon-document-tasks text-xl text-gray-500 group-hover:text-blue-600 mb-1"></div>
-              <span class="text-xs font-medium text-gray-600 group-hover:text-blue-700">内容审核</span>
-            </button>
-            <button class="flex flex-col items-center justify-center p-3 rounded-lg border bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition group">
-              <div class="i-carbon-warning text-xl text-gray-500 group-hover:text-blue-600 mb-1"></div>
-              <span class="text-xs font-medium text-gray-600 group-hover:text-blue-700">举报处理</span>
-            </button>
-            <button class="flex flex-col items-center justify-center p-3 rounded-lg border bg-gray-50 hover:bg-blue-50 hover:border-blue-200 transition group">
-              <div class="i-carbon-tag-group text-xl text-gray-500 group-hover:text-blue-600 mb-1"></div>
-              <span class="text-xs font-medium text-gray-600 group-hover:text-blue-700">标签分类</span>
-            </button>
+        <section class="glass-panel panel activity-panel">
+          <div class="panel__header">
+            <div>
+              <h2>最新治理动作</h2>
+              <p>展示最近写入的真实审计日志。</p>
+            </div>
           </div>
-        </div>
 
-        <!-- 服务器状态 -->
-        <div class="bg-white rounded-xl shadow-sm border p-5">
-          <h2 class="font-bold text-gray-800 mb-4 pb-2 border-b flex items-center justify-between">
-            系统状态
-            <span class="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> 运行正常</span>
-          </h2>
-          <div class="space-y-3">
-            <div>
-              <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">API QPS</span><span class="font-medium">320 req/s</span></div>
-              <div class="w-full bg-gray-100 rounded-full h-1.5"><div class="bg-blue-500 h-1.5 rounded-full" style="width: 45%"></div></div>
-            </div>
-            <div>
-              <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">存储使用</span><span class="font-medium">45 GB / 100 GB</span></div>
-              <div class="w-full bg-gray-100 rounded-full h-1.5"><div class="bg-indigo-500 h-1.5 rounded-full" style="width: 45%"></div></div>
-            </div>
-            <div>
-              <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">内存负载</span><span class="font-medium">2.1 GB / 4 GB</span></div>
-              <div class="w-full bg-gray-100 rounded-full h-1.5"><div class="bg-orange-500 h-1.5 rounded-full" style="width: 52%"></div></div>
-            </div>
+          <BaseEmpty
+            v-if="!recentActivities.length"
+            title="暂无治理动作"
+            description="当前审计日志为空。"
+          />
+
+          <div v-else class="activity-list">
+            <article
+              v-for="activity in recentActivities"
+              :key="activity.id"
+              class="activity-item"
+              :data-testid="`admin-dashboard-activity-${activity.id}`"
+            >
+              <div class="activity-item__title">{{ activity.action }}</div>
+              <div class="activity-item__target">{{ activity.target }}</div>
+              <div class="activity-item__meta">{{ activity.operatorKey }}</div>
+            </article>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import {
+  fetchAdminAuditLogs,
+  fetchAdminReports,
+  fetchAdminUsers,
+  type AdminAuditLogItem,
+  type AdminReportItem,
+  type AdminUserItem
+} from '@/api/admin'
+import BaseEmpty from '@/components/base/BaseEmpty.vue'
+import BaseErrorState from '@/components/base/BaseErrorState.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 
-const coreStats = ref([
-  { title: "新增注册用户", value: "2,845", trend: 12.5, icon: "i-carbon-user-follow" },
-  { title: "内容发布总数", value: "12,054", trend: 5.2, icon: "i-carbon-document-add" },
-  { title: "今日活跃互动", value: "48.2k", trend: 18.1, icon: "i-carbon-chat" },
-  { title: "待处理举报", value: "32", trend: -1.5, icon: "i-carbon-warning-alt" },
+interface DashboardTask {
+  id: string
+  typeLabel: string
+  title: string
+  description: string
+  link: string
+  linkLabel: string
+}
+
+const loading = ref(true)
+const error = ref(false)
+const reportItems = ref<AdminReportItem[]>([])
+const auditItems = ref<AdminAuditLogItem[]>([])
+const userItems = ref<AdminUserItem[]>([])
+
+const openReports = computed(() => reportItems.value.filter((item) => item.status === '待处理'))
+const bannedUsers = computed(() => userItems.value.filter((item) => item.status === '已封禁'))
+
+const coreStats = computed(() => [
+  {
+    title: '待处理举报',
+    value: String(openReports.value.length),
+    detail: `举报总量 ${reportItems.value.length}`,
+    testId: 'admin-dashboard-stat-open-reports'
+  },
+  {
+    title: '最近治理动作',
+    value: String(auditItems.value.length),
+    detail: auditItems.value[0]?.action || '暂无治理动作',
+    testId: 'admin-dashboard-stat-audit-actions'
+  },
+  {
+    title: '后台可管用户',
+    value: String(userItems.value.length),
+    detail: `已封禁 ${bannedUsers.value.length}`,
+    testId: 'admin-dashboard-stat-users'
+  },
+  {
+    title: '最新风险目标',
+    value: openReports.value[0]?.target || '暂无',
+    detail: openReports.value[0]?.reason || '当前没有待处理举报',
+    testId: 'admin-dashboard-stat-top-target'
+  }
 ])
 
-const pendingTasks = ref([
-  { id: 1, type: 'report', title: '高频侵权举报', description: '有用户连续举报"2025架构师全景"资料抄袭，需介入裁定。', time: '10分钟前' },
-  { id: 2, type: 'review', title: '敏感词风控拦截', description: '系统拦截了来自UID(10084)的疑似推广引流文章，请人工复核。', time: '1小时前' },
-  { id: 3, type: 'review', title: '批量发帖异常', description: '检测到单一IP在短时间内发布了大量低质路线图，疑似脚本。', time: '2小时前' },
-  { id: 4, type: 'report', title: '基础资料分类错误', description: '有多名用户反馈该"前端入门"资料被错误归类为"后端"。', time: '今天 09:30' },
-])
+const pendingTasks = computed<DashboardTask[]>(() => {
+  const reportTasks = openReports.value.slice(0, 3).map((item) => ({
+    id: `report-${item.id}`,
+    typeLabel: '举报待处理',
+    title: item.reason,
+    description: `${item.target} · 举报人 ${item.reporter}`,
+    link: '/admin/reports',
+    linkLabel: '前往处理'
+  }))
+
+  if (reportTasks.length > 0) {
+    return reportTasks
+  }
+
+  return auditItems.value.slice(0, 3).map((item) => ({
+    id: `audit-${item.id}`,
+    typeLabel: '治理记录',
+    title: item.action,
+    description: `${item.target} · 操作人 ${item.operatorKey}`,
+    link: '/admin/users',
+    linkLabel: '查看明细'
+  }))
+})
+
+const recentActivities = computed(() => auditItems.value.slice(0, 5))
+
+const dashboardMeta = computed(() => {
+  if (!auditItems.value.length) {
+    return `已加载 ${reportItems.value.length} 条举报 / ${userItems.value.length} 个用户`
+  }
+
+  return `最近动作 ${auditItems.value[0].action} · 已加载 ${reportItems.value.length} 条举报`
+})
+
+async function loadDashboard() {
+  loading.value = true
+  error.value = false
+
+  try {
+    const [reportsResponse, auditResponse, usersResponse] = await Promise.all([
+      fetchAdminReports(1, 20),
+      fetchAdminAuditLogs(1, 20),
+      fetchAdminUsers(1, 20)
+    ])
+    reportItems.value = reportsResponse.items
+    auditItems.value = auditResponse.items
+    userItems.value = usersResponse.items
+  } catch (loadError) {
+    error.value = true
+    reportItems.value = []
+    auditItems.value = []
+    userItems.value = []
+    console.error(loadError)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  void loadDashboard()
+})
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .admin-dashboard-shell {
-  max-width: 1200px;
-  margin: 0 auto;
+  display: grid;
+  gap: var(--space-6);
+}
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.hero__title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.hero__subtitle,
+.hero__meta {
+  color: var(--color-text-soft);
+}
+
+.hero__meta {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.875rem;
+}
+
+.stats-grid,
+.content-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.content-grid {
+  grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 1fr);
+}
+
+.panel,
+.stat-card {
+  padding: var(--space-5);
+}
+
+.panel-state {
+  min-height: 18rem;
+}
+
+.stat-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.stat-card__label {
+  color: var(--color-text-soft);
+  font-size: 0.75rem;
+}
+
+.stat-card__value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.stat-card__detail {
+  color: var(--color-text-soft);
+  font-size: 0.875rem;
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.panel__header h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.panel__header p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.875rem;
+}
+
+.panel__link,
+.todo-item__link {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.todo-list,
+.activity-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.todo-item,
+.activity-item {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.todo-item {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.todo-item__type {
+  padding: var(--space-2) var(--space-3);
+  border-radius: 999px;
+  background: rgba(29, 111, 220, 0.12);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.todo-item__title,
+.activity-item__title {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.todo-item__description,
+.activity-item__target,
+.activity-item__meta {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 80rem) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 48rem) {
+  .hero,
+  .todo-item {
+    grid-template-columns: 1fr;
+    display: grid;
+    align-items: start;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
