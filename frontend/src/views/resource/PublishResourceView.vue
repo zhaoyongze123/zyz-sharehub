@@ -43,14 +43,18 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-// 直接复用真实接口的分类枚举，过滤空白、“全部”并去重
-const publishCategoryOptions = Array.from(
+// 直接复用真实接口的分类枚举，过滤空白、“全部”并去重，若后端暂未回传则给出兜底项
+const cleanedCategories = Array.from(
   new Set(
     resourceCategoryOptions
-      .map((item) => item.trim())
+      .map((item) => item?.trim())
       .filter((item) => item && item !== '全部')
   )
-).map((item) => ({ label: item, value: item }))
+)
+const publishCategoryOptions = (cleanedCategories.length ? cleanedCategories : ['未分类']).map((item) => ({
+  label: item,
+  value: item
+}))
 const defaultCategory = publishCategoryOptions[0]?.value || ''
 const form = reactive({
   title: '',
