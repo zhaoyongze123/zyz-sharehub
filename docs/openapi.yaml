@@ -719,7 +719,7 @@ paths:
   /api/notes/{id}:
     get:
       summary: 获取笔记详情
-      description: 需要当前用户身份；当前实现只允许访问自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理
+      description: 公开已发布笔记支持匿名或其他登录用户直接读取；当前用户访问自己的笔记时仍可读取草稿与非公开内容；若已带用户身份且用户被封禁返回 `403 USER_BANNED`，其余不可访问场景统一按不存在处理
       parameters:
         - in: path
           name: id
@@ -734,12 +734,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NoteResponse'
-        '401':
-          description: 未登录（错误码 `NOT_LOGGED_IN`）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: 用户被封禁（错误码 `USER_BANNED`）
           content:

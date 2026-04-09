@@ -405,8 +405,17 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   expect(detailBody.data.id).toBe(noteId)
   expect(detailBody.data.title).toBe(noteTitle)
 
-  await loginAs(page, 'user')
+  const publicDetailResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/notes/${noteId}`) && response.request().method() === 'GET'
+  )
   await page.goto(`/notes/${noteId}`)
+  const publicDetailResponse = await publicDetailResponsePromise
+  expect(publicDetailResponse.ok()).toBeTruthy()
+  const publicDetailBody = await publicDetailResponse.json()
+  expect(publicDetailBody.success).toBeTruthy()
+  expect(publicDetailBody.data.id).toBe(noteId)
+  expect(publicDetailBody.data.visibility).toBe('PUBLIC')
+  expect(publicDetailBody.data.status).toBe('PUBLISHED')
   await expect(page.getByTestId('note-detail-page')).toBeVisible()
   await expect(page.getByTestId('note-detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
   await expect(page.getByText('这是用于详情页验收的真实正文。').first()).toBeVisible()
@@ -416,6 +425,8 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByTestId('note-outline')).toContainText('第一节')
   await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
 
+  await loginAs(page, 'user')
+  await page.reload()
   const reportResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/reports') && response.request().method() === 'POST'
   )

@@ -390,14 +390,15 @@
 
 - 全部接口统一通过 `RequestAccessService` 解析当前用户
 - 联调环境可用 `X-User-Key` 指定用户；接入 OAuth 后会优先取登录态
-- 列表、详情、更新、删除都只作用于当前用户自己的笔记
+- `GET /api/notes`、`PUT /api/notes/{id}`、`DELETE /api/notes/{id}` 只作用于当前用户自己的笔记
+- `GET /api/notes/{id}` 在笔记为 `visibility=PUBLIC` 且 `status=PUBLISHED` 时允许匿名或其他登录用户直接读取
 - `GET /api/notes` 支持 `status` 筛选；当 `status` 为空字符串或仅空白时按未传处理
 - `GET /api/notes` 的 `status` 若带前后空白，会先裁剪再参与筛选
 - `POST /api/notes` 未传 `status`、传 `null`、空字符串或仅空白时默认存为 `DRAFT`
 - `POST /api/notes`、`PUT /api/notes/{id}` 的 `visibility` 传空字符串或仅空白时按未传处理，最终存为 `null`
 - `PUT /api/notes/{id}` 传空字符串或仅空白 `status` 时按未传处理，保留原状态
-- 访问他人笔记时当前统一按不存在返回 `404 NOTE_NOT_FOUND`
-- 未带用户身份时返回 `401 NOT_LOGGED_IN`
+- 非公开已发布笔记对他人和匿名访问统一按不存在返回 `404 NOTE_NOT_FOUND`
+- 未带用户身份访问列表、创建、更新、删除时返回 `401 NOT_LOGGED_IN`
 - `404` 统一为 `NOTE_NOT_FOUND`
 - 用户已被封禁时返回 `403 USER_BANNED`
 

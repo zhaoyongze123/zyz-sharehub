@@ -56,8 +56,14 @@ public class NoteController {
         HttpServletRequest request,
         @PathVariable Long id
     ) {
-        String ownerKey = requireActiveUser(authentication, request);
-        return ApiResponse.ok(repository.findOwned(id, ownerKey));
+        String ownerKey = requestAccessService.resolveUser(authentication, request)
+            .map((login) -> {
+                userProfileRepository.upsert(login, login, null);
+                userProfileRepository.ensureActive(login);
+                return login;
+            })
+            .orElse(null);
+        return ApiResponse.ok(repository.findAccessible(id, ownerKey));
     }
 
     @PutMapping("/{id}")

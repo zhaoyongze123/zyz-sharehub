@@ -313,8 +313,17 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
   const createBody = await createResponse.json()
   const noteId = createBody.data.id as number
 
-  await loginAs(page, 'user')
+  const detailResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/notes/${noteId}`) && response.request().method() === 'GET'
+  )
   await page.goto(`/notes/${noteId}`)
+  const detailResponse = await detailResponsePromise
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.success).toBeTruthy()
+  expect(detailBody.data.id).toBe(noteId)
+  expect(detailBody.data.visibility).toBe('PUBLIC')
+  expect(detailBody.data.status).toBe('PUBLISHED')
   await expect(page.getByTestId('note-detail-page')).toBeVisible()
   await expect(page.getByTestId('note-detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
   await expect(page.getByText('这是 smoke 用例写入的真实正文。').first()).toBeVisible()
@@ -324,6 +333,8 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
   await expect(page.getByTestId('note-outline')).toContainText('小节')
   await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
 
+  await loginAs(page, 'user')
+  await page.reload()
   const reportResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/reports') && response.request().method() === 'POST'
   )

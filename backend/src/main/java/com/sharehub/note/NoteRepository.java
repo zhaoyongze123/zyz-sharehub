@@ -97,6 +97,16 @@ public class NoteRepository {
         return findOptional(id, ownerKey).orElseThrow(() -> new NotFoundException("NOTE_NOT_FOUND"));
     }
 
+    public NoteDto findAccessible(Long id, String ownerKey) {
+        if (ownerKey != null && !ownerKey.isBlank()) {
+            Optional<NoteDto> owned = findOptional(id, ownerKey);
+            if (owned.isPresent()) {
+                return owned.get();
+            }
+        }
+        return findPublicPublished(id).orElseThrow(() -> new NotFoundException("NOTE_NOT_FOUND"));
+    }
+
     public NoteDto upsertOwned(Long id, String ownerKey, NoteDto note) {
         NoteDto existing = findOwned(id, ownerKey);
         jdbcTemplate.update(
@@ -151,6 +161,25 @@ public class NoteRepository {
             ),
             id,
             ownerKey
+        );
+        return results.stream().findFirst();
+    }
+
+    private Optional<NoteDto> findPublicPublished(Long id) {
+        List<NoteDto> results = jdbcTemplate.query(
+            """
+                SELECT id, title, content_md, visibility, status
+                FROM notes
+                WHERE id = ? AND visibility = 'PUBLIC' AND status = 'PUBLISHED'
+                """,
+            (resultSet, rowNum) -> mapDto(
+                resultSet.getLong("id"),
+                resultSet.getString("title"),
+                resultSet.getString("content_md"),
+                resultSet.getString("visibility"),
+                resultSet.getString("status")
+            ),
+            id
         );
         return results.stream().findFirst();
     }
