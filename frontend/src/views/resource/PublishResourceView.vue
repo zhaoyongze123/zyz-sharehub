@@ -43,11 +43,14 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-// 直接复用真实接口的分类枚举，过滤空白与“全部”
-const publishCategoryOptions = resourceCategoryOptions
-  .map((item) => item.trim())
-  .filter((item) => item && item !== '全部')
-  .map((item) => ({ label: item, value: item }))
+// 直接复用真实接口的分类枚举，过滤空白、“全部”并去重
+const publishCategoryOptions = Array.from(
+  new Set(
+    resourceCategoryOptions
+      .map((item) => item.trim())
+      .filter((item) => item && item !== '全部')
+  )
+).map((item) => ({ label: item, value: item }))
 const defaultCategory = publishCategoryOptions[0]?.value || ''
 const form = reactive({
   title: '',
