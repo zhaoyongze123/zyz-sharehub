@@ -75,6 +75,38 @@ async function createResume(request: Parameters<typeof test>[0]['request'], temp
   return body.data.id as number
 }
 
+async function createPublicRoadmap(
+  request: Parameters<typeof test>[0]['request'],
+  title: string,
+  nodeTitles: string[] = []
+) {
+  const createResponse = await request.post(`${apiBaseUrl}/api/roadmaps`, {
+    headers: userHeaders(),
+    data: {
+      title,
+      description: `${title} description`,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED'
+    }
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const id = createBody.data.id as number
+
+  for (const [index, nodeTitle] of nodeTitles.entries()) {
+    const nodeResponse = await request.post(`${apiBaseUrl}/api/roadmaps/${id}/nodes`, {
+      headers: userHeaders(),
+      data: {
+        title: nodeTitle,
+        orderNo: index + 1
+      }
+    })
+    expect(nodeResponse.ok()).toBeTruthy()
+  }
+
+  return id
+}
+
 async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 'admin') {
   await page.addInitScript((selectedRole) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
@@ -123,19 +155,32 @@ test('resources 模块真接口联调', async ({ page, request }) => {
 
 test('roadmaps 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('roadmaps'))
+  const roadmapTitle = `Playwright Roadmap ${Date.now()}`
+  const roadmapId = await createPublicRoadmap(request, roadmapTitle, ['阶段 1：接线', '阶段 2：验证'])
+
   const listResponse = await request.get(`${apiBaseUrl}/api/roadmaps?page=1&pageSize=20`)
   expect(listResponse.ok()).toBeTruthy()
   const listBody = await listResponse.json()
   expect(Array.isArray(listBody.data.items)).toBeTruthy()
+  expect(listBody.data.items.some((item: { id: number }) => item.id === roadmapId)).toBeTruthy()
 
-  if (listBody.data.items.length > 0) {
-    const roadmapId = listBody.data.items[0].id
-    const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${roadmapId}`)
-    expect(detailResponse.ok()).toBeTruthy()
-  }
+  const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${roadmapId}`, {
+    headers: userHeaders()
+  })
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.roadmap.id).toBe(roadmapId)
+  expect(detailBody.data.nodes.length).toBeGreaterThan(0)
 
   await page.goto('/roadmaps')
   await expect(page.getByText('学习路线图')).toBeVisible()
+  const roadmapCard = page.locator('article', { hasText: roadmapTitle }).first()
+  await expect(roadmapCard).toBeVisible()
+  await expect(roadmapCard.getByText(`${roadmapTitle} description`)).toBeVisible()
+  await roadmapCard.getByRole('link', { name: '进入路线' }).click()
+  await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
+  await expect(page.getByText('节点进度结构')).toBeVisible()
+  await expect(page.getByText('阶段 1：接线')).toBeVisible()
 })
 
 test('notes 模块真接口联调', async ({ page, request }) => {
