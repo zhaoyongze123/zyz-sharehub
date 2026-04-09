@@ -439,6 +439,18 @@ test('admin 模块真接口联调', async ({ page, request }) => {
     headers: adminHeaders()
   })
   expect(reportsResponse.ok()).toBeTruthy()
+  const reportsBody = await reportsResponse.json() as {
+    data: {
+      items: Array<{
+        id: number
+        reason: string
+        reporter: string
+        targetType: string
+        targetId: number
+      }>
+    }
+  }
+  const firstReport = reportsBody.data.items[0] ?? null
 
   const auditLogsResponse = await request.get(`${apiBaseUrl}/api/admin/audit-logs?page=1&pageSize=20`, {
     headers: adminHeaders()
@@ -448,4 +460,14 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   await loginAs(page, 'admin')
   await page.goto('/admin')
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
+
+  await page.goto('/admin/reports')
+  await expect(page.getByRole('heading', { name: '举报处理' })).toBeVisible()
+  if (firstReport) {
+    await expect(page.getByText(firstReport.reason).first()).toBeVisible()
+    await expect(page.getByText(firstReport.reporter).first()).toBeVisible()
+    await expect(page.getByText(`${firstReport.targetType} #${firstReport.targetId}`).first()).toBeVisible()
+  } else {
+    await expect(page.getByText('暂无举报数据')).toBeVisible()
+  }
 })
