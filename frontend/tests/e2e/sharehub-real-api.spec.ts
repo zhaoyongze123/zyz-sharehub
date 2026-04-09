@@ -323,7 +323,15 @@ test('me 模块真接口联调', async ({ page, request }) => {
   const resumesBody = await resumesResponse.json()
 
   await loginAs(page, 'user')
+  const authMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
   await page.goto('/me')
+  const authMeResponse = await authMeResponsePromise
+  expect(authMeResponse.ok()).toBeTruthy()
+  const authMeBody = await authMeResponse.json()
+  expect(authMeBody.success).toBeTruthy()
+  expect(authMeBody.data?.login).toBeTruthy()
   await expect(page.getByRole('heading', { name: '个人资料' })).toBeVisible()
   await expect(page.getByText(`@${meBody.data.profile.login}`)).toBeVisible()
   await expect(page.getByText(String(meBody.data.myResourceCount)).first()).toBeVisible()
@@ -358,6 +366,15 @@ test('me 模块真接口联调', async ({ page, request }) => {
   expect(avatarResponse.ok()).toBeTruthy()
   const avatarBody = await avatarResponse.json()
   expect(avatarBody.data.downloadUrl).toContain('/api/files/')
+  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
+
+  const reloadAuthMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
+  await page.reload()
+  const reloadAuthMeResponse = await reloadAuthMeResponsePromise
+  expect(reloadAuthMeResponse.ok()).toBeTruthy()
+  await expect(page.getByText(`@${authMeBody.data.login}`)).toBeVisible()
   await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
 })
 
