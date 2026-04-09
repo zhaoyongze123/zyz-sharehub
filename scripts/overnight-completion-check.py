@@ -72,10 +72,25 @@ def main() -> int:
         pending,
     )
     check(
+        has_text(tests / "module-smoke.spec.ts", "browserFetch(page, '/api/resources?page=0&pageSize=5'")
+        and has_text(tests / "module-smoke.spec.ts", "getByText(`下载 ${resource.downloadCount}`)"),
+        "批次1-资源 smoke 真渲染断言",
+        passed,
+        pending,
+    )
+    check(
         has_text(tests / "sharehub-real-api.spec.ts", "page.goto('/roadmaps')")
         and has_text(tests / "sharehub-real-api.spec.ts", "/api/roadmaps/")
         and has_text(tests / "sharehub-real-api.spec.ts", "/roadmaps/${roadmapId}"),
         "批次1-路线 Playwright 真读取闭环",
+        passed,
+        pending,
+    )
+    check(
+        has_text(tests / "module-smoke.spec.ts", "browserFetch(page, '/api/roadmaps?page=1&pageSize=5')")
+        and has_text(tests / "module-smoke.spec.ts", "roadmap.description?.trim()")
+        and has_text(tests / "module-smoke.spec.ts", "page.getByText('节点进度结构')"),
+        "批次1-路线 smoke 真渲染断言",
         passed,
         pending,
     )
