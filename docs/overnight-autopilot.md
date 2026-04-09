@@ -22,7 +22,7 @@ npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 ```
 
 - 若前端已通过 `npm run dev` 运行在 `5173`，可直接把 `PLAYWRIGHT_BASE_URL` 改为 `http://127.0.0.1:5173` 复用现有服务，无需额外起一份 preview。
-- 最近一次人工复核：2026-04-10 03:53 +0800，使用前端 `http://127.0.0.1:14173`、后端 `http://127.0.0.1:18080` 执行 `full-site-walkthrough.spec.ts`，结果 7/7 通过（12.9s）。
+- 最近一次人工复核：2026-04-10 05:40 +0800，使用前端 `http://127.0.0.1:14173`、后端 `http://127.0.0.1:18080` 执行 `full-site-walkthrough.spec.ts`，结果 7/7 通过（12.7s，提交 `b759b80`）。
 
 - 只有当上述走查通过，且以下材料都存在并与当前联调方式一致时，夜间自动化才应判定整站完成：
   - `docs/deployment-runbook.md`
