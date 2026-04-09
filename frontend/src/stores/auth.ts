@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { fetchMe } from '@/api/me'
+import { fetchMe, type MeData } from '@/api/me'
 
 export interface UserProfile {
   id: number
@@ -11,26 +11,6 @@ export interface UserProfile {
   avatarUrl?: string | null
   avatarFileId?: string | null
   status?: string | null
-}
-
-export interface MeData {
-  profile: {
-    id: number
-    login: string
-    name?: string | null
-    avatarFileId?: string | null
-    avatarUrl?: string | null
-    status?: string | null
-  }
-  myResourceCount?: number
-  myFavoriteCount?: number
-  myRoadmapCount?: number
-  myNoteCount?: number
-  myResumeCount?: number
-  recentResourceCount?: number
-  publishedResourceCount?: number
-  draftNoteCount?: number
-  generatedResumeCount?: number
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -49,12 +29,13 @@ export const useAuthStore = defineStore('auth', {
       if (!profile) return null
 
       const role = (window.localStorage.getItem('sharebase.role') as UserProfile['role']) || 'user'
+      const nickname = profile.name ?? profile.login
 
       const normalized: UserProfile = {
         id: profile.id,
         login: profile.login,
         name: profile.name ?? null,
-        nickname: profile.name ?? profile.login,
+        nickname,
         role,
         headline: this.profile?.headline ?? '',
         avatarUrl: profile.avatarUrl ?? null,
@@ -63,6 +44,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       window.localStorage.setItem('sharebase.nickname', normalized.nickname || normalized.login)
+      window.localStorage.setItem('sharebase.userKey', normalized.login)
       if (!window.localStorage.getItem('sharebase.role')) {
         window.localStorage.setItem('sharebase.role', role)
       }
@@ -106,6 +88,8 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     loginAs(role: 'user' | 'admin') {
+      const nickname = role === 'admin' ? 'Admin Zoe' : 'Alex Chen'
+      const headline = role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者'
       window.localStorage.setItem('sharebase.role', role)
       window.localStorage.setItem('sharebase.userKey', role === 'admin' ? 'dev-admin' : 'dev-user')
       this.profile = {
@@ -113,8 +97,9 @@ export const useAuthStore = defineStore('auth', {
         login: role === 'admin' ? 'admin.local' : 'user.local',
         nickname: role === 'admin' ? 'Admin Zoe' : 'Alex Chen',
         role,
-        headline: role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者'
+        headline
       }
+      this.initialized = true
     },
     updateProfile(data: Partial<UserProfile>) {
       if (this.profile) {
@@ -135,6 +120,7 @@ export const useAuthStore = defineStore('auth', {
       window.localStorage.removeItem('sharebase.adminToken')
       this.profile = null
       this.me = null
+      this.initialized = true
     }
   }
 })
