@@ -666,6 +666,18 @@ test('后台模块 smoke', async ({ page }) => {
   await expect(page.getByRole('cell', { name: firstResource.category || firstResource.type || '未分类' }).first()).toBeVisible()
   await expect(page.getByTestId('admin-taxonomy-readonly').first()).toBeVisible()
 
+  await page.goto('/admin/reports')
+  await expect(page.getByRole('heading', { name: '举报处理' })).toBeVisible()
+  const firstReport = reportItems[0]
+  if (firstReport) {
+    const reportRow = page.getByTestId(`admin-report-row-${firstReport.id}`)
+    await expect(reportRow).toContainText(firstReport.reason)
+    await expect(reportRow).toContainText(firstReport.reporter)
+    await expect(reportRow).toContainText(`${firstReport.targetType} #${firstReport.targetId}`)
+  } else {
+    await expect(page.getByText('暂无举报数据')).toBeVisible()
+  }
+
   await page.goto('/admin/audit-logs')
   await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
   const firstAuditLog = auditResponse.json?.data?.items?.[0]

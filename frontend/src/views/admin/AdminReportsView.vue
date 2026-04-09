@@ -25,7 +25,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in reportItems" :key="item.id">
+          <tr v-for="item in reportItems" :key="item.id" :data-testid="`admin-report-row-${item.id}`">
             <td>{{ item.reason }}</td>
             <td>{{ item.target }}</td>
             <td>{{ item.reporter }}</td>
