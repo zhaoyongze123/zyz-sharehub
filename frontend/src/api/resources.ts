@@ -27,6 +27,9 @@ interface ResourceDto {
   likes: number | null
   favorites: number | null
   downloadCount: number | null
+  status?: string | null
+  visibility?: string | null
+  objectKey?: string | null
 }
 
 interface ResourcePageData {
@@ -46,6 +49,24 @@ export interface ResourceListQuery {
 }
 
 export const resourceCategoryOptions = ['全部', 'PDF', 'Repo', 'Markdown', 'JSON', 'ZIP', 'Sheet']
+
+interface StoredFileDto {
+  id: string
+  filename: string
+  contentType: string
+  downloadUrl: string
+}
+
+interface CreateResourcePayload {
+  title: string
+  type: string
+  category: string
+  summary: string
+  tags: string[]
+  visibility: 'PUBLIC' | 'PRIVATE'
+  status: 'DRAFT' | 'PUBLISHED'
+  externalUrl?: string
+}
 
 function normalizeResource(dto: ResourceDto): ResourceItem {
   const category = dto.category?.trim() || dto.type?.trim() || '未分类'
@@ -93,4 +114,31 @@ export async function fetchResourceDetail(id: string | number) {
 export async function fetchRelatedResources(id: string | number) {
   const response = await apiClient.get<ApiResponse<ResourceDto[]>>(`/resources/${id}/related`)
   return response.data.data.map(normalizeResource)
+}
+
+export async function createResource(payload: CreateResourcePayload) {
+  const response = await apiClient.post<ApiResponse<ResourceDto>>('/resources', payload)
+  return response.data.data
+}
+
+export async function uploadResourceAttachment(id: string | number, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await apiClient.post<ApiResponse<{ resourceId: number, file: StoredFileDto }>>(
+    `/resources/${id}/attachment`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  )
+
+  return response.data.data
+}
+
+export async function publishResource(id: string | number) {
+  const response = await apiClient.post<ApiResponse<ResourceDto>>(`/resources/${id}/publish`)
+  return response.data.data
 }

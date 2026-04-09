@@ -183,6 +183,75 @@ test('resources 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByRole('heading', { name: relatedResourceTitle })).toBeVisible()
 })
 
+test('publish-resource 页面真写入联调', async ({ page, request }) => {
+  test.skip(!shouldRun('resources'))
+  const batchId = Date.now()
+  const resourceTitle = `Playwright Publish Resource ${batchId}`
+
+  await loginAs(page, 'user')
+  await page.goto('/publish/resource')
+  await expect(page.locator('main').getByRole('heading', { name: '发布资料' })).toBeVisible()
+
+  await page.getByTestId('publish-resource-title').fill(resourceTitle)
+  await page.getByTestId('publish-resource-tags').fill('playwright,upload')
+  await page.getByTestId('publish-resource-summary').fill('通过页面完成真实资料发布闭环。')
+  await page.getByTestId('publish-resource-file').setInputFiles({
+    name: 'guide.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('playwright-resource-pdf')
+  })
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/publish') &&
+    !response.url().includes('/attachment')
+  )
+  const attachmentResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources/') &&
+    response.url().includes('/attachment') &&
+    response.request().method() === 'POST'
+  )
+  const publishResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources/') &&
+    response.url().includes('/publish') &&
+    response.request().method() === 'POST'
+  )
+
+  await page.getByTestId('publish-resource-submit').click()
+
+  const createResponse = await createResponsePromise
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const createdId = createBody.data.id as number
+
+  const attachmentResponse = await attachmentResponsePromise
+  expect(attachmentResponse.ok()).toBeTruthy()
+  const attachmentBody = await attachmentResponse.json()
+  expect(attachmentBody.data.resourceId).toBe(createdId)
+  expect(attachmentBody.data.file.filename).toBe('guide.pdf')
+
+  const publishResponse = await publishResponsePromise
+  expect(publishResponse.ok()).toBeTruthy()
+  const publishBody = await publishResponse.json()
+  expect(publishBody.data.id).toBe(createdId)
+
+  await expect(page.getByTestId('publish-resource-result')).toContainText(`资源 ID：${createdId}`)
+  await expect(page.getByTestId('publish-resource-result')).toContainText('附件：guide.pdf')
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/resources/${createdId}$`))
+  await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/resources/${createdId}`)
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.id).toBe(createdId)
+  expect(detailBody.data.title).toBe(resourceTitle)
+  expect(detailBody.data.status).toBe('PUBLISHED')
+  expect(detailBody.data.objectKey).toBeTruthy()
+  expect(detailBody.data.downloadCount).toBe(1)
+})
+
 test('roadmaps 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('roadmaps'))
   const linkedResourceTitle = `Roadmap Resource ${Date.now()}`
