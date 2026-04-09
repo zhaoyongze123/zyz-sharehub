@@ -1,4 +1,3 @@
-
 <template>
   <div class="page-shell" v-if="status === 'loading'">
     <BaseSkeleton height="18rem" />
@@ -179,8 +178,6 @@ async function markComplete() {
     updating.value = false
   }
 }
-
-onMounted(loadDetail)
 
 function favoriteRoadmap() {
   appStore.showToast('已收藏路线', '后续可在个人中心继续学习')

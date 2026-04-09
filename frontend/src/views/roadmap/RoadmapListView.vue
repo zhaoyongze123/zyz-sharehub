@@ -1,4 +1,3 @@
-
 <template>
   <div class="roadmap-paths">
     <header class="paths-hero">
@@ -59,11 +58,9 @@ import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
 import { useRoadmapStore } from '@/stores/roadmap'
-import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
 const roadmapStore = useRoadmapStore()
-const appStore = useAppStore()
 
 const keyword = ref(String(route.query.keyword ?? roadmapStore.keyword ?? ''))
 const category = ref(roadmapStore.selectedTag || '全部')

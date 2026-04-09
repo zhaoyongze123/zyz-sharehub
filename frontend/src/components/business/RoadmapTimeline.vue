@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 defineProps<{
-  items: Array<{ title: string; summary: string; tasks: string[] }>
+  items: Array<{ title: string; summary?: string; tasks?: string[] }>
 }>()
 
 defineEmits<{
