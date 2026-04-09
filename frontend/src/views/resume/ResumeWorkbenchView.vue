@@ -1,33 +1,35 @@
 <template>
   <div class="flex h-full min-h-0 flex-col bg-slate-100">
-    <header class="flex h-[68px] shrink-0 items-center justify-between border-b bg-white px-6 shadow-sm">
-      <div class="flex items-center gap-3">
-        <span class="text-sm text-slate-500">草稿</span>
-        <select v-model="currentDraftId" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-          <option v-for="draft in drafts" :key="draft.id" :value="draft.id">{{ draft.name }}</option>
-        </select>
-        <BaseButton variant="secondary" size="sm" @click="createNewDraft">新建草稿</BaseButton>
-      </div>
+    <header class="shrink-0 border-b bg-white px-6 py-3 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="text-sm text-slate-500">草稿</span>
+          <select v-model="currentDraftId" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+            <option v-for="draft in drafts" :key="draft.id" :value="draft.id">{{ draft.name }}</option>
+          </select>
+          <BaseButton variant="secondary" size="sm" @click="createNewDraft">新建草稿</BaseButton>
+        </div>
 
-      <div class="flex items-center gap-2">
-        <span v-if="saving" class="text-xs text-slate-400">保存中...</span>
-        <span v-else-if="saveTime" class="text-xs text-emerald-600">已自动保存 {{ saveTime }}</span>
-      </div>
+        <div class="flex items-center gap-2">
+          <span v-if="saving" class="text-xs text-slate-400">保存中...</span>
+          <span v-else-if="saveTime" class="text-xs text-emerald-600">已自动保存 {{ saveTime }}</span>
+        </div>
 
-      <div class="flex items-center gap-2">
-        <select v-model="currentTemplate" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-          <option value="classic">经典基础</option>
-          <option value="professional">沉稳商务</option>
-          <option value="modern">现代左右</option>
-        </select>
-        <input ref="fileInputRef" type="file" accept="application/pdf" class="hidden" @change="handlePdfImport" />
-        <BaseButton variant="secondary" size="sm" @click="triggerPdfImport">导入简历 PDF</BaseButton>
-        <BaseButton variant="secondary" size="sm" :disabled="!currentDraft?.sourceText || parsing" @click="reparseCurrentDraft">
-          {{ parsing ? '解析中...' : '重新解析' }}
-        </BaseButton>
-        <BaseButton variant="secondary" size="sm" @click="addSection">添加模块</BaseButton>
-        <BaseButton variant="secondary" size="sm" @click="resetCurrentDraft">重置</BaseButton>
-        <BaseButton size="sm" :disabled="exporting" @click="exportPdf">{{ exporting ? '导出中...' : '导出 PDF' }}</BaseButton>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <select v-model="currentTemplate" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+            <option value="classic">经典基础</option>
+            <option value="professional">沉稳商务</option>
+            <option value="modern">现代左右</option>
+          </select>
+          <input ref="fileInputRef" type="file" accept="application/pdf" class="hidden" @change="handlePdfImport" />
+          <BaseButton variant="secondary" size="sm" @click="triggerPdfImport">导入简历 PDF</BaseButton>
+          <BaseButton variant="secondary" size="sm" :disabled="!currentDraft?.sourceText || parsing" @click="reparseCurrentDraft">
+            {{ parsing ? '解析中...' : '重新解析' }}
+          </BaseButton>
+          <BaseButton variant="secondary" size="sm" @click="addSection">添加模块</BaseButton>
+          <BaseButton variant="secondary" size="sm" @click="resetCurrentDraft">重置</BaseButton>
+          <BaseButton size="sm" :disabled="exporting" @click="exportPdf">{{ exporting ? '导出中...' : '导出 PDF' }}</BaseButton>
+        </div>
       </div>
     </header>
 
@@ -103,7 +105,7 @@
                       <div class="text-sm font-semibold text-slate-800">头像</div>
                       <p class="mt-1 text-xs text-slate-500">基础信息模块固定预留头像位，支持本地上传。</p>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-3">
                       <div class="flex h-[92px] w-[72px] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                         <img v-if="getAvatarField(section)?.value" :src="getAvatarField(section)?.value" class="h-full w-full object-cover" />
                         <span v-else class="text-xs text-slate-400">头像</span>
@@ -117,14 +119,14 @@
                   </div>
                 </div>
                 <div v-for="field in editableFields(section)" :key="field.id" class="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3">
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-wrap items-center gap-2">
                     <input
                       :id="getFieldFocusId(section.id, field.id)"
                       v-model="field.label"
                       class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
                       placeholder="字段名"
                     />
-                    <input v-model="field.key" class="w-[120px] rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-500" placeholder="字段 key" />
+                    <input v-model="field.key" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-500 sm:w-[120px]" placeholder="字段 key" />
                     <button type="button" class="rounded-lg border px-2 py-2 text-xs" :class="field.visible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'" @click="field.visible = !field.visible">
                       {{ field.visible ? '显示' : '隐藏' }}
                     </button>
@@ -153,14 +155,14 @@
 
                   <div class="space-y-3">
                     <div v-for="field in item.fields" :key="field.id" class="grid gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                      <div class="flex items-center gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
                         <input
                           :id="getFieldFocusId(section.id, field.id)"
                           v-model="field.label"
                           class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium"
                           placeholder="字段名"
                         />
-                        <input v-model="field.key" class="w-[120px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500" placeholder="字段 key" />
+                        <input v-model="field.key" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 sm:w-[120px]" placeholder="字段 key" />
                         <button type="button" class="rounded-lg border px-2 py-2 text-xs" :class="field.visible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'" @click="field.visible = !field.visible">
                           {{ field.visible ? '显示' : '隐藏' }}
                         </button>
@@ -172,14 +174,14 @@
                   </div>
 
                   <div class="mt-4 space-y-3">
-                    <div v-for="description in item.descriptions" :key="description.id" class="flex gap-2">
+                    <div v-for="description in item.descriptions" :key="description.id" class="flex flex-col gap-2 md:flex-row">
                       <textarea
                         :id="getDescriptionFocusId(section.id, description.id)"
                         v-model="description.text"
                         class="min-h-[68px] flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm leading-relaxed"
                         placeholder="描述内容"
                       />
-                      <div class="flex flex-col gap-2">
+                      <div class="flex gap-2 md:flex-col">
                         <button type="button" class="rounded-lg border px-2 py-2 text-xs" :class="description.visible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'" @click="description.visible = !description.visible">
                           {{ description.visible ? '显示' : '隐藏' }}
                         </button>

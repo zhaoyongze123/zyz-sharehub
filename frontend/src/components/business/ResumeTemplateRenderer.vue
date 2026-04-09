@@ -10,7 +10,7 @@
       >
         <template v-if="section.kind === 'basic'">
           <div :class="theme.basicHeaderClass">
-            <div class="flex-1 min-w-0">
+            <div class="resume-basic-content flex-1 min-w-0">
               <div :class="theme.basicTitleWrapClass">
                 <h1 :class="theme.nameClass">{{ basicPrimary.name?.value || document.name }}</h1>
                 <div v-if="basicPrimary.intent" :class="theme.intentClass">{{ basicPrimary.intent.value }}</div>
@@ -27,7 +27,7 @@
                   <span>{{ field.value }}</span>
                 </button>
               </div>
-              <div v-if="basicExtraFields.length" class="mt-4 flex flex-wrap gap-2">
+              <div v-if="basicExtraFields.length" class="resume-basic-extra mt-3 flex flex-wrap gap-2">
                 <button
                   v-for="field in basicExtraFields"
                   :key="field.id"
@@ -241,6 +241,7 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
   align-items: center;
   color: #475569;
   font-size: 12px;
+  line-height: 1.2;
 }
 
 .resume-inline-label,
@@ -253,10 +254,19 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: rgba(241, 245, 249, 0.85);
-  font-size: 11px;
+  font-size: 10.5px;
+  line-height: 1.15;
+}
+
+.resume-basic-content {
+  min-width: 0;
+}
+
+.resume-basic-extra {
+  align-items: center;
 }
 
 .resume-avatar-slot {
