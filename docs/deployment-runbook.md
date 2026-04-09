@@ -56,8 +56,16 @@ npx playwright test tests/e2e/module-smoke.spec.ts
 cd /Users/mac/Documents/New\ project/frontend
 PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
 PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
+PLAYWRIGHT_USER_KEY='playwright-user' \
+PLAYWRIGHT_ADMIN_TOKEN='dev-admin-token' \
 npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 ```
+
+说明：
+
+- `full-site-walkthrough.spec.ts` 会通过真实接口创建 1 条笔记、1 条资料、1 条路线用于页面闭环验证
+- 后台治理页依赖管理员透传头；默认联调值为 `dev-admin-token`
+- 若目标环境改了测试账号或管理员 token，需同步覆盖 `PLAYWRIGHT_USER_KEY`、`PLAYWRIGHT_ADMIN_TOKEN`
 
 ## 夜间自动化
 

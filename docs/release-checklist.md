@@ -19,8 +19,15 @@
 cd /Users/mac/Documents/New\ project/frontend
 PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
 PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
+PLAYWRIGHT_USER_KEY='playwright-user' \
+PLAYWRIGHT_ADMIN_TOKEN='dev-admin-token' \
 npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 ```
+
+- 已确认走查账号与权限上下文：
+  - 普通用户：`PLAYWRIGHT_USER_KEY`
+  - 后台管理员透传头：`PLAYWRIGHT_ADMIN_TOKEN`
+- 已知走查会创建真实笔记、资料、路线测试数据，发布前后需允许这类验证写入
 
 ## 发布中
 
