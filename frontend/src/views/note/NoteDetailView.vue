@@ -14,12 +14,15 @@
     <section class="detail-main">
       <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
         <template #actions>
-          <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
-          <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
+          <BaseButton disabled>收藏笔记待接接口</BaseButton>
+          <BaseButton variant="secondary" disabled>举报待接接口</BaseButton>
         </template>
       </HeroBanner>
 
-      <InteractionBar :likes="likes" :favorites="favorites" @like="likeNote" @favorite="favoriteNote" @report="reportVisible = true" />
+      <div class="glass-panel interaction-pending" data-testid="note-detail-interaction-pending">
+        <p class="interaction-pending__title">互动能力待接后端</p>
+        <p>当前页面已切到真实笔记详情读取，点赞、收藏、举报接口尚未提供，已移除本地模拟成功反馈。</p>
+      </div>
 
       <article class="glass-panel markdown-panel" v-html="renderedHtml"></article>
 
@@ -43,8 +46,6 @@
       <NoteOutline :items="noteOutline" />
       <BaseEmpty title="笔记状态" :description="noteStatusDescription" />
     </aside>
-
-    <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
   </div>
 
   <div v-else-if="notFound" class="page-shell">
@@ -67,23 +68,15 @@ import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import HeroBanner from '@/components/business/HeroBanner.vue'
-import InteractionBar from '@/components/business/InteractionBar.vue'
 import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
-import ReportDialog from '@/components/business/ReportDialog.vue'
-import { useAppStore } from '@/stores/app'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-const appStore = useAppStore()
-const reportVisible = ref(false)
-const reportReason = ref('')
 const loading = ref(true)
 const notFound = ref(false)
 const note = ref<NoteDTO | null>(null)
-const likes = ref(0)
-const favorites = ref(0)
 
 const noteSummary = computed(() => extractSummary(note.value?.contentMd || ''))
 const noteOutline = computed(() => extractOutline(note.value?.contentMd || ''))
@@ -114,8 +107,6 @@ async function loadNote() {
   loading.value = true
   notFound.value = false
   note.value = null
-  likes.value = 0
-  favorites.value = 0
 
   try {
     note.value = await fetchNoteDetail(Number(route.params.id))
@@ -127,22 +118,6 @@ async function loadNote() {
   } finally {
     loading.value = false
   }
-}
-
-function likeNote() {
-  likes.value += 1
-  appStore.showToast('已点赞', '这篇笔记已加入你的点赞记录')
-}
-
-function favoriteNote() {
-  favorites.value += 1
-  appStore.showToast('已收藏', '可在个人中心继续回看')
-}
-
-function submitReport() {
-  reportVisible.value = false
-  appStore.showToast('举报已提交', reportReason.value || '已进入处理队列')
-  reportReason.value = ''
 }
 
 function extractSummary(content: string) {
@@ -194,6 +169,17 @@ onMounted(() => {
 .markdown-panel,
 .panel {
   padding: var(--space-6);
+}
+
+.interaction-pending {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.interaction-pending__title {
+  margin: 0;
+  font-weight: 600;
 }
 
 .markdown-panel :deep(h1),

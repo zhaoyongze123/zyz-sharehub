@@ -387,6 +387,9 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   await expect(page.locator('.markdown-panel')).toContainText('Playwright detail paragraph')
   await expect(page.locator('.outline')).toContainText('第一节')
   await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
+  await expect(page.getByTestId('note-detail-interaction-pending')).toContainText('当前页面已切到真实笔记详情读取')
+  await expect(page.getByRole('button', { name: '收藏笔记待接接口' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '举报待接接口' })).toBeDisabled()
 })
 
 test('resumes 模块真接口联调', async ({ page, request }) => {
