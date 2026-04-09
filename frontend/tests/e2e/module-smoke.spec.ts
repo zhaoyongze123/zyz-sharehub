@@ -139,6 +139,7 @@ test('简历模块 smoke', async ({ page }) => {
   await loginAs(page, 'user')
   await page.goto('/resume')
   await expect(page.getByRole('button', { name: '导出 PDF' })).toBeVisible()
+  await expect(page.getByTestId('resume-workbench-summary')).toContainText('累计')
 
   const apiResponse = await browserFetch(page, '/api/resumes?page=1&pageSize=5', {
     'X-User-Key': userKey
@@ -147,6 +148,12 @@ test('简历模块 smoke', async ({ page }) => {
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+
+  const firstResume = apiResponse.json?.data?.items?.[0]
+  if (firstResume) {
+    await expect(page.getByText(firstResume.fileName || `resume-${firstResume.id}.pdf`).first()).toBeVisible()
+    await expect(page.getByTestId(`resume-server-item-${firstResume.id}`)).toBeVisible()
+  }
 })
 
 test('个人中心模块 smoke', async ({ page }) => {
@@ -173,6 +180,16 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(Array.isArray(resourcesResponse.json?.data?.items)).toBeTruthy()
   if (resourcesResponse.json?.data?.items?.length) {
     await expect(page.getByRole('link', { name: resourcesResponse.json.data.items[0].title }).first()).toBeVisible()
+  }
+
+  const resumesResponse = await browserFetch(page, '/api/me/resumes?page=1&pageSize=5', {
+    'X-User-Key': userKey
+  })
+  expect(resumesResponse.ok).toBeTruthy()
+  expect(Array.isArray(resumesResponse.json?.data?.items)).toBeTruthy()
+  if (resumesResponse.json?.data?.items?.length) {
+    const firstResume = resumesResponse.json.data.items[0]
+    await expect(page.getByText(firstResume.fileName || `resume-${firstResume.id}.pdf`).first()).toBeVisible()
   }
 })
 
