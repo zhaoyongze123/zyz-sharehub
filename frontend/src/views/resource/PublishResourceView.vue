@@ -43,18 +43,11 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-const categoryOptions = computed(() =>
-  Array.from(
-    new Set(
-      resourceCategoryOptions
-        .map((item) => item?.trim())
-        .filter((item): item is string => Boolean(item))
-    )
-  )
-    .filter((item) => item !== '全部')
-    .map((item) => ({ label: item, value: item }))
-)
-const defaultCategory = computed(() => categoryOptions.value[0]?.value || '')
+// 直接复用真实接口的分类枚举，彻底去掉 mock 依赖
+const categoryOptions = resourceCategoryOptions
+  .filter((item) => item !== '全部')
+  .map((item) => ({ label: item, value: item }))
+const defaultCategory = computed(() => categoryOptions[0]?.value || '')
 const form = reactive({
   title: '',
   category: defaultCategory.value,
