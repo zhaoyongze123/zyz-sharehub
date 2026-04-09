@@ -51,16 +51,29 @@ export interface ResumeWorkbenchData {
 }
 
 function formatDate(value: string | null | undefined) {
-  return value ? value.slice(0, 16).replace('T', ' ') : '未知时间'
+  const normalized = value?.trim()
+  return normalized ? normalized.slice(0, 16).replace('T', ' ') : '未知时间'
+}
+
+function getResumeTimestamp(dto: ResumeDto) {
+  const updated = dto.fileUpdatedAt ? Date.parse(dto.fileUpdatedAt) : NaN
+  if (Number.isFinite(updated)) {
+    return updated
+  }
+  const created = dto.fileCreatedAt ? Date.parse(dto.fileCreatedAt) : NaN
+  return Number.isFinite(created) ? created : 0
 }
 
 function normalizeResume(dto: ResumeDto): ResumeItem {
+  const templateKey = dto.templateKey?.trim() || 'default'
+  const fallbackFileName = `resume-${templateKey}.pdf`
+
   return {
     id: dto.id,
-    templateKey: dto.templateKey?.trim() || 'default',
+    templateKey,
     status: dto.status?.trim() || 'UNKNOWN',
     fileUrl: dto.fileUrl?.trim() || `/api/resumes/${dto.id}/download`,
-    fileName: dto.fileName?.trim() || `resume-${dto.id}.pdf`,
+    fileName: dto.fileName?.trim() || fallbackFileName,
     fileSize: dto.fileSize ?? 0,
     createdAt: formatDate(dto.fileCreatedAt),
     updatedAt: formatDate(dto.fileUpdatedAt)
@@ -87,8 +100,13 @@ export async function fetchResumes(page = 1, pageSize = 10) {
     params: { page, pageSize }
   })
 
+  const sortedItems = [...(response.data.data.items ?? [])].sort((a, b) => {
+    const diff = getResumeTimestamp(b) - getResumeTimestamp(a)
+    return diff !== 0 ? diff : b.id - a.id
+  })
+
   return {
-    items: response.data.data.items.map(normalizeResume),
+    items: sortedItems.map(normalizeResume),
     total: response.data.data.total,
     page: response.data.data.page,
     pageSize: response.data.data.pageSize
