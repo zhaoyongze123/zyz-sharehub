@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page, type Response } from '@playwright/test'
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
 const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
@@ -33,6 +33,27 @@ function normalizeAuditAction(action: string) {
     .filter(Boolean)
     .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
     .join(' ')
+}
+
+async function waitForResponses(
+  page: Page,
+  predicate: (response: Response) => boolean,
+  count: number
+) {
+  return new Promise<Response[]>((resolve) => {
+    const responses: Response[] = []
+    const handler = (response: Response) => {
+      if (!predicate(response)) {
+        return
+      }
+      responses.push(response)
+      if (responses.length >= count) {
+        page.off('response', handler)
+        resolve(responses)
+      }
+    }
+    page.on('response', handler)
+  })
 }
 
 async function createAdminUser(request: Parameters<typeof test>[0]['request'], login: string) {
@@ -324,16 +345,11 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
     response.request().method() === 'POST' &&
     !response.url().includes('/nodes')
   )
-  const firstNodeResponsePromise = page.waitForResponse((response) =>
+  const nodeResponsesPromise = waitForResponses(page, (response) =>
     response.url().includes('/api/roadmaps/') &&
     response.url().includes('/nodes') &&
     response.request().method() === 'POST'
-  )
-  const secondNodeResponsePromise = page.waitForResponse((response) =>
-    response.url().includes('/api/roadmaps/') &&
-    response.url().includes('/nodes') &&
-    response.request().method() === 'POST'
-  )
+  , 2)
 
   await page.getByTestId('publish-roadmap-submit').click()
 
@@ -342,12 +358,12 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   const createBody = await createResponse.json()
   const createdId = createBody.data.id as number
 
-  const firstNodeResponse = await firstNodeResponsePromise
-  const secondNodeResponse = await secondNodeResponsePromise
-  expect(firstNodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
-  expect(secondNodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
-  expect(firstNodeResponse.ok()).toBeTruthy()
-  expect(secondNodeResponse.ok()).toBeTruthy()
+  const nodeResponses = await nodeResponsesPromise
+  expect(nodeResponses).toHaveLength(2)
+  for (const nodeResponse of nodeResponses) {
+    expect(nodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
+    expect(nodeResponse.ok()).toBeTruthy()
+  }
 
   await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${createdId}`)
   await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')

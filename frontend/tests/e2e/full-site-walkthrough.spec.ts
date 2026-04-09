@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page, type Response } from '@playwright/test'
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
 const userKey = process.env.PLAYWRIGHT_USER_KEY || 'playwright-user'
@@ -51,6 +51,23 @@ async function createPublishedNote(request: APIRequestContext, title: string) {
   expect(response.ok()).toBeTruthy()
   const body = await response.json()
   return body.data.id as number
+}
+
+async function waitForResponses(page: Page, predicate: (response: Response) => boolean, count: number) {
+  return new Promise<Response[]>((resolve) => {
+    const responses: Response[] = []
+    const handler = (response: Response) => {
+      if (!predicate(response)) {
+        return
+      }
+      responses.push(response)
+      if (responses.length >= count) {
+        page.off('response', handler)
+        resolve(responses)
+      }
+    }
+    page.on('response', handler)
+  })
 }
 
 test.describe.configure({ mode: 'serial' })
@@ -269,14 +286,10 @@ test('发布页走查', async ({ page, request }) => {
     response.request().method() === 'POST' &&
     !response.url().includes('/nodes')
   )
-  const firstNodeResponsePromise = page.waitForResponse((response) =>
+  const nodeResponsesPromise = waitForResponses(page, (response) =>
     response.url().includes('/nodes') &&
     response.request().method() === 'POST'
-  )
-  const secondNodeResponsePromise = page.waitForResponse((response) =>
-    response.url().includes('/nodes') &&
-    response.request().method() === 'POST'
-  )
+  , 2)
 
   await page.getByTestId('publish-roadmap-submit').click()
 
@@ -285,10 +298,12 @@ test('发布页走查', async ({ page, request }) => {
   const roadmapCreateBody = await roadmapCreateResponse.json()
   const roadmapId = roadmapCreateBody.data.id as number
 
-  const firstNodeResponse = await firstNodeResponsePromise
-  const secondNodeResponse = await secondNodeResponsePromise
-  expect(firstNodeResponse.ok()).toBeTruthy()
-  expect(secondNodeResponse.ok()).toBeTruthy()
+  const nodeResponses = await nodeResponsesPromise
+  expect(nodeResponses).toHaveLength(2)
+  for (const nodeResponse of nodeResponses) {
+    expect(nodeResponse.url()).toContain(`/api/roadmaps/${roadmapId}/nodes`)
+    expect(nodeResponse.ok()).toBeTruthy()
+  }
 
   await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${roadmapId}`)
   await page.getByRole('link', { name: '查看详情页' }).click()
