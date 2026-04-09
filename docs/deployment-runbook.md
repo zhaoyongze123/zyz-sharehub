@@ -67,6 +67,12 @@ npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 - 后台治理页依赖管理员透传头；默认联调值为 `dev-admin-token`
 - 若目标环境改了测试账号或管理员 token，需同步覆盖 `PLAYWRIGHT_USER_KEY`、`PLAYWRIGHT_ADMIN_TOKEN`
 
+最近一次本地复核：
+
+- 复核时间：2026-04-10 03:06 +0800
+- 复核环境：前端 `http://127.0.0.1:14173`，后端 `http://127.0.0.1:18080`
+- 复核结果：`tests/e2e/full-site-walkthrough.spec.ts` 7/7 通过
+
 ## 夜间自动化
 
 启动：
