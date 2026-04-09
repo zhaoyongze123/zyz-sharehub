@@ -106,10 +106,10 @@ public class ResumeController {
     public ApiResponse<String> delete(Authentication authentication, HttpServletRequest request, @PathVariable Long id) {
         String ownerKey = requireActiveUser(authentication, request);
         ResumeDto resume = resumeRepository.findOwned(id, ownerKey);
+        resumeRepository.delete(id, ownerKey);
         if (resume.fileId() != null) {
             fileRepository.deleteById(resume.fileId());
         }
-        resumeRepository.delete(id, ownerKey);
         return ApiResponse.ok("DELETED");
     }
 

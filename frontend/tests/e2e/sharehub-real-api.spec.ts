@@ -290,6 +290,25 @@ test('resumes 模块真接口联调', async ({ page, request }) => {
   await page.getByTestId(`resume-download-${generatedId}`).click()
   const browserDownload = await downloadPromise
   expect(browserDownload.suggestedFilename()).toContain('resume-modern')
+
+  const deleteResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/resumes/${generatedId}`) && response.request().method() === 'DELETE'
+  )
+  const reloadAfterDeletePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resumes?page=1&pageSize=10') && response.request().method() === 'GET'
+  )
+  await page.getByTestId(`resume-delete-${generatedId}`).click()
+  const deleteResponse = await deleteResponsePromise
+  expect(deleteResponse.ok()).toBeTruthy()
+  await reloadAfterDeletePromise
+  await expect(page.getByTestId(`resume-server-item-${generatedId}`)).toHaveCount(0)
+
+  const listAfterDeleteResponse = await request.get(`${apiBaseUrl}/api/resumes?page=1&pageSize=10`, {
+    headers: userHeaders()
+  })
+  expect(listAfterDeleteResponse.ok()).toBeTruthy()
+  const listAfterDeleteBody = await listAfterDeleteResponse.json()
+  expect(listAfterDeleteBody.data.items.some((item: { id: number }) => item.id === generatedId)).toBeFalsy()
 })
 
 test('me 模块真接口联调', async ({ page, request }) => {
