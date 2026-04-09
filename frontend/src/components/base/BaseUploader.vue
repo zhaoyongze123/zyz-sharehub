@@ -49,6 +49,14 @@ function onSelect(event: Event) {
   emit('select', file)
 }
 
+function openFileDialog() {
+  fileInput.value?.click()
+}
+
+defineExpose({
+  openFileDialog
+})
+
 watch(
   () => props.file,
   (next) => {

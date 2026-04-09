@@ -40,6 +40,7 @@
           <div class="hero-upload-card">
             <p class="upload-title">头像上传</p>
             <BaseUploader
+              ref="avatarUploaderRef"
               hint="选择图片后立即走 `/api/auth/avatar` 真上传，并刷新个人中心头像。"
               :file="selectedAvatarFile"
               accept="image/*"
@@ -49,7 +50,13 @@
               @select="handleAvatarSelected"
             />
           </div>
-          <button class="btn-outline" type="button" :disabled="avatarUploading" data-testid="profile-avatar-upload">
+          <button
+            class="btn-outline"
+            type="button"
+            :disabled="avatarUploading"
+            data-testid="profile-avatar-upload"
+            @click="triggerAvatarUpload"
+          >
             {{ avatarUploading ? '头像上传中...' : '通过真实接口上传头像' }}
           </button>
           <button class="btn-outline" type="button" disabled>资料编辑待接写接口</button>
@@ -148,6 +155,7 @@ const loading = ref(true)
 const loadError = ref(false)
 const avatarUploading = ref(false)
 const selectedAvatarFile = ref<File | null>(null)
+const avatarUploaderRef = ref<InstanceType<typeof BaseUploader> | null>(null)
 
 const status = computed(() => {
   if (loading.value) return 'loading'
@@ -219,6 +227,10 @@ async function handleAvatarSelected(file: File | null) {
     avatarUploading.value = false
     selectedAvatarFile.value = null
   }
+}
+
+function triggerAvatarUpload() {
+  avatarUploaderRef.value?.openFileDialog()
 }
 
 onMounted(() => {
