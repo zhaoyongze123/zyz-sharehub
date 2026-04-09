@@ -581,7 +581,8 @@ test('me 模块真接口联调', async ({ page, request }) => {
 
 test('admin 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('admin'))
-  await createPublishedResource(request, `Admin Resource ${Date.now()}`)
+  const adminResourceTitle = `Admin Resource ${Date.now()}`
+  await createPublishedResource(request, adminResourceTitle)
   const managedUserLogin = `admin-user-${Date.now()}`
   const managedUserId = await createAdminUser(request, managedUserLogin)
 
@@ -634,6 +635,25 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   }
   const targetUser = usersBody.data.items.find((item) => item.id === managedUserId)
   expect(targetUser).toBeTruthy()
+
+  const resourcesResponse = await request.get(`${apiBaseUrl}/api/resources?page=0&pageSize=100`, {
+    headers: userHeaders()
+  })
+  expect(resourcesResponse.ok()).toBeTruthy()
+  const resourcesBody = await resourcesResponse.json() as {
+    data: {
+      items: Array<{
+        id: number
+        title: string
+        type: string | null
+        category: string | null
+      }>
+      total: number
+    }
+  }
+  const taxonomyResource = resourcesBody.data.items.find((item) => item.title === adminResourceTitle) ?? resourcesBody.data.items[0]
+  expect(taxonomyResource).toBeTruthy()
+  const taxonomyName = taxonomyResource.category?.trim() || taxonomyResource.type?.trim() || '未分类'
 
   await loginAs(page, 'admin')
   await page.goto('/admin')
@@ -722,4 +742,14 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   expect(listAfterBan.ok()).toBeTruthy()
   const listAfterBanBody = await listAfterBan.json()
   expect(listAfterBanBody.data.items.some((item: { id: number, status: string }) => item.id === managedUserId && item.status === 'BANNED')).toBeTruthy()
+
+  await page.goto('/admin/taxonomy')
+  await expect(page.getByRole('heading', { name: '标签分类管理' })).toBeVisible()
+  await expect(page.getByTestId('admin-taxonomy-summary')).toContainText(
+    `已读取 ${resourcesBody.data.items.length} / ${resourcesBody.data.total} 条真实资料`
+  )
+  await expect(page.getByRole('cell', { name: taxonomyName }).first()).toBeVisible()
+  await page.getByTestId('admin-taxonomy-readonly').first().click()
+  await expect(page.locator('.global-toast').last()).toContainText('当前为只读概览')
+  await expect(page.locator('.global-toast').last()).toContainText(`已来自真实资料数据`)
 })
