@@ -439,6 +439,33 @@ test('后台模块 smoke', async ({ page }) => {
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+  const reportItems = apiResponse.json?.data?.items ?? []
+  const openReports = reportItems.filter((item: { status?: string }) => item.status === 'OPEN')
+  await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toContainText(String(openReports.length))
+  if (reportItems[0]) {
+    await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
+      `${reportItems[0].targetType} #${reportItems[0].targetId}`
+    )
+  }
+
+  const auditResponse = await browserFetch(page, '/api/admin/audit-logs?page=1&pageSize=5', {
+    'X-Admin-Token': adminToken
+  })
+  expect(auditResponse.ok).toBeTruthy()
+  expect(auditResponse.status).toBe(200)
+  expect(auditResponse.json?.success).toBeTruthy()
+  expect(Array.isArray(auditResponse.json?.data?.items)).toBeTruthy()
+
+  const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=5', {
+    'X-Admin-Token': adminToken
+  })
+  expect(usersResponse.ok).toBeTruthy()
+  expect(usersResponse.status).toBe(200)
+  expect(usersResponse.json?.success).toBeTruthy()
+  expect(Array.isArray(usersResponse.json?.data?.items)).toBeTruthy()
+  await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(
+    String(usersResponse.json?.data?.items?.length ?? 0)
+  )
 
   const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {
     'X-User-Key': userKey
@@ -455,6 +482,26 @@ test('后台模块 smoke', async ({ page }) => {
   )
   await expect(page.getByRole('cell', { name: firstResource.category || firstResource.type || '未分类' }).first()).toBeVisible()
   await expect(page.getByTestId('admin-taxonomy-readonly').first()).toBeVisible()
+
+  await page.goto('/admin/audit-logs')
+  await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
+  const firstAuditLog = auditResponse.json?.data?.items?.[0]
+  if (firstAuditLog) {
+    await expect(page.getByTestId(`admin-audit-log-row-${firstAuditLog.id}`)).toContainText(
+      `${firstAuditLog.targetType} #${firstAuditLog.targetId}`
+    )
+  } else {
+    await expect(page.getByText('暂无审计日志')).toBeVisible()
+  }
+
+  await page.goto('/admin/users')
+  await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
+  const firstUser = usersResponse.json?.data?.items?.[0]
+  if (firstUser) {
+    await expect(page.locator('tbody tr').filter({ hasText: firstUser.login }).first()).toContainText(firstUser.login)
+  } else {
+    await expect(page.getByText('暂无用户数据')).toBeVisible()
+  }
 })
 
 test('管理员拦截 smoke', async ({ page }) => {
