@@ -47,10 +47,10 @@ const uploadMode = ref('file')
 const categoryOptions = resourceCategoryOptions
   .filter((item) => item !== '全部')
   .map((item) => ({ label: item, value: item }))
-const defaultCategory = computed(() => categoryOptions[0]?.value || '')
+const defaultCategory = categoryOptions[0]?.value || ''
 const form = reactive({
   title: '',
-  category: defaultCategory.value,
+  category: defaultCategory,
   tags: '',
   url: '',
   summary: ''
