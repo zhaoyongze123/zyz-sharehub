@@ -9,15 +9,15 @@ const userKey = process.env.PLAYWRIGHT_USER_KEY || 'playwright-user'
 const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
 async function loginAs(page: Page, role: 'user' | 'admin') {
-  await page.addInitScript((selectedRole) => {
+  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
     window.localStorage.setItem('sharebase.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
     }
-  }, role)
+  }, { selectedRole: role, adminTokenValue: adminToken })
 }
 
 function shouldRun(name: string) {
@@ -470,10 +470,12 @@ test('后台模块 smoke', async ({ page }) => {
     item.status === 'OPEN' || item.status === '待处理'
   )
   await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toContainText(String(openReports.length))
-  if (reportItems[0]) {
+  if (openReports[0]) {
     await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
-      `${reportItems[0].targetType} #${reportItems[0].targetId}`
+      `${openReports[0].targetType} #${openReports[0].targetId}`
     )
+  } else {
+    await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText('暂无')
   }
 
   const auditResponse = await browserFetch(page, '/api/admin/audit-logs?page=1&pageSize=5', {

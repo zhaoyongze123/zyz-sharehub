@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
+const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 const enabledModules = new Set(
   (process.env.PLAYWRIGHT_MODULES || 'all')
     .split(',')
@@ -128,15 +129,15 @@ async function createPublicRoadmap(
 }
 
 async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 'admin') {
-  await page.addInitScript((selectedRole) => {
+  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
     window.localStorage.setItem('sharebase.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
     }
-  }, role)
+  }, { selectedRole: role, adminTokenValue: adminToken })
 }
 
 test.describe.configure({ mode: 'serial' })

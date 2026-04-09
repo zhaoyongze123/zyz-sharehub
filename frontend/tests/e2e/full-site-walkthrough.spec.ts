@@ -2,17 +2,18 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
 const userKey = process.env.PLAYWRIGHT_USER_KEY || 'playwright-user'
+const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
 async function loginAs(page: Page, role: 'user' | 'admin') {
-  await page.addInitScript((selectedRole) => {
+  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
     window.localStorage.setItem('sharebase.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
     }
-  }, role)
+  }, { selectedRole: role, adminTokenValue: adminToken })
 }
 
 async function apiFetch(request: APIRequestContext, path: string, headers: Record<string, string> = {}) {
