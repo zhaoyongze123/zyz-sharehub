@@ -56,6 +56,8 @@ cd /Users/mac/Documents/New\ project
 - `supervisor` 是唯一常驻进程，不再依赖 `launchd`
 - 当前轮次结束后，`supervisor` 会自动启动下一轮
 - 如果单轮执行超时、保活进程退出或状态文件异常，`supervisor` 会自动自愈
+- `supervisor` 会在每轮结束后执行一次“整站完成判定”；若所有机器可判定验收项都满足，则自动停止，不再继续下一轮
+- 当判定整站已完成时，会自动发一条飞书通知：`ShareHub 夜间推进已全部完成`
 - 夜间值守使用独立 `output/overnight/codex-home` 作为 `CODEX_HOME`，避免和桌面会话共享状态库
 - 到 09:00 后 supervisor 自动退出
 - 每轮调用 `codex exec`

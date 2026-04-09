@@ -31,6 +31,7 @@ START_EPOCH="$(date '+%s')"
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 mkdir -p "${RUN_DIR}" "${STATE_DIR}"
+chmod +x "${PROJECT_ROOT}/scripts/overnight-completion-check.py" 2>/dev/null || true
 
 if [[ "${OVERNIGHT_RUN_SNAPSHOT_ACTIVE:-0}" != "1" ]]; then
   cp "$0" "${SNAPSHOT_SCRIPT}"
