@@ -24,6 +24,7 @@ MODEL="${OVERNIGHT_FRONTEND_FOLLOWUP_MODEL:-gpt-5.1-codex-max}"
 CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
 BASE_BRANCH="$(git -C "${PROJECT_ROOT}" branch --show-current)"
 FOLLOW_ALL_MODULES="${OVERNIGHT_FRONTEND_FOLLOWUP_ALL_MODULES:-0}"
+WORKTREE_START_POINT=""
 
 mkdir -p "${FOLLOWUP_DIR}" "${WORKTREE_ROOT}"
 
@@ -82,6 +83,19 @@ sync_frontend_branch() {
     log "前端分支已完成 rebase：${branch}"
   else
     log "远端前端分支不存在，首次推送无需 rebase：${branch}"
+  fi
+}
+
+resolve_worktree_start_point() {
+  local branch="$1"
+
+  git -C "${PROJECT_ROOT}" fetch origin "${branch}" >> "${RAW_LOG_FILE}" 2>&1 || true
+  if git -C "${PROJECT_ROOT}" ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
+    WORKTREE_START_POINT="origin/${branch}"
+    log "前端工作树基线切换为远端前端分支：${WORKTREE_START_POINT}"
+  else
+    WORKTREE_START_POINT="${BASE_BRANCH}"
+    log "远端前端分支不存在，前端工作树基线回退到当前后端分支：${WORKTREE_START_POINT}"
   fi
 }
 
@@ -264,6 +278,7 @@ WORKTREE_DIR="${WORKTREE_ROOT}/${FRONTEND_BRANCH//\//-}-${RUN_DIR##*/}"
 FRONTEND_WORKDIR="${WORKTREE_DIR}/frontend"
 MODULE_CONTEXT="$(build_module_context "${MODULES}")"
 MODULE_DIRECTIVE="$(build_module_directive "${MODULES}")"
+resolve_worktree_start_point "${FRONTEND_BRANCH}"
 
 {
   cat "${PROMPT_TEMPLATE_FILE}"
@@ -296,6 +311,7 @@ MODULE_DIRECTIVE="$(build_module_directive "${MODULES}")"
 echo "FRONTEND_BRANCH=${FRONTEND_BRANCH}" >> "${META_FILE}"
 echo "WORKTREE_DIR=${WORKTREE_DIR}" >> "${META_FILE}"
 echo "FRONTEND_WORKDIR=${FRONTEND_WORKDIR}" >> "${META_FILE}"
+echo "WORKTREE_START_POINT=${WORKTREE_START_POINT}" >> "${META_FILE}"
 
 if [[ "${OVERNIGHT_FRONTEND_FOLLOWUP_DRY_RUN:-0}" == "1" ]]; then
   log "前端子代理 dry-run 完成，模块=${MODULES}，分支=${FRONTEND_BRANCH}"
@@ -310,9 +326,9 @@ cleanup() {
 
 trap cleanup EXIT
 
-git -C "${PROJECT_ROOT}" worktree add -B "${FRONTEND_BRANCH}" "${WORKTREE_DIR}" "${BASE_BRANCH}" >/dev/null
+git -C "${PROJECT_ROOT}" worktree add -B "${FRONTEND_BRANCH}" "${WORKTREE_DIR}" "${WORKTREE_START_POINT}" >/dev/null
 
-log "前端子代理工作树已创建，分支=${FRONTEND_BRANCH}"
+log "前端子代理工作树已创建，分支=${FRONTEND_BRANCH}，基线=${WORKTREE_START_POINT}"
 
 set +e
 python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" \

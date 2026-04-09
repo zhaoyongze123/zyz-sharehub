@@ -68,6 +68,9 @@ if [[ -z "${output_file}" ]]; then
 fi
 
 printf 'cwd=%s\n' "$(pwd)" > "${output_file}"
+if [[ -f README.md ]]; then
+  printf 'readme=%s\n' "$(tr '\n' '|' < README.md)" >> "${output_file}"
+fi
 cat >> "${output_file}"
 EOF
 
@@ -108,6 +111,7 @@ LAST_MESSAGE_FILE="${RUN_DIR}/frontend-followup/last-message.md"
 grep -q '模块直达上下文' "${PROMPT_FILE}" || { echo "module context missing"; exit 1; }
 grep -q 'frontend/src/views/resource/ResourceListView.vue' "${PROMPT_FILE}" || { echo "resource context missing"; exit 1; }
 grep -q '^FRONTEND_WORKDIR=' "${META_FILE}" || { echo "frontend workdir missing"; exit 1; }
+grep -q '^WORKTREE_START_POINT=test-branch' "${META_FILE}" || { echo "initial worktree start point missing"; exit 1; }
 grep -q '/frontend$' "${LAST_MESSAGE_FILE}" || { echo "codex cwd was not frontend"; exit 1; }
 
 git -C "${TEST_REMOTE}" show-ref --verify --quiet refs/heads/feature/frontend-real-api-resources || {
@@ -136,9 +140,12 @@ git -C "${REMOTE_CLONE}" push -q origin feature/frontend-real-api-resources
 }
 
 REBASE_LOG="${RUN_DIR_REBASE}/frontend-followup/codex-output.log"
+REBASE_META_FILE="${RUN_DIR_REBASE}/frontend-followup/meta.env"
 [[ -f "${REBASE_LOG}" ]] || { echo "rebase log missing"; exit 1; }
 grep -q '先执行 fetch + rebase' "${REBASE_LOG}" || { echo "fetch+rebase log missing"; exit 1; }
 grep -q '前端分支已完成 rebase' "${REBASE_LOG}" || { echo "rebase success log missing"; exit 1; }
+grep -q '^WORKTREE_START_POINT=origin/feature/frontend-real-api-resources' "${REBASE_META_FILE}" || { echo "rebase worktree start point missing"; exit 1; }
+grep -q '基线=origin/feature/frontend-real-api-resources' "${REBASE_LOG}" || { echo "worktree did not start from remote frontend branch"; exit 1; }
 
 UPDATED_REMOTE_CLONE="${TEST_ROOT}/remote-clone-verify"
 git clone -q "${TEST_REMOTE}" "${UPDATED_REMOTE_CLONE}"
