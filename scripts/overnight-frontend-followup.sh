@@ -31,6 +31,60 @@ log() {
   echo "[$(date '+%F %T')] $*" | tee -a "${RAW_LOG_FILE}"
 }
 
+extract_git_failure_reason() {
+  local log_file="$1"
+  python3 - <<'PY' "${log_file}"
+from pathlib import Path
+import sys
+
+content = Path(sys.argv[1]).read_text(encoding="utf-8", errors="ignore")
+
+checks = [
+    ("non-fast-forward", "远端分支领先，本地推送被非快进拒绝（non-fast-forward）"),
+    ("Updates were rejected because the tip of your current branch is behind", "远端分支领先，本地分支落后，需先同步后再推送"),
+    ("failed to push some refs", "Git 拒绝推送 refs，需要先同步远端分支"),
+    ("CONFLICT", "rebase 过程中出现真实代码冲突，需要人工处理"),
+    ("could not apply", "rebase 无法自动应用补丁，存在真实代码冲突"),
+]
+
+for needle, message in checks:
+    if needle in content:
+        print(message)
+        break
+else:
+    last_lines = [line.strip() for line in content.splitlines() if line.strip()][-8:]
+    print("Git 操作失败，关键信息：" + " | ".join(last_lines) if last_lines else "Git 操作失败，日志中未提取到更明确原因")
+PY
+}
+
+sync_frontend_branch() {
+  local branch="$1"
+
+  if git -C "${WORKTREE_DIR}" ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
+    log "检测到远端前端分支已存在，先执行 fetch + rebase：${branch}"
+    git -C "${WORKTREE_DIR}" fetch origin "${branch}" >> "${RAW_LOG_FILE}" 2>&1
+    if ! git -C "${WORKTREE_DIR}" rebase "origin/${branch}" >> "${RAW_LOG_FILE}" 2>&1; then
+      local reason
+      reason="$(extract_git_failure_reason "${RAW_LOG_FILE}")"
+      log "前端子代理 rebase 失败：${reason}"
+      python3 "${NOTIFY_SCRIPT}" \
+        --event "前端子代理异常" \
+        --status "需关注" \
+        --run-id "${RUN_DIR##*/}" \
+        --module "${MODULES}" \
+        --frontend-branch "${FRONTEND_BRANCH}" \
+        --duration-seconds "${DURATION_SECONDS}" \
+        --reason "前端子代理 rebase 失败：${reason}" \
+        --evidence "${FOLLOWUP_DIR}/codex-output.log" \
+        >> "${RAW_LOG_FILE}" 2>&1 || true
+      exit 1
+    fi
+    log "前端分支已完成 rebase：${branch}"
+  else
+    log "远端前端分支不存在，首次推送无需 rebase：${branch}"
+  fi
+}
+
 read_meta_value() {
   local key="$1"
   local file="$2"
@@ -253,8 +307,11 @@ if [[ ${EXIT_CODE} -ne 0 ]]; then
   exit "${EXIT_CODE}"
 fi
 
+sync_frontend_branch "${FRONTEND_BRANCH}"
+
 if ! git -C "${WORKTREE_DIR}" push origin "${FRONTEND_BRANCH}" >> "${RAW_LOG_FILE}" 2>&1; then
-  log "前端子代理 push 失败"
+  PUSH_REASON="$(extract_git_failure_reason "${RAW_LOG_FILE}")"
+  log "前端子代理 push 失败：${PUSH_REASON}"
   python3 "${NOTIFY_SCRIPT}" \
     --event "前端子代理异常" \
     --status "需关注" \
@@ -262,7 +319,7 @@ if ! git -C "${WORKTREE_DIR}" push origin "${FRONTEND_BRANCH}" >> "${RAW_LOG_FIL
     --module "${MODULES}" \
     --frontend-branch "${FRONTEND_BRANCH}" \
     --duration-seconds "${DURATION_SECONDS}" \
-    --reason "前端子代理 push 失败" \
+    --reason "前端子代理 push 失败：${PUSH_REASON}" \
     --evidence "${FOLLOWUP_DIR}/codex-output.log" \
     >> "${RAW_LOG_FILE}" 2>&1 || true
   exit 1
