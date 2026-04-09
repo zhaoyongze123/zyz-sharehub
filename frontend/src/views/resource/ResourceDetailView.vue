@@ -1,5 +1,16 @@
 <template>
-  <div class="page-shell detail-grid" v-if="resource">
+  <div v-if="loading" class="page-shell detail-grid">
+    <section class="detail-main">
+      <BaseSkeleton height="14rem" />
+      <BaseSkeleton height="10rem" />
+      <BaseSkeleton height="4rem" />
+    </section>
+    <aside class="detail-side">
+      <BaseSkeleton height="8rem" />
+    </aside>
+  </div>
+
+  <div class="page-shell detail-grid" v-else-if="resource">
     <section class="detail-main">
       <HeroBanner kicker="资料详情" :title="resource.title" :description="resource.summary">
         <template #actions>
@@ -39,7 +50,7 @@
       <div class="glass-panel panel">
         <div class="section-heading">
           <h2>评论区</h2>
-          <p>先用 mock 数据模拟真实社区反馈。</p>
+          <p>当前先保留页面侧静态评论占位，后续再接评论真接口。</p>
         </div>
         <CommentList :items="resourceComments" />
       </div>
@@ -53,19 +64,26 @@
     <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
   </div>
 
-  <div v-else class="page-shell">
+  <div v-else-if="notFound" class="page-shell">
     <BaseErrorState title="资料不存在" description="当前资源可能已下架，或你访问的 ID 不存在。">
       <BaseButton @click="router.push('/resources')">返回资料广场</BaseButton>
     </BaseErrorState>
   </div>
+
+  <div v-else class="page-shell">
+    <BaseErrorState title="资料加载失败" description="服务暂时不可用，请稍后刷新重试。" />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
+import { fetchRelatedResources, fetchResourceDetail, type ResourceItem } from '@/api/resources'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import BaseTag from '@/components/base/BaseTag.vue'
 import CommentList from '@/components/business/CommentList.vue'
 import HeroBanner from '@/components/business/HeroBanner.vue'
@@ -73,7 +91,6 @@ import InteractionBar from '@/components/business/InteractionBar.vue'
 import ReportDialog from '@/components/business/ReportDialog.vue'
 import ResourceCard from '@/components/business/ResourceCard.vue'
 import ResourceMeta from '@/components/business/ResourceMeta.vue'
-import { resourceComments, resources } from '@/mock/resources'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
@@ -81,11 +98,39 @@ const router = useRouter()
 const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
+const loading = ref(true)
+const notFound = ref(false)
+const resource = ref<ResourceItem | null>(null)
+const relatedResources = ref<ResourceItem[]>([])
+const likes = ref(0)
+const favorites = ref(0)
 
-const resource = computed(() => resources.find((item) => String(item.id) === String(route.params.id)))
-const relatedResources = computed(() => resources.filter((item) => item.id !== resource.value?.id).slice(0, 2))
-const likes = ref(resource.value?.likes ?? 0)
-const favorites = ref(resource.value?.favorites ?? 0)
+const resourceComments = [
+  { author: 'Mina', createdAt: '2 小时前', content: '资源详情已切到真实接口后，这里继续补评论真数据会更顺。' },
+  { author: 'Alex', createdAt: '昨天', content: '相关推荐已经来自后端，评论区下一轮可以继续收口。' }
+]
+
+async function loadResource() {
+  loading.value = true
+  notFound.value = false
+  resource.value = null
+  relatedResources.value = []
+
+  try {
+    const detail = await fetchResourceDetail(String(route.params.id))
+    resource.value = detail
+    likes.value = detail.likes
+    favorites.value = detail.favorites
+    relatedResources.value = await fetchRelatedResources(detail.id)
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? (error.response?.status ?? 0) : 0
+    if ([404, 410].includes(status)) {
+      notFound.value = true
+    }
+  } finally {
+    loading.value = false
+  }
+}
 
 function likeResource() {
   likes.value += 1
@@ -106,6 +151,14 @@ function submitReport() {
   appStore.showToast('举报已提交', reportReason.value || '已进入后台处理队列')
   reportReason.value = ''
 }
+
+watch(() => route.params.id, () => {
+  void loadResource()
+})
+
+onMounted(() => {
+  void loadResource()
+})
 </script>
 
 <style scoped lang="scss">
