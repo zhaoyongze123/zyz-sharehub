@@ -6,11 +6,21 @@
 - 关键文档已同步：
   - 接口文档
   - 实施文档
-  - 部署 / 演示材料
+  - `docs/deployment-runbook.md`
+  - `docs/release-checklist.md`
+  - `docs/demo-script.md`
 - 后端健康检查通过
 - 前端可正常打开
 - `module-smoke.spec.ts` 通过
 - `full-site-walkthrough.spec.ts` 通过
+- 全站走查执行命令已按当前联调地址复核：
+
+```bash
+cd /Users/mac/Documents/New\ project/frontend
+PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
+PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
+npx playwright test tests/e2e/full-site-walkthrough.spec.ts
+```
 
 ## 发布中
 
@@ -29,6 +39,7 @@
 - 检查后台页面权限拦截正常
 - 检查后台审计日志页可读取真实记录
 - 检查最近一次 Playwright 报告已生成
+- 若使用夜间脚本执行，确认报告位于 `output/overnight/*/browser-smoke/playwright-report`
 
 ## 回滚条件
 
