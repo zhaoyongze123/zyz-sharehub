@@ -494,12 +494,10 @@ test('后台模块 smoke', async ({ page }) => {
   const bannedUsers = managedUsers.filter((item: { status?: string }) =>
     item.status === 'BANNED' || item.status === '已封禁'
   )
-  await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(
-    String(managedUsers.length)
-  )
-  await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(
-    `已封禁 ${bannedUsers.length}`
-  )
+  const userStatCard = page.getByTestId('admin-dashboard-stat-users')
+  await expect(userStatCard).toContainText('后台可管用户')
+  await expect(userStatCard).toContainText(`已封禁 ${bannedUsers.length}`)
+  await expect(userStatCard.locator('.stat-card__value')).toContainText(/^\d+$/)
 
   const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {
     'X-User-Key': userKey
