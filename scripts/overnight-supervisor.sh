@@ -12,6 +12,8 @@ CHECK_INTERVAL_SECONDS="${OVERNIGHT_CHECK_INTERVAL_SECONDS:-20}"
 STALE_SECONDS="${OVERNIGHT_STALE_SECONDS:-4200}"
 RUN_SCRIPT="${PROJECT_ROOT}/scripts/overnight-hourly-run.sh"
 NOTIFY_SCRIPT="${PROJECT_ROOT}/scripts/feishu_notify.py"
+COMPLETION_CHECK_SCRIPT="${PROJECT_ROOT}/scripts/overnight-completion-check.py"
+COMPLETION_STATUS_FILE="${STATE_DIR}/completion-status.env"
 SUPERVISOR_PID_FILE="${STATE_DIR}/autopilot.pid"
 RUN_PID_FILE="${STATE_DIR}/current_run.pid"
 RUN_META_FILE="${STATE_DIR}/current_run.meta"
@@ -61,6 +63,10 @@ write_supervisor_pid() {
   echo "$$" > "${SUPERVISOR_PID_FILE}"
 }
 
+clear_completion_status() {
+  rm -f "${COMPLETION_STATUS_FILE}"
+}
+
 restart_caffeinate() {
   local seconds="$1"
   if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
@@ -104,6 +110,61 @@ ensure_caffeinate_alive() {
   fi
 }
 
+mark_completed_and_exit() {
+  local summary_file="$1"
+  local reason="$2"
+  local summary_text="已满足机器可判定完成标准"
+
+  if [[ -f "${summary_file}" ]]; then
+    summary_text="$(cat "${summary_file}")"
+  fi
+
+  log "检测到整站已满足完成标准，停止夜间自动推进"
+  stop_current_run_if_any
+  if [[ -f "${CAFFEINATE_PID_FILE}" ]]; then
+    local pid
+    pid="$(cat "${CAFFEINATE_PID_FILE}" 2>/dev/null || true)"
+    if [[ -n "${pid}" ]]; then
+      kill "${pid}" >/dev/null 2>&1 || true
+    fi
+    rm -f "${CAFFEINATE_PID_FILE}"
+  fi
+
+  python3 "${NOTIFY_SCRIPT}" \
+    --event "夜间推进已全部完成" \
+    --status "成功" \
+    --completion-status "整站机器可判定验收已通过" \
+    --reason "${reason}" \
+    --action "已自动停止 supervisor 与保活进程" \
+    --result "${summary_text}" \
+    --evidence "${summary_file}" \
+    >> "${LOG_FILE}" 2>&1 || true
+  exit 0
+}
+
+check_project_completion() {
+  if [[ ! -f "${COMPLETION_CHECK_SCRIPT}" ]]; then
+    return 1
+  fi
+
+  set +e
+  python3 "${COMPLETION_CHECK_SCRIPT}" \
+    --project-root "${PROJECT_ROOT}" \
+    --output "${COMPLETION_STATUS_FILE}" \
+    >> "${LOG_FILE}" 2>&1
+  local exit_code=$?
+  set -e
+
+  if [[ ${exit_code} -ne 0 ]]; then
+    return 1
+  fi
+
+  local summary_file reason
+  summary_file="$(awk -F'=' '$1=="SUMMARY_FILE"{print substr($0, index($0, "=") + 1); exit}' "${COMPLETION_STATUS_FILE}" 2>/dev/null || true)"
+  reason="$(awk -F'=' '$1=="REASON"{print substr($0, index($0, "=") + 1); exit}' "${COMPLETION_STATUS_FILE}" 2>/dev/null || true)"
+  mark_completed_and_exit "${summary_file}" "${reason:-所有批次验收项已满足}"
+}
+
 ensure_deadline() {
   if [[ "$(date '+%s')" -ge "${DEADLINE_EPOCH}" ]]; then
     log "已到截止时间，停止夜间自动推进"
@@ -125,6 +186,7 @@ ensure_deadline() {
       >> "${LOG_FILE}" 2>&1 || true
     exit 0
   fi
+  clear_completion_status
 }
 
 start_run() {
@@ -202,6 +264,9 @@ handle_stale_run() {
 
   if [[ -n "${run_pid}" ]]; then
     log "检测到上一轮进程已退出，准备自动启动下一轮"
+    if check_project_completion; then
+      return
+    fi
     rm -f "${RUN_PID_FILE}" "${RUN_META_FILE}"
     start_run "上一轮结束后自动续跑"
   fi
@@ -219,6 +284,9 @@ ensure_run_alive() {
     return
   fi
   if [[ -z "${run_pid}" ]]; then
+    if check_project_completion; then
+      return
+    fi
     start_run "启动立即执行"
     return
   fi

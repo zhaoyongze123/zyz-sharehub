@@ -51,6 +51,8 @@ def build_structured_message(args: argparse.Namespace) -> str:
         lines.append(f"前端分支：{args.frontend_branch}")
     if args.stage:
         lines.append(f"阶段：{args.stage}")
+    if args.batch:
+        lines.append(f"批次：{args.batch}")
     if args.duration_seconds is not None:
         lines.append(f"耗时：{format_duration(args.duration_seconds)}")
     if args.commit:
@@ -69,6 +71,8 @@ def build_structured_message(args: argparse.Namespace) -> str:
         lines.append(f"动作：{args.action}")
     if args.impact:
         lines.append(f"影响：{args.impact}")
+    if args.completion_status:
+        lines.append(f"完成状态：{args.completion_status}")
     if args.result:
         lines.append(f"结果：{args.result}")
     if args.evidence:
@@ -163,6 +167,7 @@ def main() -> int:
     parser.add_argument("--module", help="模块")
     parser.add_argument("--frontend-branch", help="前端分支")
     parser.add_argument("--stage", help="阶段")
+    parser.add_argument("--batch", help="批次")
     parser.add_argument("--duration-seconds", type=int, help="耗时秒数")
     parser.add_argument("--commit", help="提交")
     parser.add_argument("--smoke", help="Smoke 状态")
@@ -172,6 +177,7 @@ def main() -> int:
     parser.add_argument("--reason", help="原因")
     parser.add_argument("--action", help="动作")
     parser.add_argument("--impact", help="影响")
+    parser.add_argument("--completion-status", help="整体完成状态")
     parser.add_argument("--result", help="结果")
     parser.add_argument("--evidence", help="证据路径")
     args = parser.parse_args()
