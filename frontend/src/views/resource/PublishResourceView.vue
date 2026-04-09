@@ -44,8 +44,8 @@ import { useAppStore } from '@/stores/app'
 const appStore = useAppStore()
 const uploadMode = ref('file')
 const categoryOptions = resourceCategoryOptions
-  .filter((item) => item !== '全部')
-  .map((item) => ({ label: item, value: item }))
+  .filter((item) => item && item.trim() !== '全部')
+  .map((item) => ({ label: item, value: item.trim() }))
 const defaultCategory = categoryOptions[0]?.value || ''
 const form = reactive({
   title: '',
