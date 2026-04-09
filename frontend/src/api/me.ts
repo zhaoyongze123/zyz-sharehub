@@ -48,6 +48,11 @@ interface PagedData<T> {
   items: T[]
 }
 
+interface StoredFileDto {
+  id: string
+  downloadUrl: string
+}
+
 export interface MeDashboardData {
   profile: {
     id: number
@@ -152,4 +157,17 @@ export async function fetchMeDashboard(): Promise<MeDashboardData> {
       updatedAt: formatDate(item.fileUpdatedAt)
     }))
   }
+}
+
+export async function uploadMyAvatar(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await apiClient.post<ApiResponse<StoredFileDto>>('/auth/avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+
+  return response.data.data
 }

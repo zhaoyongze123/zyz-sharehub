@@ -22,7 +22,7 @@
           <h1>个人资料</h1>
           <p class="hero-desc">当前页面已切到真实 `/api/me` 聚合数据，展示账号身份与工作台统计。</p>
           <div class="identity-row">
-            <div class="avatar">
+            <div class="avatar" data-testid="profile-avatar">
               <img v-if="dashboard.profile.avatarUrl" :src="dashboard.profile.avatarUrl" alt="avatar" />
               <span v-else>{{ dashboard.profile.displayName.slice(0, 1).toUpperCase() }}</span>
             </div>
@@ -37,7 +37,23 @@
           </div>
         </div>
         <div class="hero-actions">
-          <button class="btn-outline" type="button" disabled>头像上传待接后端</button>
+          <input
+            ref="avatarInputRef"
+            class="sr-only"
+            type="file"
+            accept="image/*"
+            data-testid="profile-avatar-input"
+            @change="handleAvatarSelected"
+          />
+          <button
+            class="btn-outline"
+            type="button"
+            :disabled="avatarUploading"
+            data-testid="profile-avatar-upload"
+            @click="triggerAvatarUpload"
+          >
+            {{ avatarUploading ? '头像上传中...' : '上传头像' }}
+          </button>
           <button class="btn-outline" type="button" disabled>资料编辑待接写接口</button>
         </div>
       </header>
@@ -122,13 +138,17 @@ import { computed, onMounted, ref } from 'vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
-import { fetchMeDashboard, type MeDashboardData } from '@/api/me'
+import { fetchMeDashboard, type MeDashboardData, uploadMyAvatar } from '@/api/me'
+import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
+const appStore = useAppStore()
 const authStore = useAuthStore()
 const dashboard = ref<MeDashboardData | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
+const avatarUploading = ref(false)
+const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 const status = computed(() => {
   if (loading.value) return 'loading'
@@ -176,6 +196,35 @@ async function loadDashboard() {
     loadError.value = true
   } finally {
     loading.value = false
+  }
+}
+
+function triggerAvatarUpload() {
+  avatarInputRef.value?.click()
+}
+
+async function handleAvatarSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) {
+    return
+  }
+
+  avatarUploading.value = true
+
+  try {
+    await uploadMyAvatar(file)
+    await loadDashboard()
+    if (dashboard.value?.profile.avatarUrl) {
+      authStore.updateProfile({
+        avatarUrl: dashboard.value.profile.avatarUrl
+      })
+    }
+    appStore.showToast('头像已更新', '个人中心已刷新为最新头像', 'success')
+  } finally {
+    avatarUploading.value = false
+    input.value = ''
   }
 }
 

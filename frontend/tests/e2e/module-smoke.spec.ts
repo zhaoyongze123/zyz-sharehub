@@ -172,6 +172,7 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(meResponse.json?.data).toBeTruthy()
   expect(meResponse.json?.data?.profile?.login).toBeTruthy()
   await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
+  await expect(page.getByTestId('profile-avatar-upload')).toBeEnabled()
 
   const resourcesResponse = await browserFetch(page, '/api/me/resources?page=1&pageSize=5', {
     'X-User-Key': userKey
