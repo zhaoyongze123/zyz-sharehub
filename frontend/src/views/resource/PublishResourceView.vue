@@ -43,8 +43,8 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-// 直接复用真实接口的分类枚举，过滤掉“全部”并清理空白
-const categoryOptions = resourceCategoryOptions
+// 直接复用真实接口的分类枚举，去重后过滤掉“全部”并清理空白
+const categoryOptions = Array.from(new Set(resourceCategoryOptions))
   .map((item) => item.trim())
   .filter((item) => item && item !== '全部')
   .map((item) => ({ label: item, value: item }))
