@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watchEffect } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
@@ -43,25 +43,28 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-// 直接复用真实接口的分类枚举，过滤空白、“全部”并去重，若后端暂未回传则给出兜底项
-const cleanedCategories = Array.from(
-  new Set(
-    resourceCategoryOptions
-      .map((item) => item?.trim())
-      .filter((item) => item && item !== '全部')
-  )
-)
-const publishCategoryOptions = (cleanedCategories.length ? cleanedCategories : ['未分类']).map((item) => ({
-  label: item,
-  value: item
-}))
-const defaultCategory = publishCategoryOptions[0]?.value || ''
+// 分类选项直接复用资源 API 暴露的常量，去掉 mock 依赖，并对缺省场景给出兜底。
+const publishCategoryOptions = computed(() => {
+  const cleaned = resourceCategoryOptions
+    .map((item) => item?.trim())
+    .filter((item) => item && item !== '全部')
+
+  const finalList = cleaned.length ? cleaned : ['未分类']
+  return finalList.map((item) => ({ label: item, value: item }))
+})
+
 const form = reactive({
   title: '',
-  category: defaultCategory,
+  category: '',
   tags: '',
   url: '',
   summary: ''
+})
+
+watchEffect(() => {
+  if (!form.category && publishCategoryOptions.value.length) {
+    form.category = publishCategoryOptions.value[0].value
+  }
 })
 
 const uploadModeItems = [
