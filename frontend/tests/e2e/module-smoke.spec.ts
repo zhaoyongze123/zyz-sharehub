@@ -150,6 +150,34 @@ test('社区笔记模块 smoke', async ({ page }) => {
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
 })
 
+test('笔记详情真实读取 smoke', async ({ page, request }) => {
+  test.skip(!shouldRun('notes'))
+  const noteTitle = `Smoke Note ${Date.now()}`
+  const createResponse = await request.post(`${apiBaseUrl}/api/notes`, {
+    headers: {
+      'X-User-Key': userKey,
+      'Content-Type': 'application/json'
+    },
+    data: {
+      title: noteTitle,
+      contentMd: `# ${noteTitle}\n\n这是 smoke 用例写入的真实正文。\n\n## 小节\nSmoke detail paragraph`,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED'
+    }
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const noteId = createBody.data.id as number
+
+  await loginAs(page, 'user')
+  await page.goto(`/notes/${noteId}`)
+  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.locator('.markdown-panel')).toContainText('这是 smoke 用例写入的真实正文。')
+  await expect(page.locator('.markdown-panel')).toContainText('Smoke detail paragraph')
+  await expect(page.locator('.outline')).toContainText('小节')
+  await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
+})
+
 test('简历模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('resumes'))
   await loginAs(page, 'user')
