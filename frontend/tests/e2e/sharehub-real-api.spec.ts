@@ -332,13 +332,12 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/publish/roadmap')
   await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
+  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
 
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过页面完成真实路线创建和节点追加闭环。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建')
-  await page.getByTestId('publish-roadmap-node-summary-0').fill('先创建路线主体。')
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：节点落库')
-  await page.getByTestId('publish-roadmap-node-summary-1').fill('再追加节点。')
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&

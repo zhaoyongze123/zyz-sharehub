@@ -275,12 +275,11 @@ test('发布页走查', async ({ page, request }) => {
 
   const roadmapTitle = `Walkthrough Roadmap ${Date.now()}`
   await page.goto('/publish/roadmap')
+  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过全站走查验证路线创建与节点追加闭环。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')
-  await page.getByTestId('publish-roadmap-node-summary-0').fill('先完成路线主体创建。')
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：追加节点')
-  await page.getByTestId('publish-roadmap-node-summary-1').fill('再写入真实节点。')
 
   const roadmapCreateResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&

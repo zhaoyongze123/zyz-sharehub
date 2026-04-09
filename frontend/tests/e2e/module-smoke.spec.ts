@@ -231,13 +231,12 @@ test('路线发布真实写入 smoke', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/publish/roadmap')
   await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
+  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
 
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过 smoke 用例验证路线创建与节点追加真实写入。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')
-  await page.getByTestId('publish-roadmap-node-summary-0').fill('先完成路线主体创建。')
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：写入节点')
-  await page.getByTestId('publish-roadmap-node-summary-1').fill('再完成真实节点写入。')
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&
