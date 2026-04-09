@@ -212,7 +212,13 @@
           红线代表 A4 分页线，导出时会自动去除
         </div>
         <div class="mx-auto w-[794px] min-w-[794px]">
-          <component :is="templateComponents[currentTemplate]" ref="resumeTemplateRef" :document="currentDocument" @focus-field="handleFocusField" />
+          <component
+            :is="templateComponents[currentTemplate]"
+            :key="previewRenderKey"
+            ref="resumeTemplateRef"
+            :document="currentDocument"
+            @focus-field="handleFocusField"
+          />
         </div>
       </section>
   </main>
@@ -376,6 +382,17 @@ const templateComponents: Record<TemplateKey, any> = {
 
 const currentDraft = computed(() => drafts.value.find((draft) => draft.id === currentDraftId.value) ?? null)
 const currentDocument = computed(() => currentDraft.value?.document ?? createEmptyDocument())
+const previewRenderKey = computed(() => {
+  if (!currentDraft.value) {
+    return `preview-empty-${currentTemplate.value}`
+  }
+
+  return JSON.stringify({
+    templateKey: currentTemplate.value,
+    draftName: currentDraft.value.name,
+    document: currentDraft.value.document
+  })
+})
 
 const currentTemplate = computed<TemplateKey>({
   get() {
