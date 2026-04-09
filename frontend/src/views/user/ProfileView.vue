@@ -37,22 +37,20 @@
           </div>
         </div>
         <div class="hero-actions">
-          <input
-            ref="avatarInputRef"
-            class="sr-only"
-            type="file"
-            accept="image/*"
-            data-testid="profile-avatar-input"
-            @change="handleAvatarSelected"
-          />
-          <button
-            class="btn-outline"
-            type="button"
-            :disabled="avatarUploading"
-            data-testid="profile-avatar-upload"
-            @click="triggerAvatarUpload"
-          >
-            {{ avatarUploading ? '头像上传中...' : '上传头像' }}
+          <div class="hero-upload-card">
+            <p class="upload-title">头像上传</p>
+            <BaseUploader
+              hint="选择图片后立即走 `/api/auth/avatar` 真上传，并刷新个人中心头像。"
+              :file="selectedAvatarFile"
+              accept="image/*"
+              :disabled="avatarUploading"
+              input-testid="profile-avatar-input"
+              @update:file="selectedAvatarFile = $event"
+              @select="handleAvatarSelected"
+            />
+          </div>
+          <button class="btn-outline" type="button" :disabled="avatarUploading" data-testid="profile-avatar-upload">
+            {{ avatarUploading ? '头像上传中...' : '通过真实接口上传头像' }}
           </button>
           <button class="btn-outline" type="button" disabled>资料编辑待接写接口</button>
         </div>
@@ -138,6 +136,7 @@ import { computed, onMounted, ref } from 'vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import BaseUploader from '@/components/base/BaseUploader.vue'
 import { fetchMeDashboard, type MeDashboardData, uploadMyAvatar } from '@/api/me'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -148,7 +147,7 @@ const dashboard = ref<MeDashboardData | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
 const avatarUploading = ref(false)
-const avatarInputRef = ref<HTMLInputElement | null>(null)
+const selectedAvatarFile = ref<File | null>(null)
 
 const status = computed(() => {
   if (loading.value) return 'loading'
@@ -199,14 +198,7 @@ async function loadDashboard() {
   }
 }
 
-function triggerAvatarUpload() {
-  avatarInputRef.value?.click()
-}
-
-async function handleAvatarSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-
+async function handleAvatarSelected(file: File | null) {
   if (!file) {
     return
   }
@@ -215,6 +207,7 @@ async function handleAvatarSelected(event: Event) {
 
   try {
     await uploadMyAvatar(file)
+    selectedAvatarFile.value = null
     await loadDashboard()
     if (dashboard.value?.profile.avatarUrl) {
       authStore.updateProfile({
@@ -224,7 +217,7 @@ async function handleAvatarSelected(event: Event) {
     appStore.showToast('头像已更新', '个人中心已刷新为最新头像', 'success')
   } finally {
     avatarUploading.value = false
-    input.value = ''
+    selectedAvatarFile.value = null
   }
 }
 
@@ -252,6 +245,17 @@ onMounted(() => {
   border-radius: 20px;
   background: linear-gradient(135deg, #0f172a, #1d4ed8);
   color: white;
+}
+
+.hero-upload-card {
+  display: grid;
+  gap: 8px;
+}
+
+.upload-title {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .hero-kicker {
@@ -313,6 +317,7 @@ onMounted(() => {
 }
 
 .hero-actions {
+  width: min(22rem, 100%);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
