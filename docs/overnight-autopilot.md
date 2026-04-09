@@ -9,6 +9,23 @@
 - 简历模块当前定义为纯前端界面能力，因此夜间自动化对简历只要求前端 smoke / 交互验收通过，不再要求 `/api/resumes/*` 真接口联调。
 - 进一步地，当前整站完成判定已不再把简历模块列为硬门槛，避免自动化继续围绕简历后端链路空转。
 
+## 当前完成态
+
+- 批次 1-3 已完成，当前整站完成判定依赖批次 4 的全站浏览器走查与收尾材料一致性
+- 批次 4 的核心验证命令如下：
+
+```bash
+cd /Users/mac/Documents/New\ project/frontend
+PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
+PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
+npx playwright test tests/e2e/full-site-walkthrough.spec.ts
+```
+
+- 只有当上述走查通过，且以下材料都存在并与当前联调方式一致时，夜间自动化才应判定整站完成：
+  - `docs/deployment-runbook.md`
+  - `docs/release-checklist.md`
+  - `docs/demo-script.md`
+
 ## 角色模型
 
 - 经理：读取需求、拆分任务、派发、审核、收口
