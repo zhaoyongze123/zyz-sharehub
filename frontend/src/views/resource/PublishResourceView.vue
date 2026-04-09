@@ -93,10 +93,12 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-const categoryOptions = resourceCategoryOptions
-  .filter((item) => item !== '全部')
-  .map((item) => ({ label: item, value: item }))
-const defaultCategory = computed(() => categoryOptions[0]?.value || '')
+const categoryOptions = computed(() =>
+  resourceCategoryOptions
+    .filter((item) => item !== '全部')
+    .map((item) => ({ label: item, value: item }))
+)
+const defaultCategory = computed(() => categoryOptions.value[0]?.value || '')
 const selectedFile = ref<File | null>(null)
 const isSubmitting = ref(false)
 const validationMessage = ref('')
