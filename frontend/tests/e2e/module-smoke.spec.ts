@@ -195,6 +195,26 @@ test('个人中心模块 smoke', async ({ page }) => {
   }
 })
 
+test('个人中心在 auth/me 失效时回跳登录页', async ({ page }) => {
+  test.skip(!shouldRun('profile'))
+  await loginAs(page, 'user')
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        code: 'UNAUTHORIZED',
+        msg: 'unauthorized'
+      })
+    })
+  })
+
+  await page.goto('/me')
+  await expect(page).toHaveURL(/\/login\?redirect=\/me$/)
+  await expect(page.getByRole('heading', { name: '用内容构建你的学习资产' })).toBeVisible()
+})
+
 test('后台模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('admin'))
   await loginAs(page, 'admin')

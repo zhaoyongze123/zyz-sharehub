@@ -78,21 +78,7 @@ export const useAuthStore = defineStore('auth', {
           this.profile = null
         }
       } catch (error) {
-        if (axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
-          this.profile = null
-        } else {
-          const savedRole = window.localStorage.getItem('sharebase.role')
-          if (savedRole === 'user' || savedRole === 'admin') {
-            const savedNickname = window.localStorage.getItem('sharebase.nickname')
-            const savedHeadline = window.localStorage.getItem('sharebase.headline')
-            this.profile = {
-              id: 1,
-              nickname: savedNickname || (savedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen'),
-              role: savedRole,
-              headline: savedHeadline || (savedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
-            }
-          }
-        }
+        this.profile = null
       } finally {
         this.initialized = true
       }
