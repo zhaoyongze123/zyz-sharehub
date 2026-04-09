@@ -176,6 +176,31 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
   await expect(page.locator('.markdown-panel')).toContainText('Smoke detail paragraph')
   await expect(page.locator('.outline')).toContainText('小节')
   await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
+
+  const reportResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/reports') && response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '举报' }).first().click()
+  await page.getByLabel('举报原因').fill('Smoke note detail report')
+  await page.getByRole('button', { name: '提交举报' }).click()
+  const reportResponse = await reportResponsePromise
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetId).toBe(noteId)
+  expect(reportBody.data.reason).toBe('Smoke note detail report')
+
+  const adminReportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
+    headers: {
+      'X-Admin-Token': adminToken
+    }
+  })
+  expect(adminReportsResponse.ok()).toBeTruthy()
+  const adminReportsBody = await adminReportsResponse.json()
+  const createdReport = (adminReportsBody.data.items as Array<{ targetId: number, reason: string }>).find((item) =>
+    item.targetId === noteId && item.reason === 'Smoke note detail report'
+  )
+  expect(createdReport).toBeTruthy()
 })
 
 test('简历模块 smoke', async ({ page }) => {

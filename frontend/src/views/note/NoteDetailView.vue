@@ -44,7 +44,12 @@
       <BaseEmpty title="笔记状态" :description="noteStatusDescription" />
     </aside>
 
-    <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
+    <ReportDialog
+      v-model:reason="reportReason"
+      :visible="reportVisible"
+      @close="closeReportDialog"
+      @submit="submitReport"
+    />
   </div>
 
   <div v-else-if="notFound" class="page-shell">
@@ -62,6 +67,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import { fetchNoteDetail, type NoteDTO } from '@/api/notes'
+import { createReport } from '@/api/reports'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
@@ -79,6 +85,7 @@ const router = useRouter()
 const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
+const reporting = ref(false)
 const loading = ref(true)
 const notFound = ref(false)
 const note = ref<NoteDTO | null>(null)
@@ -139,10 +146,30 @@ function favoriteNote() {
   appStore.showToast('已收藏', '可在个人中心继续回看')
 }
 
-function submitReport() {
+function closeReportDialog() {
   reportVisible.value = false
-  appStore.showToast('举报已提交', reportReason.value || '已进入处理队列')
   reportReason.value = ''
+}
+
+async function submitReport() {
+  if (!note.value || reporting.value) {
+    return
+  }
+
+  reporting.value = true
+
+  try {
+    const report = await createReport({
+      resourceId: note.value.id,
+      reason: reportReason.value
+    })
+    appStore.showToast('举报已提交', `举报 #${report.id} 已进入后台处理队列`)
+    closeReportDialog()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    reporting.value = false
+  }
 }
 
 function extractSummary(content: string) {
