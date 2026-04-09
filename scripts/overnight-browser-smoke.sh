@@ -14,6 +14,12 @@ FRONTEND_LOG="${SMOKE_DIR}/frontend.log"
 SMOKE_LOG="${SMOKE_DIR}/smoke.log"
 META_FILE="${SMOKE_DIR}/meta.env"
 BACKEND_MODE_FILE="${SMOKE_DIR}/backend-mode.txt"
+FULL_WALKTHROUGH_ENABLED="${OVERNIGHT_FULL_WALKTHROUGH_ENABLED:-1}"
+FULL_WALKTHROUGH_SPEC="${FRONTEND_DIR}/tests/e2e/full-site-walkthrough.spec.ts"
+STANDARD_SMOKE_SPECS=(
+  "tests/e2e/module-smoke.spec.ts"
+  "tests/e2e/sharehub-real-api.spec.ts"
+)
 
 BACKEND_PORT="${OVERNIGHT_BACKEND_PORT:-18080}"
 FRONTEND_PORT="${OVERNIGHT_FRONTEND_PORT:-14173}"
@@ -249,7 +255,36 @@ export PLAYWRIGHT_HTML_REPORT="${SMOKE_DIR}/playwright-report"
 export VITE_API_PROXY_TARGET="${BACKEND_BASE_URL}"
 
 log "开始执行 Playwright smoke"
-(cd "${FRONTEND_DIR}" && npm run test:e2e) | tee -a "${SMOKE_LOG}"
+set +e
+(cd "${FRONTEND_DIR}" && npx playwright test "${STANDARD_SMOKE_SPECS[@]}") | tee -a "${SMOKE_LOG}"
+STANDARD_SMOKE_EXIT_CODE=${PIPESTATUS[0]}
+set -e
+
+FULL_WALKTHROUGH_EXECUTED=0
+FULL_WALKTHROUGH_EXIT_CODE=SKIPPED
+
+if [[ ${STANDARD_SMOKE_EXIT_CODE} -eq 0 && "${FULL_WALKTHROUGH_ENABLED}" == "1" && -f "${FULL_WALKTHROUGH_SPEC}" ]]; then
+  FULL_WALKTHROUGH_EXECUTED=1
+  log "开始执行全站浏览器走查"
+  set +e
+  (
+    cd "${FRONTEND_DIR}" && \
+    PLAYWRIGHT_MODULES=all npx playwright test tests/e2e/full-site-walkthrough.spec.ts
+  ) | tee -a "${SMOKE_LOG}"
+  FULL_WALKTHROUGH_EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+  if [[ ${FULL_WALKTHROUGH_EXIT_CODE} -eq 0 ]]; then
+    log "全站浏览器走查执行完成"
+  else
+    log "全站浏览器走查失败，退出码=${FULL_WALKTHROUGH_EXIT_CODE}"
+    exit "${FULL_WALKTHROUGH_EXIT_CODE}"
+  fi
+fi
+
+if [[ ${STANDARD_SMOKE_EXIT_CODE} -ne 0 ]]; then
+  log "Playwright smoke 失败，退出码=${STANDARD_SMOKE_EXIT_CODE}"
+  exit "${STANDARD_SMOKE_EXIT_CODE}"
+fi
 
 cat > "${META_FILE}" <<EOF
 BACKEND_PORT=${BACKEND_PORT}
@@ -258,6 +293,10 @@ MODULES=${MODULES}
 BACKEND_BASE_URL=${BACKEND_BASE_URL}
 FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
 BACKEND_MODE=${BACKEND_MODE}
+FULL_WALKTHROUGH_ENABLED=${FULL_WALKTHROUGH_ENABLED}
+FULL_WALKTHROUGH_EXECUTED=${FULL_WALKTHROUGH_EXECUTED}
+FULL_WALKTHROUGH_EXIT_CODE=${FULL_WALKTHROUGH_EXIT_CODE}
+STANDARD_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
 EOF
 
 log "Playwright smoke 执行完成"

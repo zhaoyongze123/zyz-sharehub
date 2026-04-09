@@ -457,7 +457,7 @@ test('后台模块 smoke', async ({ page }) => {
   await page.goto('/admin')
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
 
-  const apiResponse = await browserFetch(page, '/api/admin/reports?page=1&pageSize=5', {
+  const apiResponse = await browserFetch(page, '/api/admin/reports?page=1&pageSize=20', {
     'X-Admin-Token': adminToken
   })
   expect(apiResponse.ok).toBeTruthy()
@@ -465,7 +465,9 @@ test('后台模块 smoke', async ({ page }) => {
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
   const reportItems = apiResponse.json?.data?.items ?? []
-  const openReports = reportItems.filter((item: { status?: string }) => item.status === 'OPEN')
+  const openReports = reportItems.filter((item: { status?: string }) =>
+    item.status === 'OPEN' || item.status === '待处理'
+  )
   await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toContainText(String(openReports.length))
   if (reportItems[0]) {
     await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
@@ -481,15 +483,22 @@ test('后台模块 smoke', async ({ page }) => {
   expect(auditResponse.json?.success).toBeTruthy()
   expect(Array.isArray(auditResponse.json?.data?.items)).toBeTruthy()
 
-  const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=5', {
+  const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=20', {
     'X-Admin-Token': adminToken
   })
   expect(usersResponse.ok).toBeTruthy()
   expect(usersResponse.status).toBe(200)
   expect(usersResponse.json?.success).toBeTruthy()
   expect(Array.isArray(usersResponse.json?.data?.items)).toBeTruthy()
+  const managedUsers = usersResponse.json?.data?.items ?? []
+  const bannedUsers = managedUsers.filter((item: { status?: string }) =>
+    item.status === 'BANNED' || item.status === '已封禁'
+  )
   await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(
-    String(usersResponse.json?.data?.items?.length ?? 0)
+    String(managedUsers.length)
+  )
+  await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(
+    `已封禁 ${bannedUsers.length}`
   )
 
   const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {

@@ -16,6 +16,7 @@ MAX_RETRIES="${OVERNIGHT_MAX_RETRIES:-3}"
 PRIMARY_MODEL="${OVERNIGHT_PRIMARY_MODEL:-gpt-5.4}"
 FALLBACK_MODELS="${OVERNIGHT_FALLBACK_MODELS:-gpt-5.1-codex-max,gpt-5.1-codex-mini}"
 CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
+ENABLE_MULTI_AGENT="${OVERNIGHT_ENABLE_MULTI_AGENT:-1}"
 POST_RUN_SMOKE_SCRIPT="${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"
 POST_FRONTEND_FOLLOWUP_SCRIPT="${PROJECT_ROOT}/scripts/overnight-frontend-followup.sh"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
@@ -179,13 +180,15 @@ while (( ATTEMPT <= MAX_RETRIES )); do
     "${CODEX_BIN}"
     exec
     --ephemeral
-    --disable multi_agent
     -c 'model_reasoning_effort="low"'
     -m "${CURRENT_MODEL}"
     --dangerously-bypass-approvals-and-sandbox
     -C "${PROJECT_ROOT}"
     -o "${LAST_MESSAGE_FILE}"
   )
+  if [[ "${ENABLE_MULTI_AGENT}" != "1" ]]; then
+    CODEX_CMD+=(--disable multi_agent)
+  fi
   rm -f "${LAST_MESSAGE_FILE}"
   echo "[$(date '+%F %T')] 执行尝试 ${ATTEMPT}/${MAX_RETRIES}，模型=${CURRENT_MODEL}" | tee -a "${RAW_LOG_FILE}"
 
