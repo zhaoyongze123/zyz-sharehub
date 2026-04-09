@@ -38,7 +38,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTabs from '@/components/base/BaseTabs.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseUploader from '@/components/base/BaseUploader.vue'
-import { resourceCategories } from '@/mock/resources'
+import { resourceCategoryOptions } from '@/api/resources'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
@@ -56,7 +56,7 @@ const uploadModeItems = [
   { label: '外链引用', value: 'link' }
 ]
 
-const categoryOptions = resourceCategories.filter((item) => item !== '全部').map((item) => ({ label: item, value: item }))
+const categoryOptions = resourceCategoryOptions.filter((item) => item !== '全部').map((item) => ({ label: item, value: item }))
 const previewText = computed(() => form.title ? `${form.title} · ${form.category} · ${form.tags || '未填标签'}` : '填写标题后，这里会展示发布预览摘要。')
 
 function saveDraft() {
