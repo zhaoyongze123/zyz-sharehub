@@ -33,6 +33,21 @@ export interface RoadmapTimelineItem {
   noteId: number | null
 }
 
+interface CreateRoadmapPayload {
+  title: string
+  description: string
+  visibility: 'PUBLIC' | 'PRIVATE'
+  status: 'DRAFT' | 'PUBLISHED'
+}
+
+interface CreateRoadmapNodePayload {
+  parentId?: number | null
+  title: string
+  orderNo: number
+  resourceId?: number | null
+  noteId?: number | null
+}
+
 interface RoadmapDto {
   id: number
   title: string
@@ -146,4 +161,14 @@ export async function fetchRoadmapDetail(id: string | number): Promise<RoadmapDe
     timeline,
     relatedResources
   }
+}
+
+export async function createRoadmap(payload: CreateRoadmapPayload) {
+  const response = await apiClient.post<ApiResponse<RoadmapDto>>('/roadmaps', payload)
+  return response.data.data
+}
+
+export async function addRoadmapNode(id: string | number, payload: CreateRoadmapNodePayload) {
+  const response = await apiClient.post<ApiResponse<RoadmapNodeTreeDto[]>>(`/roadmaps/${id}/nodes`, payload)
+  return response.data.data
 }

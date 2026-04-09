@@ -294,6 +294,71 @@ test('roadmaps 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByRole('heading', { name: linkedResourceTitle })).toBeVisible()
 })
 
+test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
+  test.skip(!shouldRun('roadmaps'))
+  const batchId = Date.now()
+  const roadmapTitle = `Playwright Publish Roadmap ${batchId}`
+
+  await loginAs(page, 'user')
+  await page.goto('/publish/roadmap')
+  await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
+
+  await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
+  await page.getByTestId('publish-roadmap-summary').fill('通过页面完成真实路线创建和节点追加闭环。')
+  await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建')
+  await page.getByTestId('publish-roadmap-node-summary-0').fill('先创建路线主体。')
+  await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：节点落库')
+  await page.getByTestId('publish-roadmap-node-summary-1').fill('再追加节点。')
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/nodes')
+  )
+  const firstNodeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps/') &&
+    response.url().includes('/nodes') &&
+    response.request().method() === 'POST'
+  )
+  const secondNodeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps/') &&
+    response.url().includes('/nodes') &&
+    response.request().method() === 'POST'
+  )
+
+  await page.getByTestId('publish-roadmap-submit').click()
+
+  const createResponse = await createResponsePromise
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const createdId = createBody.data.id as number
+
+  const firstNodeResponse = await firstNodeResponsePromise
+  const secondNodeResponse = await secondNodeResponsePromise
+  expect(firstNodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
+  expect(secondNodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
+  expect(firstNodeResponse.ok()).toBeTruthy()
+  expect(secondNodeResponse.ok()).toBeTruthy()
+
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${createdId}`)
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/roadmaps/${createdId}$`))
+  await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
+  await expect(page.getByText('阶段 1：创建')).toBeVisible()
+  await expect(page.getByText('阶段 2：节点落库')).toBeVisible()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${createdId}`, {
+    headers: userHeaders()
+  })
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.roadmap.id).toBe(createdId)
+  expect(detailBody.data.roadmap.title).toBe(roadmapTitle)
+  expect(detailBody.data.roadmap.status).toBe('PUBLISHED')
+  expect(detailBody.data.nodes).toHaveLength(2)
+})
+
 test('notes 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('notes'))
   const noteTitle = `Playwright Note ${Date.now()}`
