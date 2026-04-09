@@ -43,10 +43,12 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-const categoryOptions = resourceCategoryOptions
-  .filter((item) => item !== '全部')
-  .map((item) => ({ label: item, value: item }))
-const defaultCategory = categoryOptions[0]?.value || ''
+const categoryOptions = computed(() =>
+  resourceCategoryOptions
+    .filter((item) => item !== '全部')
+    .map((item) => ({ label: item, value: item }))
+)
+const defaultCategory = categoryOptions.value[0]?.value || ''
 const form = reactive({
   title: '',
   category: defaultCategory,
