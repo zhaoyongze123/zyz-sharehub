@@ -388,6 +388,7 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('notes'))
   const noteTitle = `Playwright Note ${Date.now()}`
   const noteId = await createNote(request, noteTitle)
+  const reportReason = `Playwright note report ${Date.now()}`
 
   const listResponse = await request.get(`${apiBaseUrl}/api/notes?page=1&pageSize=10`, {
     headers: userHeaders()
@@ -415,6 +416,37 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByTestId('note-detail-content')).toContainText('Playwright detail paragraph')
   await expect(page.getByTestId('note-outline')).toContainText('第一节')
   await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
+
+  const reportResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/reports') && response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '举报' }).first().click()
+  await page.getByLabel('举报原因').fill(reportReason)
+  await page.getByRole('button', { name: '提交举报' }).click()
+  const reportResponse = await reportResponsePromise
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetType).toBe('NOTE')
+  expect(reportBody.data.targetId).toBe(noteId)
+  expect(reportBody.data.reason).toBe(reportReason)
+
+  const adminReportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
+    headers: adminHeaders()
+  })
+  expect(adminReportsResponse.ok()).toBeTruthy()
+  const adminReportsBody = await adminReportsResponse.json() as {
+    data: {
+      items: Array<{
+        targetType: string
+        targetId: number
+        reason: string
+      }>
+    }
+  }
+  expect(adminReportsBody.data.items.some((item) =>
+    item.targetType === 'NOTE' && item.targetId === noteId && item.reason === reportReason
+  )).toBeTruthy()
 })
 
 test('resumes 模块真接口联调', async ({ page, request }) => {
