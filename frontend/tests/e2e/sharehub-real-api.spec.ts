@@ -343,7 +343,22 @@ test('me 模块真接口联调', async ({ page, request }) => {
     await expect(page.getByText(firstResume.fileName || `resume-${firstResume.id}.pdf`).first()).toBeVisible()
   }
 
-  await expect(page.getByRole('button', { name: '头像上传待接后端' })).toBeDisabled()
+  const avatarResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/avatar') && response.request().method() === 'POST'
+  )
+  await page.getByTestId('profile-avatar-input').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ZkAAAAASUVORK5CYII=',
+      'base64'
+    )
+  })
+  const avatarResponse = await avatarResponsePromise
+  expect(avatarResponse.ok()).toBeTruthy()
+  const avatarBody = await avatarResponse.json()
+  expect(avatarBody.data.downloadUrl).toContain('/api/files/')
+  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
 })
 
 test('admin 模块真接口联调', async ({ page, request }) => {
