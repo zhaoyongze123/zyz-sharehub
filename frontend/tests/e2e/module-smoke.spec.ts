@@ -279,10 +279,26 @@ test('个人中心模块 smoke', async ({ page }) => {
   await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
   await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
   await expect(page.getByTestId('profile-avatar-upload')).toBeEnabled()
-  const fileChooserPromise = page.waitForEvent('filechooser')
-  await page.getByTestId('profile-avatar-upload').click()
-  await fileChooserPromise
   await expect(page.getByRole('button', { name: '资料编辑待接写接口' })).toBeDisabled()
+
+  const avatarResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/avatar') && response.request().method() === 'POST'
+  )
+  await page.getByTestId('profile-avatar-input').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0ZkAAAAASUVORK5CYII=',
+      'base64'
+    )
+  })
+  const avatarResponse = await avatarResponsePromise
+  expect(avatarResponse.ok()).toBeTruthy()
+  const avatarBody = await avatarResponse.json()
+  expect(avatarBody.success).toBeTruthy()
+  expect(avatarBody.data?.downloadUrl).toContain('/api/files/')
+  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
+  await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
 
   const resourcesResponse = await browserFetch(page, '/api/me/resources?page=1&pageSize=5', {
     'X-User-Key': userKey
@@ -311,6 +327,20 @@ test('个人中心模块 smoke', async ({ page }) => {
     const firstResume = resumesResponse.json.data.items[0]
     await expect(page.getByText(firstResume.fileName || `resume-${firstResume.id}.pdf`).first()).toBeVisible()
   }
+
+  const reloadAuthMeResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
+  await page.reload()
+  const reloadAuthMeResponse = await reloadAuthMeResponsePromise
+  expect(reloadAuthMeResponse.ok()).toBeTruthy()
+  const reloadAuthMeBody = await reloadAuthMeResponse.json()
+  expect(reloadAuthMeBody.success).toBeTruthy()
+  expect(reloadAuthMeBody.data?.login).toBe(authMeBody.data.login)
+  await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
+  await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
+  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
+  await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
 })
 
 test('个人中心在 auth/me 失效时回跳登录页', async ({ page }) => {
