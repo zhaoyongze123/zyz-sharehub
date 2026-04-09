@@ -37,7 +37,6 @@
           </div>
         </div>
         <div class="hero-actions">
-<<<<<<< HEAD
           <div class="hero-upload-card">
             <p class="upload-title">头像上传</p>
             <BaseUploader
@@ -52,24 +51,6 @@
           </div>
           <button class="btn-outline" type="button" :disabled="avatarUploading" data-testid="profile-avatar-upload">
             {{ avatarUploading ? '头像上传中...' : '通过真实接口上传头像' }}
-=======
-          <input
-            ref="avatarInputRef"
-            class="sr-only"
-            type="file"
-            accept="image/*"
-            data-testid="profile-avatar-input"
-            @change="handleAvatarSelected"
-          />
-          <button
-            class="btn-outline"
-            type="button"
-            :disabled="avatarUploading"
-            data-testid="profile-avatar-upload"
-            @click="triggerAvatarUpload"
-          >
-            {{ avatarUploading ? '头像上传中...' : '上传头像' }}
->>>>>>> 1504c4c (feat: 接通个人中心头像上传真链路)
           </button>
           <button class="btn-outline" type="button" disabled>资料编辑待接写接口</button>
         </div>
@@ -155,10 +136,7 @@ import { computed, onMounted, ref } from 'vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
-<<<<<<< HEAD
 import BaseUploader from '@/components/base/BaseUploader.vue'
-=======
->>>>>>> 1504c4c (feat: 接通个人中心头像上传真链路)
 import { fetchMeDashboard, type MeDashboardData, uploadMyAvatar } from '@/api/me'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -169,11 +147,7 @@ const dashboard = ref<MeDashboardData | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
 const avatarUploading = ref(false)
-<<<<<<< HEAD
 const selectedAvatarFile = ref<File | null>(null)
-=======
-const avatarInputRef = ref<HTMLInputElement | null>(null)
->>>>>>> 1504c4c (feat: 接通个人中心头像上传真链路)
 
 const status = computed(() => {
   if (loading.value) return 'loading'
@@ -224,18 +198,7 @@ async function loadDashboard() {
   }
 }
 
-<<<<<<< HEAD
 async function handleAvatarSelected(file: File | null) {
-=======
-function triggerAvatarUpload() {
-  avatarInputRef.value?.click()
-}
-
-async function handleAvatarSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-
->>>>>>> 1504c4c (feat: 接通个人中心头像上传真链路)
   if (!file) {
     return
   }
@@ -244,10 +207,7 @@ async function handleAvatarSelected(event: Event) {
 
   try {
     await uploadMyAvatar(file)
-<<<<<<< HEAD
     selectedAvatarFile.value = null
-=======
->>>>>>> 1504c4c (feat: 接通个人中心头像上传真链路)
     await loadDashboard()
     if (dashboard.value?.profile.avatarUrl) {
       authStore.updateProfile({
@@ -257,11 +217,7 @@ async function handleAvatarSelected(event: Event) {
     appStore.showToast('头像已更新', '个人中心已刷新为最新头像', 'success')
   } finally {
     avatarUploading.value = false
-<<<<<<< HEAD
     selectedAvatarFile.value = null
-=======
-    input.value = ''
->>>>>>> 1504c4c (feat: 接通个人中心头像上传真链路)
   }
 }
 
