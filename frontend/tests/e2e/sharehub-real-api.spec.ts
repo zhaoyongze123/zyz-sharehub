@@ -55,7 +55,7 @@ async function createNote(request: Parameters<typeof test>[0]['request'], title:
     headers: userHeaders(),
     data: {
       title,
-      contentMd: `# ${title}\n\nplaywright`,
+      contentMd: `# ${title}\n\n这是用于详情页验收的真实正文。\n\n## 第一节\nPlaywright detail paragraph`,
       visibility: 'PUBLIC',
       status: 'PUBLISHED'
     }
@@ -216,7 +216,8 @@ test('roadmaps 模块真接口联调', async ({ page, request }) => {
 
 test('notes 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('notes'))
-  const noteId = await createNote(request, `Playwright Note ${Date.now()}`)
+  const noteTitle = `Playwright Note ${Date.now()}`
+  const noteId = await createNote(request, noteTitle)
 
   const listResponse = await request.get(`${apiBaseUrl}/api/notes?page=1&pageSize=10`, {
     headers: userHeaders()
@@ -230,9 +231,17 @@ test('notes 模块真接口联调', async ({ page, request }) => {
     headers: userHeaders()
   })
   expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.id).toBe(noteId)
+  expect(detailBody.data.title).toBe(noteTitle)
 
-  await page.goto('/community')
-  await expect(page.getByText('AI 资源类别')).toBeVisible()
+  await loginAs(page, 'user')
+  await page.goto(`/notes/${noteId}`)
+  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.locator('.markdown-panel')).toContainText('这是用于详情页验收的真实正文。')
+  await expect(page.locator('.markdown-panel')).toContainText('Playwright detail paragraph')
+  await expect(page.locator('.outline')).toContainText('第一节')
+  await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
 })
 
 test('resumes 模块真接口联调', async ({ page, request }) => {
