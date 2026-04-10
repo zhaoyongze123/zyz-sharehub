@@ -14,8 +14,8 @@ FRONTEND_LOG="${SMOKE_DIR}/frontend.log"
 SMOKE_LOG="${SMOKE_DIR}/smoke.log"
 META_FILE="${SMOKE_DIR}/meta.env"
 BACKEND_MODE_FILE="${SMOKE_DIR}/backend-mode.txt"
-FULL_WALKTHROUGH_ENABLED="${OVERNIGHT_FULL_WALKTHROUGH_ENABLED:-1}"
-FULL_WALKTHROUGH_SPEC="${FRONTEND_DIR}/tests/e2e/full-site-walkthrough.spec.ts"
+ADMIN_AUTOPILOT_MODE="${OVERNIGHT_ADMIN_AUTOPILOT:-1}"
+ADMIN_REQUIRE_POSTGRES="${OVERNIGHT_ADMIN_REQUIRE_POSTGRES:-1}"
 STANDARD_SMOKE_SPECS=(
   "tests/e2e/module-smoke.spec.ts"
   "tests/e2e/sharehub-real-api.spec.ts"
@@ -30,6 +30,12 @@ mkdir -p "${SMOKE_DIR}"
 
 log() {
   echo "[$(date '+%F %T')] $*" | tee -a "${SMOKE_LOG}"
+}
+
+gate_check() {
+  local message="$1"
+  log "后台门禁失败：${message}"
+  ADMIN_GATE_EXIT_CODE=1
 }
 
 can_use_cloud_dev() {
@@ -111,86 +117,6 @@ kill_port_process() {
   fi
 }
 
-collect_modules() {
-  local files=""
-  if [[ -n "${START_HEAD}" && -n "${END_HEAD}" ]]; then
-    files="$(git -C "${PROJECT_ROOT}" diff --name-only "${START_HEAD}".."${END_HEAD}" || true)"
-  fi
-
-  if [[ -z "${files}" ]]; then
-    files="$(git -C "${PROJECT_ROOT}" diff --name-only || true)"
-  fi
-
-  local untracked_files
-  untracked_files="$(git -C "${PROJECT_ROOT}" ls-files --others --exclude-standard || true)"
-  if [[ -n "${untracked_files}" ]]; then
-    if [[ -n "${files}" ]]; then
-      files="${files}"$'\n'"${untracked_files}"
-    else
-      files="${untracked_files}"
-    fi
-  fi
-
-  python3 - <<'PY' "${files}"
-import sys
-
-files = [line.strip() for line in sys.argv[1].splitlines() if line.strip()]
-modules = set()
-frontend_changed = False
-frontend_global_changed = False
-
-for path in files:
-    lowered = path.lower()
-    if "frontend/" in lowered or lowered.startswith("frontend"):
-        frontend_changed = True
-        if any(token in lowered for token in (
-            "frontend/package.json",
-            "frontend/package-lock.json",
-            "frontend/vite.config",
-            "frontend/playwright.config",
-            "frontend/tests/",
-            "frontend/src/api/"
-        )):
-            frontend_global_changed = True
-        if "resource" in lowered:
-            modules.add("resources")
-        if "roadmap" in lowered:
-            modules.add("roadmaps")
-        if "note" in lowered or "community" in lowered:
-            modules.add("notes")
-        if "resume" in lowered:
-            modules.add("resumes")
-        if "admin" in lowered:
-            modules.add("admin")
-        if "user/" in lowered or "/me" in lowered or "profile" in lowered or "auth" in lowered:
-            modules.add("profile")
-    if path.startswith("backend/"):
-        modules.add("backend")
-        if "resource" in lowered:
-            modules.add("resources")
-        if "roadmap" in lowered:
-            modules.add("roadmaps")
-        if "note" in lowered:
-            modules.add("notes")
-        if "resume" in lowered:
-            modules.add("resumes")
-        if "admin" in lowered or "audit" in lowered or "report" in lowered:
-            modules.add("admin")
-        if "me/" in lowered or "profile" in lowered or "auth" in lowered or "user" in lowered:
-            modules.add("profile")
-
-if frontend_changed and (frontend_global_changed or not modules.intersection({"resources", "roadmaps", "notes", "resumes", "admin", "profile"})):
-    modules.update({"resources", "roadmaps", "notes", "resumes", "admin", "profile"})
-
-if not modules:
-    modules.update({"public", "backend"})
-else:
-    modules.add("public")
-
-print(",".join(sorted(modules)))
-PY
-}
-
 cleanup() {
   if [[ -n "${FRONTEND_PID:-}" ]] && kill -0 "${FRONTEND_PID}" >/dev/null 2>&1; then
     kill "${FRONTEND_PID}" >/dev/null 2>&1 || true
@@ -204,7 +130,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-MODULES="${PLAYWRIGHT_MODULES:-$(collect_modules)}"
+MODULES="${PLAYWRIGHT_MODULES:-admin,backend}"
 log "本轮浏览器 smoke 模块：${MODULES}"
 
 kill_port_process "${BACKEND_PORT}"
@@ -233,6 +159,16 @@ if ! wait_for_stable_url "${BACKEND_BASE_URL}/actuator/health" "${BACKEND_PID}" 
   exit 1
 fi
 
+if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/readiness" "${BACKEND_PID}" "后端 readiness" 60 2; then
+  log "后端 readiness 检查失败，请查看 ${BACKEND_LOG}"
+  exit 1
+fi
+
+if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/liveness" "${BACKEND_PID}" "后端 liveness" 60 2; then
+  log "后端 liveness 检查失败，请查看 ${BACKEND_LOG}"
+  exit 1
+fi
+
 export VITE_API_PROXY_TARGET="${BACKEND_BASE_URL}"
 nohup bash -lc "cd '${FRONTEND_DIR}' && npm run dev -- --host 127.0.0.1 --port ${FRONTEND_PORT} --strictPort" > "${FRONTEND_LOG}" 2>&1 &
 FRONTEND_PID=$!
@@ -251,6 +187,7 @@ fi
 export PLAYWRIGHT_BASE_URL="${FRONTEND_BASE_URL}"
 export PLAYWRIGHT_API_BASE_URL="${BACKEND_BASE_URL}"
 export PLAYWRIGHT_MODULES="${MODULES}"
+export PLAYWRIGHT_ADMIN_USER_KEY="${PLAYWRIGHT_ADMIN_USER_KEY:-playwright-admin}"
 export PLAYWRIGHT_HTML_REPORT="${SMOKE_DIR}/playwright-report"
 export VITE_API_PROXY_TARGET="${BACKEND_BASE_URL}"
 
@@ -260,30 +197,53 @@ set +e
 STANDARD_SMOKE_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
-FULL_WALKTHROUGH_EXECUTED=0
-FULL_WALKTHROUGH_EXIT_CODE=SKIPPED
+ADMIN_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
+ADMIN_GATE_EXIT_CODE=0
 
-if [[ ${STANDARD_SMOKE_EXIT_CODE} -eq 0 && "${FULL_WALKTHROUGH_ENABLED}" == "1" && -f "${FULL_WALKTHROUGH_SPEC}" ]]; then
-  FULL_WALKTHROUGH_EXECUTED=1
-  log "开始执行全站浏览器走查"
-  set +e
-  (
-    cd "${FRONTEND_DIR}" && \
-    PLAYWRIGHT_MODULES=all npx playwright test tests/e2e/full-site-walkthrough.spec.ts
-  ) | tee -a "${SMOKE_LOG}"
-  FULL_WALKTHROUGH_EXIT_CODE=${PIPESTATUS[0]}
-  set -e
-  if [[ ${FULL_WALKTHROUGH_EXIT_CODE} -eq 0 ]]; then
-    log "全站浏览器走查执行完成"
-  else
-    log "全站浏览器走查失败，退出码=${FULL_WALKTHROUGH_EXIT_CODE}"
-    exit "${FULL_WALKTHROUGH_EXIT_CODE}"
+if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
+  if ! rg -q "jdbc:postgresql" "${PROJECT_ROOT}/backend/src/main/resources/application.yml"; then
+    gate_check "application.yml 未使用 PostgreSQL JDBC"
+  fi
+
+  if [[ "${ADMIN_REQUIRE_POSTGRES}" == "1" ]]; then
+    if rg -q "jdbc:mysql|mysql:" "${PROJECT_ROOT}/deploy/docker-compose.prod.yml"; then
+      gate_check "生产部署仍然包含 MySQL 配置，未满足 PostgreSQL-only"
+    fi
+  fi
+
+  if ! curl -fsS -H "X-User-Key:${PLAYWRIGHT_ADMIN_USER_KEY}" "${BACKEND_BASE_URL}/api/admin/reports?page=1&pageSize=1" >/dev/null 2>&1; then
+    gate_check "管理员身份访问后台举报列表失败"
+  fi
+
+  if curl -fsS -H "X-User-Key:${PLAYWRIGHT_USER_KEY:-playwright-user}" "${BACKEND_BASE_URL}/api/admin/reports?page=1&pageSize=1" >/dev/null 2>&1; then
+    gate_check "普通用户仍可访问后台举报列表"
+  fi
+
+  AUTH_ME_BODY="$(curl -fsS -H "X-User-Key:${PLAYWRIGHT_ADMIN_USER_KEY}" "${BACKEND_BASE_URL}/api/auth/me" || true)"
+  if [[ "${AUTH_ME_BODY}" != *'"isAdmin":true'* ]]; then
+    gate_check "auth/me 未返回 isAdmin=true"
+  fi
+
+  if ! curl -fsS "${BACKEND_BASE_URL}/actuator/health/readiness" >/dev/null 2>&1; then
+    gate_check "readiness probe 不可用"
+  fi
+
+  if ! curl -fsS "${BACKEND_BASE_URL}/actuator/health/liveness" >/dev/null 2>&1; then
+    gate_check "liveness probe 不可用"
+  fi
+
+  if rg -q "PLAYWRIGHT_ADMIN_TOKEN" "${FRONTEND_DIR}/tests/e2e/module-smoke.spec.ts" "${FRONTEND_DIR}/tests/e2e/sharehub-real-api.spec.ts"; then
+    gate_check "后台 Playwright 仍依赖 PLAYWRIGHT_ADMIN_TOKEN"
   fi
 fi
 
 if [[ ${STANDARD_SMOKE_EXIT_CODE} -ne 0 ]]; then
   log "Playwright smoke 失败，退出码=${STANDARD_SMOKE_EXIT_CODE}"
   exit "${STANDARD_SMOKE_EXIT_CODE}"
+fi
+
+if [[ ${ADMIN_GATE_EXIT_CODE} -ne 0 ]]; then
+  exit "${ADMIN_GATE_EXIT_CODE}"
 fi
 
 cat > "${META_FILE}" <<EOF
@@ -293,9 +253,10 @@ MODULES=${MODULES}
 BACKEND_BASE_URL=${BACKEND_BASE_URL}
 FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
 BACKEND_MODE=${BACKEND_MODE}
-FULL_WALKTHROUGH_ENABLED=${FULL_WALKTHROUGH_ENABLED}
-FULL_WALKTHROUGH_EXECUTED=${FULL_WALKTHROUGH_EXECUTED}
-FULL_WALKTHROUGH_EXIT_CODE=${FULL_WALKTHROUGH_EXIT_CODE}
+ADMIN_AUTOPILOT_MODE=${ADMIN_AUTOPILOT_MODE}
+ADMIN_REQUIRE_POSTGRES=${ADMIN_REQUIRE_POSTGRES}
+ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE}
+ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}
 STANDARD_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
 EOF
 

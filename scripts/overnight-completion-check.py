@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def read_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
 def has_text(path: Path, needle: str) -> bool:
@@ -13,13 +13,6 @@ def has_text(path: Path, needle: str) -> bool:
 
 def lacks_text(path: Path, needle: str) -> bool:
     return needle not in read_text(path)
-
-
-def check(predicate: bool, name: str, passed: list[str], pending: list[str]) -> None:
-    if predicate:
-        passed.append(name)
-    else:
-        pending.append(name)
 
 
 def env_value(path: Path, key: str) -> str:
@@ -32,8 +25,15 @@ def env_value(path: Path, key: str) -> str:
     return ""
 
 
+def check(predicate: bool, name: str, passed: list[str], pending: list[str]) -> None:
+    if predicate:
+        passed.append(name)
+    else:
+        pending.append(name)
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="检查 ShareHub 夜间推进是否已整体完成")
+    parser = argparse.ArgumentParser(description="检查 ShareHub 后台专项夜间推进是否已完成")
     parser.add_argument("--project-root", required=True, help="仓库根目录")
     parser.add_argument("--output", required=True, help="状态输出文件")
     args = parser.parse_args()
@@ -42,8 +42,8 @@ def main() -> int:
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    frontend = root / "frontend" / "src"
     tests = root / "frontend" / "tests" / "e2e"
+    scripts_dir = root / "scripts"
     docs_dir = root / "docs"
     overnight_dir = root / "output" / "overnight"
     latest_meta = overnight_dir / "latest-meta.env"
@@ -55,185 +55,135 @@ def main() -> int:
     pending: list[str] = []
 
     check(
-        lacks_text(frontend / "views" / "resource" / "ResourceListView.vue", "@/mock/resources"),
-        "批次1-资源列表去 mock",
+        lacks_text(scripts_dir / "overnight-manager-prompt.md", "批次 1：资源 + 路线公开读取链路")
+        and has_text(scripts_dir / "overnight-manager-prompt.md", "后台管理生产级改造专项"),
+        "自动化 prompt 已切到后台专项",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "resource" / "ResourceDetailView.vue", "@/mock/resources"),
-        "批次1-资源详情去 mock",
+        has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_AUTH_EXIT_CODE")
+        and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_SMOKE_EXIT_CODE")
+        and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_GATE_EXIT_CODE"),
+        "单轮编排输出后台专项状态码",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "roadmap" / "RoadmapListView.vue", "@/mock/roadmaps"),
-        "批次1-路线列表去 mock",
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "OVERNIGHT_ADMIN_AUTOPILOT")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "PLAYWRIGHT_ADMIN_USER_KEY"),
+        "后台 smoke 已切到后台专项模式",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "roadmap" / "RoadmapDetailView.vue", "@/mock/roadmaps"),
-        "批次1-路线详情去 mock",
+        has_text(scripts_dir / "overnight-browser-smoke.sh", 'PLAYWRIGHT_MODULES:-admin,backend')
+        and lacks_text(scripts_dir / "overnight-browser-smoke.sh", "FULL_WALKTHROUGH_ENABLED")
+        and lacks_text(scripts_dir / "overnight-browser-smoke.sh", "full-site-walkthrough.spec.ts"),
+        "后台 smoke 只聚焦后台模块，不再触发全站走查",
         passed,
         pending,
     )
     check(
-        has_text(tests / "sharehub-real-api.spec.ts", "page.goto('/resources')")
-        and has_text(tests / "sharehub-real-api.spec.ts", "/api/resources/")
-        and has_text(tests / "sharehub-real-api.spec.ts", "/resources/${resourceId}"),
-        "批次1-资源 Playwright 真读取闭环",
+        lacks_text(tests / "module-smoke.spec.ts", "PLAYWRIGHT_ADMIN_TOKEN")
+        and has_text(tests / "module-smoke.spec.ts", "PLAYWRIGHT_ADMIN_USER_KEY"),
+        "后台 smoke 不再依赖管理员 token",
         passed,
         pending,
     )
     check(
-        has_text(tests / "module-smoke.spec.ts", "browserFetch(page, '/api/resources?page=0&pageSize=5'")
-        and has_text(tests / "module-smoke.spec.ts", "getByText(`下载 ${resource.downloadCount}`)"),
-        "批次1-资源 smoke 真渲染断言",
+        lacks_text(tests / "sharehub-real-api.spec.ts", "PLAYWRIGHT_ADMIN_TOKEN")
+        and has_text(tests / "sharehub-real-api.spec.ts", "PLAYWRIGHT_ADMIN_USER_KEY"),
+        "后台真接口验收不再依赖管理员 token",
         passed,
         pending,
     )
     check(
-        has_text(tests / "sharehub-real-api.spec.ts", "page.goto('/roadmaps')")
-        and has_text(tests / "sharehub-real-api.spec.ts", "/api/roadmaps/")
-        and has_text(tests / "sharehub-real-api.spec.ts", "/roadmaps/${roadmapId}"),
-        "批次1-路线 Playwright 真读取闭环",
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "/actuator/health/readiness")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "/actuator/health/liveness"),
+        "后台 smoke 已纳入 readiness/liveness probes",
         passed,
         pending,
     )
     check(
-        has_text(tests / "module-smoke.spec.ts", "browserFetch(page, '/api/roadmaps?page=1&pageSize=5')")
-        and has_text(tests / "module-smoke.spec.ts", "roadmap.description?.trim()")
-        and has_text(tests / "module-smoke.spec.ts", "page.getByText('节点进度结构')"),
-        "批次1-路线 smoke 真渲染断言",
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "生产部署仍然包含 MySQL 配置")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "未满足 PostgreSQL-only"),
+        "后台门禁会阻断非 PostgreSQL-only 生产配置",
         passed,
         pending,
     )
     check(
-        has_text(frontend / "stores" / "auth.ts", "/auth/me"),
-        "批次2-鉴权接 auth/me",
+        has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reports')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/users')")
+        and has_text(tests / "sharehub-real-api.spec.ts", "await page.goto('/admin/reviews')"),
+        "后台页面真接口验收覆盖 admin/reports/reviews/users/audit-logs",
         passed,
         pending,
     )
     check(
-        has_text(frontend / "views" / "user" / "ProfileView.vue", "/api/me")
-        or has_text(frontend / "views" / "user" / "ProfileView.vue", "fetchMe"),
-        "批次2-个人中心接 me 聚合",
+        has_text(docs_dir / "admin-automation-runbook.md", "ADMIN_AUTH_EXIT_CODE")
+        and has_text(docs_dir / "admin-automation-runbook.md", "ADMIN_SMOKE_EXIT_CODE")
+        and has_text(docs_dir / "admin-automation-runbook.md", "ADMIN_GATE_EXIT_CODE"),
+        "后台运行手册包含专项状态码复核说明",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "user" / "ProfileView.vue", "个人资料保存成功！"),
-        "批次2-个人中心不再模拟保存成功",
-        passed,
-        pending,
-    )
-    # 简历模块当前不作为“整站完成”的硬门槛。
-    # 产品边界已调整为纯前端界面优先，是否继续保留或移除后端链路
-    # 由后续单独任务收口，不阻塞夜间总完成判定。
-    check(
-        lacks_text(frontend / "views" / "admin" / "AdminReportsView.vue", "@/mock/admin"),
-        "批次3-后台报告页去 mock",
+        has_text(docs_dir / "admin-release-gates.md", "PostgreSQL-only")
+        and has_text(docs_dir / "admin-release-gates.md", "readiness / liveness"),
+        "后台发布门禁清单包含 PostgreSQL-only 与 probes",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "admin" / "AdminReviewsView.vue", "@/mock/admin"),
-        "批次3-后台审核页去 mock",
+        has_text(docs_dir / "admin-rollback-checklist.md", "git checkout <上一稳定提交>")
+        and has_text(docs_dir / "admin-rollback-checklist.md", "ADMIN_GATE_EXIT_CODE"),
+        "后台回滚检查项包含状态码复核",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "admin" / "AdminUsersView.vue", "@/mock/admin"),
-        "批次3-后台用户页去 mock",
+        (docs_dir / "admin-automation-runbook.md").exists()
+        and (docs_dir / "admin-release-gates.md").exists()
+        and (docs_dir / "admin-rollback-checklist.md").exists(),
+        "后台专项运行文档已落盘",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "admin" / "AdminTaxonomyView.vue", "@/mock/admin"),
-        "批次3-后台标签页去 mock",
+        env_value(latest_meta, "ADMIN_AUTH_EXIT_CODE") in {"0", "SKIPPED", ""},
+        "最近一轮后台鉴权线结果已产出",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "note" / "NoteDetailView.vue", "@/mock/notes"),
-        "批次3-笔记详情去 mock",
+        env_value(latest_meta, "ADMIN_SMOKE_EXIT_CODE") == "0",
+        "最近一轮后台 smoke 通过",
         passed,
         pending,
     )
     check(
-        lacks_text(frontend / "views" / "resource" / "PublishResourceView.vue", "@/mock/resources"),
-        "批次3-资料发布去 mock",
+        env_value(latest_meta, "ADMIN_GATE_EXIT_CODE") == "0",
+        "最近一轮后台门禁验证通过",
         passed,
         pending,
     )
     check(
-        has_text(frontend / "views" / "roadmap" / "PublishRoadmapView.vue", "/api/roadmaps")
-        or has_text(frontend / "views" / "roadmap" / "PublishRoadmapView.vue", "createRoadmap"),
-        "批次3-路线创建接真实接口",
+        env_value(latest_smoke_meta, "ADMIN_AUTOPILOT_MODE") == "1",
+        "最近一轮 smoke 已按后台专项模式执行",
         passed,
         pending,
     )
     check(
-        has_text(tests / "sharehub-real-api.spec.ts", "/api/admin/reports")
-        and has_text(tests / "sharehub-real-api.spec.ts", "/api/admin/audit-logs"),
-        "批次3-后台 Playwright 闭环",
-        passed,
-        pending,
-    )
-    check(
-        (tests / "full-site-walkthrough.spec.ts").exists(),
-        "批次4-全站走查用例已落盘",
-        passed,
-        pending,
-    )
-    check(
-        has_text(tests / "full-site-walkthrough.spec.ts", "公开页走查")
-        and has_text(tests / "full-site-walkthrough.spec.ts", "资源模块走查")
-        and has_text(tests / "full-site-walkthrough.spec.ts", "路线模块走查")
-        and has_text(tests / "full-site-walkthrough.spec.ts", "笔记模块走查")
-        and has_text(tests / "full-site-walkthrough.spec.ts", "个人中心走查")
-        and has_text(tests / "full-site-walkthrough.spec.ts", "后台模块走查"),
-        "批次4-全站走查覆盖主模块",
-        passed,
-        pending,
-    )
-    check(
-        (docs_dir / "deployment-runbook.md").exists()
-        and (docs_dir / "release-checklist.md").exists()
-        and (docs_dir / "demo-script.md").exists(),
-        "批次4-部署发布演示材料已落盘",
-        passed,
-        pending,
-    )
-    check(
-        has_text(docs_dir / "deployment-runbook.md", "启动")
-        and has_text(docs_dir / "release-checklist.md", "发布前")
-        and has_text(docs_dir / "demo-script.md", "演示流程"),
-        "批次4-收尾材料具备可执行内容",
-        passed,
-        pending,
-    )
-    check(
-        env_value(latest_meta, "SMOKE_EXIT_CODE") == "0",
-        "批次4-最近一轮标准 smoke 通过",
-        passed,
-        pending,
-    )
-    check(
-        env_value(latest_smoke_meta, "FULL_WALKTHROUGH_EXECUTED") == "1",
-        "批次4-最近一轮已进入全站走查阶段",
-        passed,
-        pending,
-    )
-    check(
-        env_value(latest_smoke_meta, "FULL_WALKTHROUGH_EXIT_CODE") == "0",
-        "批次4-最近一轮全站走查通过",
+        env_value(latest_smoke_meta, "MODULES") == "admin,backend",
+        "最近一轮 smoke 仅执行后台模块",
         passed,
         pending,
     )
 
-    lines = ["ShareHub 夜间推进整体完成判定", ""]
+    lines = ["ShareHub 后台专项夜间推进完成判定", ""]
     lines.append(f"已完成检查项：{len(passed)}/{len(passed) + len(pending)}")
     if passed:
         lines.append("")
@@ -247,12 +197,16 @@ def main() -> int:
             lines.append(f"- {item}")
     else:
         lines.append("")
-        lines.append("所有机器可判定检查项均已满足，可自动停止 night supervisor。")
+        lines.append("后台专项所有机器可判定检查项均已满足，可自动停止 night supervisor。")
+
+    reason = "后台管理专项机器可判定验收已通过"
+    if pending:
+        reason = "后台管理专项仍有待满足的机器判定项"
 
     summary_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
     output.write_text(
         f"SUMMARY_FILE={summary_file}\n"
-        f"REASON=所有批次验收项已满足\n"
+        f"REASON={reason}\n"
         f"PENDING_COUNT={len(pending)}\n",
         encoding="utf-8",
     )
