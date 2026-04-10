@@ -14,12 +14,26 @@
     <section class="detail-main" data-testid="note-detail-main">
       <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
         <template #actions>
-          <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
+          <BaseButton disabled>收藏待接后端</BaseButton>
           <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
         </template>
       </HeroBanner>
 
-      <InteractionBar :likes="likes" :favorites="favorites" @like="likeNote" @favorite="favoriteNote" @report="reportVisible = true" />
+      <InteractionBar
+        :likes="0"
+        :favorites="0"
+        disable-like
+        disable-favorite
+        like-label="点赞待接后端"
+        favorite-label="收藏待接后端"
+        @report="reportVisible = true"
+      />
+
+      <BaseEmpty
+        title="互动说明"
+        description="当前批次仅收口真实详情读取与举报闭环，点赞和收藏按钮已禁用，待后端提供对应接口后再开放。"
+        data-testid="note-detail-interaction-hint"
+      />
 
       <article class="glass-panel markdown-panel" data-testid="note-detail-content" v-html="renderedHtml"></article>
 
@@ -89,8 +103,6 @@ const reporting = ref(false)
 const loading = ref(true)
 const notFound = ref(false)
 const note = ref<NoteDTO | null>(null)
-const likes = ref(0)
-const favorites = ref(0)
 
 const noteSummary = computed(() => extractSummary(note.value?.contentMd || ''))
 const noteOutline = computed(() => extractOutline(note.value?.contentMd || ''))
@@ -121,8 +133,6 @@ async function loadNote() {
   loading.value = true
   notFound.value = false
   note.value = null
-  likes.value = 0
-  favorites.value = 0
 
   try {
     note.value = await fetchNoteDetail(Number(route.params.id))
@@ -134,16 +144,6 @@ async function loadNote() {
   } finally {
     loading.value = false
   }
-}
-
-function likeNote() {
-  likes.value += 1
-  appStore.showToast('已点赞', '这篇笔记已加入你的点赞记录')
-}
-
-function favoriteNote() {
-  favorites.value += 1
-  appStore.showToast('已收藏', '可在个人中心继续回看')
 }
 
 function closeReportDialog() {

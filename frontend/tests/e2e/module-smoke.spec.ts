@@ -332,6 +332,9 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
   await expect(page.getByTestId('note-detail-content')).toContainText('Smoke detail paragraph')
   await expect(page.getByTestId('note-outline')).toContainText('小节')
   await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
+  await expect(page.getByTestId('note-detail-interaction-hint')).toContainText('当前批次仅收口真实详情读取与举报闭环')
+  await expect(page.getByRole('button', { name: '点赞待接后端' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '收藏待接后端' }).first()).toBeDisabled()
 
   await loginAs(page, 'user')
   await page.reload()
