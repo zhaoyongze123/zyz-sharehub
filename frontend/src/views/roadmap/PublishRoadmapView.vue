@@ -88,7 +88,6 @@ import { addRoadmapNode, createRoadmap } from '@/api/roadmaps'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
-const router = useRouter()
 const title = ref('')
 const summary = ref('')
 const isSubmitting = ref(false)
