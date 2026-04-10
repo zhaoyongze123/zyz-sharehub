@@ -710,7 +710,14 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toContainText(String(
     reportsBody.data.items.filter((item) => item.status === 'OPEN').length
   ))
-  await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(String(usersBody.data.items.length))
+  await expect(page.getByTestId('admin-dashboard-stat-users-value')).toContainText(String(usersBody.data.items.length))
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-value')).toContainText(String(
+    auditLogsBody.data.items.length
+  ))
+  const expectedDashboardMeta = firstAuditLog
+    ? `最近动作 ${normalizeAuditAction(firstAuditLog.action)} · 已加载 ${reportsBody.data.items.length} 条举报`
+    : `已加载 ${reportsBody.data.items.length} 条举报 / ${usersBody.data.items.length} 个用户`
+  await expect(page.getByTestId('admin-dashboard-meta')).toContainText(expectedDashboardMeta)
   if (firstOpenReport) {
     await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
       `${firstOpenReport.targetType} #${firstOpenReport.targetId}`
@@ -720,9 +727,14 @@ test('admin 模块真接口联调', async ({ page, request }) => {
     await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText('暂无')
   }
   if (firstAuditLog) {
+    await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText(
+      normalizeAuditAction(firstAuditLog.action)
+    )
     await expect(page.getByTestId(`admin-dashboard-activity-${firstAuditLog.id}`)).toContainText(
       `${firstAuditLog.targetType} #${firstAuditLog.targetId}`
     )
+  } else {
+    await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText('暂无治理动作')
   }
 
   await page.goto('/admin/reports')

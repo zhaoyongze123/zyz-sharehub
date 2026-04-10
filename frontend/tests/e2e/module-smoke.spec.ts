@@ -643,6 +643,17 @@ test('后台模块 smoke', async ({ page }) => {
   expect(auditResponse.status).toBe(200)
   expect(auditResponse.json?.success).toBeTruthy()
   expect(Array.isArray(auditResponse.json?.data?.items)).toBeTruthy()
+  const auditItems = auditResponse.json?.data?.items ?? []
+  const firstAuditLog = auditItems[0]
+  const expectedLatestAction = firstAuditLog
+    ? firstAuditLog.action
+      .split('_')
+      .filter(Boolean)
+      .map((segment: string) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+      .join(' ')
+    : '暂无治理动作'
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-value')).toContainText(String(auditItems.length))
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText(expectedLatestAction)
 
   const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=20', {
     'X-Admin-Token': adminToken
@@ -655,10 +666,14 @@ test('后台模块 smoke', async ({ page }) => {
   const bannedUsers = managedUsers.filter((item: { status?: string }) =>
     item.status === 'BANNED' || item.status === '已封禁'
   )
+  const expectedMeta = firstAuditLog
+    ? `最近动作 ${expectedLatestAction} · 已加载 ${reportItems.length} 条举报`
+    : `已加载 ${reportItems.length} 条举报 / ${managedUsers.length} 个用户`
+  await expect(page.getByTestId('admin-dashboard-meta')).toContainText(expectedMeta)
   const userStatCard = page.getByTestId('admin-dashboard-stat-users')
   await expect(userStatCard).toContainText('后台可管用户')
   await expect(userStatCard).toContainText(`已封禁 ${bannedUsers.length}`)
-  await expect(userStatCard.locator('.stat-card__value')).toContainText(/^\d+$/)
+  await expect(page.getByTestId('admin-dashboard-stat-users-value')).toContainText(String(managedUsers.length))
 
   const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {
     'X-User-Key': userKey
@@ -690,7 +705,6 @@ test('后台模块 smoke', async ({ page }) => {
 
   await page.goto('/admin/audit-logs')
   await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
-  const firstAuditLog = auditResponse.json?.data?.items?.[0]
   if (firstAuditLog) {
     await expect(page.getByTestId(`admin-audit-log-row-${firstAuditLog.id}`)).toContainText(
       `${firstAuditLog.targetType} #${firstAuditLog.targetId}`

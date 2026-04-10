@@ -28,9 +28,9 @@
           class="glass-panel stat-card"
           :data-testid="stat.testId"
         >
-          <div class="stat-card__label">{{ stat.title }}</div>
-          <div class="stat-card__value">{{ stat.value }}</div>
-          <div class="stat-card__detail">{{ stat.detail }}</div>
+          <div class="stat-card__label" :data-testid="`${stat.testId}-label`">{{ stat.title }}</div>
+          <div class="stat-card__value" :data-testid="`${stat.testId}-value`">{{ stat.value }}</div>
+          <div class="stat-card__detail" :data-testid="`${stat.testId}-detail`">{{ stat.detail }}</div>
         </article>
       </div>
 
@@ -132,6 +132,16 @@ const userItems = ref<AdminUserItem[]>([])
 const openReports = computed(() => reportItems.value.filter((item) => item.status === '待处理'))
 const bannedUsers = computed(() => userItems.value.filter((item) => item.status === '已封禁'))
 
+function formatAuditAction(action?: string) {
+  if (!action) return '暂无治理动作'
+
+  return action
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((segment) => `${segment[0].toUpperCase()}${segment.slice(1).toLowerCase()}`)
+    .join(' ')
+}
+
 const coreStats = computed(() => [
   {
     title: '待处理举报',
@@ -142,7 +152,7 @@ const coreStats = computed(() => [
   {
     title: '最近治理动作',
     value: String(auditItems.value.length),
-    detail: auditItems.value[0]?.action || '暂无治理动作',
+    detail: formatAuditAction(auditItems.value[0]?.action),
     testId: 'admin-dashboard-stat-audit-actions'
   },
   {
@@ -176,7 +186,7 @@ const pendingTasks = computed<DashboardTask[]>(() => {
   return auditItems.value.slice(0, 3).map((item) => ({
     id: `audit-${item.id}`,
     typeLabel: '治理记录',
-    title: item.action,
+    title: formatAuditAction(item.action),
     description: `${item.target} · 操作人 ${item.operatorKey}`,
     link: '/admin/users',
     linkLabel: '查看明细'
@@ -190,7 +200,7 @@ const dashboardMeta = computed(() => {
     return `已加载 ${reportItems.value.length} 条举报 / ${userItems.value.length} 个用户`
   }
 
-  return `最近动作 ${auditItems.value[0].action} · 已加载 ${reportItems.value.length} 条举报`
+  return `最近动作 ${formatAuditAction(auditItems.value[0].action)} · 已加载 ${reportItems.value.length} 条举报`
 })
 
 async function loadDashboard() {
