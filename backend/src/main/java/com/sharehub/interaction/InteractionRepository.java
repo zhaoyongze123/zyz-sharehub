@@ -3,6 +3,7 @@ package com.sharehub.interaction;
 import com.sharehub.admin.AdminAuditLogDto;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
+import com.sharehub.note.NoteRepository;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resource.ResourceRepository;
 import java.sql.PreparedStatement;
@@ -26,10 +27,16 @@ public class InteractionRepository {
 
     private final JdbcTemplate jdbcTemplate;
     private final ResourceRepository resourceRepository;
+    private final NoteRepository noteRepository;
 
-    public InteractionRepository(JdbcTemplate jdbcTemplate, ResourceRepository resourceRepository) {
+    public InteractionRepository(
+        JdbcTemplate jdbcTemplate,
+        ResourceRepository resourceRepository,
+        NoteRepository noteRepository
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.resourceRepository = resourceRepository;
+        this.noteRepository = noteRepository;
     }
 
     private static final String STATUS_VISIBLE = "VISIBLE";
@@ -261,6 +268,15 @@ public class InteractionRepository {
 
     public ReportRecord saveReport(Long resourceId, String reason, String reporter) {
         requireResource(resourceId);
+        return insertReport("RESOURCE", resourceId, reason, reporter);
+    }
+
+    public ReportRecord saveNoteReport(Long noteId, String reason, String reporter) {
+        requireNote(noteId);
+        return insertReport("NOTE", noteId, reason, reporter);
+    }
+
+    private ReportRecord insertReport(String targetType, Long targetId, String reason, String reporter) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
@@ -271,8 +287,8 @@ public class InteractionRepository {
                         """,
                     new String[] {"id"}
                 );
-                statement.setString(1, "RESOURCE");
-                statement.setLong(2, resourceId);
+                statement.setString(1, targetType);
+                statement.setLong(2, targetId);
                 statement.setString(3, reporter);
                 statement.setString(4, reason == null || reason.isBlank() ? "无" : reason);
                 statement.setString(5, null);
@@ -475,6 +491,12 @@ public class InteractionRepository {
     private void requireResource(Long resourceId) {
         if (resourceId == null || !resourceRepository.existsById(resourceId)) {
             throw new NotFoundException("RESOURCE_NOT_FOUND");
+        }
+    }
+
+    private void requireNote(Long noteId) {
+        if (noteId == null || !noteRepository.existsById(noteId)) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
         }
     }
 

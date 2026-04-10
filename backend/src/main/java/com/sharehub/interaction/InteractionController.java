@@ -6,6 +6,7 @@ import com.sharehub.common.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -112,9 +113,15 @@ public class InteractionController {
         @RequestBody Map<String, String> req
     ) {
         String reporter = requireActiveUser(authentication, request);
-        long resourceId = Long.parseLong(req.getOrDefault("resourceId", "0"));
+        String targetType = req.getOrDefault("targetType", req.containsKey("noteId") ? "NOTE" : "RESOURCE")
+            .trim()
+            .toUpperCase(Locale.ROOT);
         String reason = req.getOrDefault("reason", "无");
-        InteractionRepository.ReportRecord report = repository.saveReport(resourceId, reason, reporter);
+        InteractionRepository.ReportRecord report = switch (targetType) {
+            case "NOTE" -> repository.saveNoteReport(Long.parseLong(req.getOrDefault("noteId", "0")), reason, reporter);
+            case "RESOURCE" -> repository.saveReport(Long.parseLong(req.getOrDefault("resourceId", "0")), reason, reporter);
+            default -> throw new IllegalArgumentException("Unsupported target type: " + targetType);
+        };
         return ApiResponse.ok(report);
     }
 

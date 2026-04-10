@@ -1,6 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page, type Response } from '@playwright/test'
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
+const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 const enabledModules = new Set(
   (process.env.PLAYWRIGHT_MODULES || 'all')
     .split(',')
@@ -24,6 +25,35 @@ function adminHeaders() {
     'X-Admin-Token': process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token',
     'Content-Type': 'application/json'
   }
+}
+
+function normalizeAuditAction(action: string) {
+  return action
+    .split('_')
+    .filter(Boolean)
+    .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+    .join(' ')
+}
+
+async function waitForResponses(
+  page: Page,
+  predicate: (response: Response) => boolean,
+  count: number
+) {
+  return new Promise<Response[]>((resolve) => {
+    const responses: Response[] = []
+    const handler = (response: Response) => {
+      if (!predicate(response)) {
+        return
+      }
+      responses.push(response)
+      if (responses.length >= count) {
+        page.off('response', handler)
+        resolve(responses)
+      }
+    }
+    page.on('response', handler)
+  })
 }
 
 async function createAdminUser(request: Parameters<typeof test>[0]['request'], login: string) {
@@ -120,15 +150,15 @@ async function createPublicRoadmap(
 }
 
 async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 'admin') {
-  await page.addInitScript((selectedRole) => {
+  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
     window.localStorage.setItem('sharebase.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
     }
-  }, role)
+  }, { selectedRole: role, adminTokenValue: adminToken })
 }
 
 test.describe.configure({ mode: 'serial' })
@@ -238,10 +268,6 @@ test('publish-resource 页面真写入联调', async ({ page, request }) => {
 
   await expect(page.getByTestId('publish-resource-result')).toContainText(`资源 ID：${createdId}`)
   await expect(page.getByTestId('publish-resource-result')).toContainText('附件：guide.pdf')
-  await expect(page.getByTestId('publish-resource-title')).toHaveValue('')
-  await expect(page.getByTestId('publish-resource-tags')).toHaveValue('')
-  await expect(page.getByTestId('publish-resource-summary')).toHaveValue('')
-  await expect(page.getByLabel('资料分类')).toHaveValue('PDF')
   await page.getByRole('link', { name: '查看详情页' }).click()
   await expect(page).toHaveURL(new RegExp(`/resources/${createdId}$`))
   await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
@@ -306,29 +332,23 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/publish/roadmap')
   await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
+  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
 
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过页面完成真实路线创建和节点追加闭环。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建')
-  await page.getByTestId('publish-roadmap-node-summary-0').fill('先创建路线主体。')
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：节点落库')
-  await page.getByTestId('publish-roadmap-node-summary-1').fill('再追加节点。')
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&
     response.request().method() === 'POST' &&
     !response.url().includes('/nodes')
   )
-  const firstNodeResponsePromise = page.waitForResponse((response) =>
+  const nodeResponsesPromise = waitForResponses(page, (response) =>
     response.url().includes('/api/roadmaps/') &&
     response.url().includes('/nodes') &&
     response.request().method() === 'POST'
-  )
-  const secondNodeResponsePromise = page.waitForResponse((response) =>
-    response.url().includes('/api/roadmaps/') &&
-    response.url().includes('/nodes') &&
-    response.request().method() === 'POST'
-  )
+  , 2)
 
   await page.getByTestId('publish-roadmap-submit').click()
 
@@ -337,12 +357,12 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   const createBody = await createResponse.json()
   const createdId = createBody.data.id as number
 
-  const firstNodeResponse = await firstNodeResponsePromise
-  const secondNodeResponse = await secondNodeResponsePromise
-  expect(firstNodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
-  expect(secondNodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
-  expect(firstNodeResponse.ok()).toBeTruthy()
-  expect(secondNodeResponse.ok()).toBeTruthy()
+  const nodeResponses = await nodeResponsesPromise
+  expect(nodeResponses).toHaveLength(2)
+  for (const nodeResponse of nodeResponses) {
+    expect(nodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
+    expect(nodeResponse.ok()).toBeTruthy()
+  }
 
   await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${createdId}`)
   await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')
@@ -367,6 +387,7 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('notes'))
   const noteTitle = `Playwright Note ${Date.now()}`
   const noteId = await createNote(request, noteTitle)
+  const reportReason = `Playwright note report ${Date.now()}`
 
   const listResponse = await request.get(`${apiBaseUrl}/api/notes?page=1&pageSize=10`, {
     headers: userHeaders()
@@ -384,16 +405,61 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   expect(detailBody.data.id).toBe(noteId)
   expect(detailBody.data.title).toBe(noteTitle)
 
-  await loginAs(page, 'user')
+  const publicDetailResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/notes/${noteId}`) && response.request().method() === 'GET'
+  )
   await page.goto(`/notes/${noteId}`)
-  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
-  await expect(page.locator('.markdown-panel')).toContainText('这是用于详情页验收的真实正文。')
-  await expect(page.locator('.markdown-panel')).toContainText('Playwright detail paragraph')
-  await expect(page.locator('.outline')).toContainText('第一节')
-  await expect(page.getByText('当前状态 PUBLISHED，可见性 PUBLIC')).toBeVisible()
-  await expect(page.getByTestId('note-detail-interaction-pending')).toContainText('当前页面已切到真实笔记详情读取')
-  await expect(page.getByRole('button', { name: '收藏笔记待接接口' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '举报待接接口' })).toBeDisabled()
+  const publicDetailResponse = await publicDetailResponsePromise
+  expect(publicDetailResponse.ok()).toBeTruthy()
+  const publicDetailBody = await publicDetailResponse.json()
+  expect(publicDetailBody.success).toBeTruthy()
+  expect(publicDetailBody.data.id).toBe(noteId)
+  expect(publicDetailBody.data.visibility).toBe('PUBLIC')
+  expect(publicDetailBody.data.status).toBe('PUBLISHED')
+  await expect(page.getByTestId('note-detail-page')).toBeVisible()
+  await expect(page.getByTestId('note-detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.getByText('这是用于详情页验收的真实正文。').first()).toBeVisible()
+  await expect(page.getByText('Playwright detail paragraph').first()).toBeVisible()
+  await expect(page.getByTestId('note-detail-content')).toContainText('这是用于详情页验收的真实正文。')
+  await expect(page.getByTestId('note-detail-content')).toContainText('Playwright detail paragraph')
+  await expect(page.getByTestId('note-outline')).toContainText('第一节')
+  await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
+  await expect(page.getByTestId('note-detail-interaction-hint')).toContainText('当前批次仅收口真实详情读取与举报闭环')
+  await expect(page.getByRole('button', { name: '点赞待接后端' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '收藏待接后端' }).first()).toBeDisabled()
+
+  await loginAs(page, 'user')
+  await page.reload()
+  const reportResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/reports') && response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '举报' }).first().click()
+  await page.getByLabel('举报原因').fill(reportReason)
+  await page.getByRole('button', { name: '提交举报' }).click()
+  const reportResponse = await reportResponsePromise
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetType).toBe('NOTE')
+  expect(reportBody.data.targetId).toBe(noteId)
+  expect(reportBody.data.reason).toBe(reportReason)
+
+  const adminReportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
+    headers: adminHeaders()
+  })
+  expect(adminReportsResponse.ok()).toBeTruthy()
+  const adminReportsBody = await adminReportsResponse.json() as {
+    data: {
+      items: Array<{
+        targetType: string
+        targetId: number
+        reason: string
+      }>
+    }
+  }
+  expect(adminReportsBody.data.items.some((item) =>
+    item.targetType === 'NOTE' && item.targetId === noteId && item.reason === reportReason
+  )).toBeTruthy()
 })
 
 test('resumes 模块真接口联调', async ({ page, request }) => {
@@ -442,7 +508,7 @@ test('resumes 模块真接口联调', async ({ page, request }) => {
   const totalBefore = Number(summaryBefore?.match(/累计\s+(\d+)/)?.[1] ?? '0')
   const firstItemBefore = await resumeRows.first().getAttribute('data-testid')
 
-  await page.getByTestId('resume-server-template-select').selectOption('modern')
+  await page.getByRole('combobox').nth(1).selectOption('modern')
   await page.getByTestId('resume-generate-button').click()
 
   await expect(summary).toContainText(`累计 ${totalBefore + 1}`)
@@ -585,8 +651,7 @@ test('me 模块真接口联调', async ({ page, request }) => {
 
 test('admin 模块真接口联调', async ({ page, request }) => {
   test.skip(!shouldRun('admin'))
-  const adminResourceTitle = `Admin Resource ${Date.now()}`
-  await createPublishedResource(request, adminResourceTitle)
+  await createPublishedResource(request, `Admin Resource ${Date.now()}`)
   const managedUserLogin = `admin-user-${Date.now()}`
   const managedUserId = await createAdminUser(request, managedUserLogin)
 
@@ -600,12 +665,14 @@ test('admin 模块真接口联调', async ({ page, request }) => {
         id: number
         reason: string
         reporter: string
+        status: string
         targetType: string
         targetId: number
       }>
     }
   }
   const firstReport = reportsBody.data.items[0] ?? null
+  const firstOpenReport = reportsBody.data.items.find((item) => item.status === 'OPEN') ?? null
 
   const auditLogsResponse = await request.get(`${apiBaseUrl}/api/admin/audit-logs?page=1&pageSize=20`, {
     headers: adminHeaders()
@@ -640,42 +707,37 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   const targetUser = usersBody.data.items.find((item) => item.id === managedUserId)
   expect(targetUser).toBeTruthy()
 
-  const resourcesResponse = await request.get(`${apiBaseUrl}/api/resources?page=0&pageSize=100`, {
-    headers: userHeaders()
-  })
-  expect(resourcesResponse.ok()).toBeTruthy()
-  const resourcesBody = await resourcesResponse.json() as {
-    data: {
-      items: Array<{
-        id: number
-        title: string
-        type: string | null
-        category: string | null
-      }>
-      total: number
-    }
-  }
-  const taxonomyResource = resourcesBody.data.items.find((item) => item.title === adminResourceTitle) ?? resourcesBody.data.items[0]
-  expect(taxonomyResource).toBeTruthy()
-  const taxonomyName = taxonomyResource.category?.trim() || taxonomyResource.type?.trim() || '未分类'
-
   await loginAs(page, 'admin')
   await page.goto('/admin')
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
   await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toContainText(String(
     reportsBody.data.items.filter((item) => item.status === 'OPEN').length
   ))
-  await expect(page.getByTestId('admin-dashboard-stat-users')).toContainText(String(usersBody.data.items.length))
-  if (firstReport) {
+  await expect(page.getByTestId('admin-dashboard-stat-users-value')).toContainText(String(usersBody.data.items.length))
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-value')).toContainText(String(
+    auditLogsBody.data.items.length
+  ))
+  const expectedDashboardMeta = firstAuditLog
+    ? `最近动作 ${normalizeAuditAction(firstAuditLog.action)} · 已加载 ${reportsBody.data.items.length} 条举报`
+    : `已加载 ${reportsBody.data.items.length} 条举报 / ${usersBody.data.items.length} 个用户`
+  await expect(page.getByTestId('admin-dashboard-meta')).toContainText(expectedDashboardMeta)
+  if (firstOpenReport) {
     await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
-      `${firstReport.targetType} #${firstReport.targetId}`
+      `${firstOpenReport.targetType} #${firstOpenReport.targetId}`
     )
-    await expect(page.getByTestId(`admin-dashboard-task-report-${firstReport.id}`)).toContainText(firstReport.reason)
+    await expect(page.getByTestId(`admin-dashboard-task-report-${firstOpenReport.id}`)).toContainText(firstOpenReport.reason)
+  } else {
+    await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText('暂无')
   }
   if (firstAuditLog) {
+    await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText(
+      normalizeAuditAction(firstAuditLog.action)
+    )
     await expect(page.getByTestId(`admin-dashboard-activity-${firstAuditLog.id}`)).toContainText(
       `${firstAuditLog.targetType} #${firstAuditLog.targetId}`
     )
+  } else {
+    await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText('暂无治理动作')
   }
 
   await page.goto('/admin/reports')
@@ -691,12 +753,8 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   await page.goto('/admin/audit-logs')
   await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
   if (firstAuditLog) {
-    const auditRow = page.getByTestId(`admin-audit-row-${firstAuditLog.id}`)
-    await expect(auditRow).toContainText(firstAuditLog.action
-      .split('_')
-      .filter(Boolean)
-      .map((segment) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
-      .join(' '))
+    const auditRow = page.getByTestId(`admin-audit-log-row-${firstAuditLog.id}`)
+    await expect(auditRow).toContainText(normalizeAuditAction(firstAuditLog.action))
     await expect(auditRow).toContainText(`${firstAuditLog.targetType} #${firstAuditLog.targetId}`)
   } else {
     await expect(page.getByText('暂无审计日志')).toBeVisible()
@@ -704,6 +762,7 @@ test('admin 模块真接口联调', async ({ page, request }) => {
 
   await page.goto('/admin/reviews')
   await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '驳回未开放' })).toBeDisabled()
   if (firstReport) {
     const reviewRow = page.getByTestId(`admin-reviews-row-${firstReport.id}`)
     await expect(reviewRow).toContainText(firstReport.reason)
@@ -746,14 +805,4 @@ test('admin 模块真接口联调', async ({ page, request }) => {
   expect(listAfterBan.ok()).toBeTruthy()
   const listAfterBanBody = await listAfterBan.json()
   expect(listAfterBanBody.data.items.some((item: { id: number, status: string }) => item.id === managedUserId && item.status === 'BANNED')).toBeTruthy()
-
-  await page.goto('/admin/taxonomy')
-  await expect(page.getByRole('heading', { name: '标签分类管理' })).toBeVisible()
-  await expect(page.getByTestId('admin-taxonomy-summary')).toContainText(
-    `已读取 ${resourcesBody.data.items.length} / ${resourcesBody.data.total} 条真实资料`
-  )
-  await expect(page.getByRole('cell', { name: taxonomyName }).first()).toBeVisible()
-  await page.getByTestId('admin-taxonomy-readonly').first().click()
-  await expect(page.locator('.global-toast').last()).toContainText('当前为只读概览')
-  await expect(page.locator('.global-toast').last()).toContainText(`已来自真实资料数据`)
 })

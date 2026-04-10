@@ -28,12 +28,6 @@
               placeholder="阶段标题"
               :data-testid="`publish-roadmap-node-title-${index}`"
             />
-            <BaseTextarea
-              v-model="node.summary"
-              label="节点说明"
-              placeholder="阶段任务和里程碑"
-              :data-testid="`publish-roadmap-node-summary-${index}`"
-            />
           </div>
         </div>
 
@@ -70,7 +64,7 @@
     </section>
 
     <aside class="side-stack">
-      <BaseEmpty title="关联资料" description="当前批次先收口创建后追加节点流程，资料绑定后续再补。" />
+      <BaseEmpty title="关联资料" description="当前批次先收口路线创建与节点顺序写入，资料绑定后续再补。" />
       <BaseEmpty title="发布校验" :description="statusDescription" />
       <div v-if="lastCreatedRoadmapId" class="glass-panel publish-result" data-testid="publish-roadmap-result">
         <p class="publish-result__title">真实路线写入已完成</p>
@@ -83,6 +77,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -100,19 +95,19 @@ const validationMessage = ref('')
 const lastCreatedRoadmapId = ref<number | null>(null)
 const lastCreatedNodeCount = ref(0)
 const nodes = reactive([
-  { id: 1, title: '阶段 1：协议与接入', summary: '' },
-  { id: 2, title: '阶段 2：工作流编排', summary: '' }
+  { id: 1, title: '阶段 1：协议与接入' },
+  { id: 2, title: '阶段 2：工作流编排' }
 ])
 
 const statusDescription = computed(() => {
   if (lastCreatedRoadmapId.value) {
     return `已通过真实接口创建路线 #${lastCreatedRoadmapId.value}，并写入 ${lastCreatedNodeCount.value} 个节点。`
   }
-  return `${nodes.length} 个节点待提交，发布时会先创建路线，再逐个追加节点。`
+  return `${nodes.length} 个节点待提交；当前真实接口仅写入节点标题和顺序。`
 })
 
 function addNode() {
-  nodes.push({ id: Date.now(), title: '', summary: '' })
+  nodes.push({ id: Date.now(), title: '' })
 }
 
 function validateForm() {
@@ -133,7 +128,17 @@ function resetForm() {
   title.value = ''
   summary.value = ''
   validationMessage.value = ''
-  nodes.splice(0, nodes.length, { id: Date.now(), title: '阶段 1：协议与接入', summary: '' })
+  nodes.splice(0, nodes.length, { id: Date.now(), title: '阶段 1：协议与接入' })
+}
+
+function resolveSubmitError(error: unknown, fallbackMessage: string) {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.msg || error.response?.data?.message || fallbackMessage
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return fallbackMessage
 }
 
 async function submitRoadmap(status: 'DRAFT' | 'PUBLISHED') {
@@ -165,6 +170,11 @@ async function submitRoadmap(status: 'DRAFT' | 'PUBLISHED') {
     lastCreatedNodeCount.value = nodes.length
     appStore.showToast(status === 'DRAFT' ? '草稿已保存' : '发布成功', `路线 #${created.id} 已完成真实写入`)
     resetForm()
+  } catch (error) {
+    validationMessage.value = resolveSubmitError(
+      error,
+      status === 'DRAFT' ? '路线草稿保存失败，请稍后重试' : '路线发布失败，请稍后重试'
+    )
   } finally {
     isSubmitting.value = false
   }

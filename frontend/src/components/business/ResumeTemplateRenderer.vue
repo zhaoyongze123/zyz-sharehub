@@ -170,7 +170,7 @@ const basicAvatarField = computed(() => {
   return fields.find((field) => field.visible && field.key === 'avatar') ?? null
 })
 
-const basicMetaKeys = ['phone', 'email', 'city', 'currentCity', 'experience', 'education', 'gender', 'age']
+const basicMetaKeys = ['phone', 'email', 'city', 'currentCity', 'experience', 'education', 'gender', 'age', 'arrival']
 
 const basicMetaFields = computed(() => {
   const fields = basicSection.value?.fields ?? []
@@ -270,6 +270,7 @@ function visibleItems(section: ResumeSection): ResumeItem[] {
 }
 
 .resume-avatar-slot {
+  margin-left: auto;
   width: 86px;
   min-width: 86px;
   height: 112px;

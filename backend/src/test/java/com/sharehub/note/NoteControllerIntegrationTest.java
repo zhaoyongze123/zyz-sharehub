@@ -106,8 +106,8 @@ public class NoteControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
 
         mvc.perform(get("/api/notes/1"))
-            .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
 
         mvc.perform(put("/api/notes/1")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -199,6 +199,68 @@ public class NoteControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
 
         mvc.perform(delete("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldAllowAnonymousAccessToPublishedPublicNoteDetail() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Public Published Note","contentMd":"# content","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Map<?, ?> created = mapper.readValue(response, Map.class);
+        Map<?, ?> data = (Map<?, ?>) created.get("data");
+        Long id = Long.valueOf(data.get("id").toString());
+
+        mvc.perform(get("/api/notes/" + id))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(id))
+            .andExpect(jsonPath("$.data.title").value("Public Published Note"))
+            .andExpect(jsonPath("$.data.visibility").value("PUBLIC"))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+    }
+
+    @Test
+    void shouldAllowOtherUsersToReadPublishedPublicNoteDetailOnly() throws Exception {
+        String publicResponse = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Public Published Note","contentMd":"# content","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+        Long publicId = Long.valueOf(((Map<?, ?>) ((Map<?, ?>) mapper.readValue(publicResponse, Map.class)).get("data")).get("id").toString());
+
+        String privateResponse = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Private Draft Note","contentMd":"# content","visibility":"PRIVATE","status":"DRAFT"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+        Long privateId = Long.valueOf(((Map<?, ?>) ((Map<?, ?>) mapper.readValue(privateResponse, Map.class)).get("data")).get("id").toString());
+
+        mvc.perform(get("/api/notes/" + publicId)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.title").value("Public Published Note"));
+
+        mvc.perform(get("/api/notes/" + privateId)
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));

@@ -4,6 +4,31 @@
 
 让 ShareHub 项目从当前时刻开始，由单一 `supervisor` 常驻推进：启动立即执行一轮，之后每轮结束自动触发下一轮，到次日早上 9 点停止。
 
+说明：
+- “整站完成”按当前产品边界判定，不等于所有页面都必须接后端真接口。
+- 简历模块当前定义为纯前端界面能力，因此夜间自动化对简历只要求前端 smoke / 交互验收通过，不再要求 `/api/resumes/*` 真接口联调。
+- 进一步地，当前整站完成判定已不再把简历模块列为硬门槛，避免自动化继续围绕简历后端链路空转。
+
+## 当前完成态
+
+- 批次 1-3 已完成，当前整站完成判定依赖批次 4 的全站浏览器走查与收尾材料一致性
+- 批次 4 的核心验证命令如下：
+
+```bash
+cd /Users/mac/Documents/New\ project/frontend
+PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
+PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
+npx playwright test tests/e2e/full-site-walkthrough.spec.ts
+```
+
+- 若前端已通过 `npm run dev` 运行在 `5173`，可直接把 `PLAYWRIGHT_BASE_URL` 改为 `http://127.0.0.1:5173` 复用现有服务，无需额外起一份 preview。
+- 最近一次人工复核：2026-04-10 08:40 +0800，使用前端 `http://127.0.0.1:14173`、后端 `http://127.0.0.1:18080` 执行 `full-site-walkthrough.spec.ts`，结果 7/7 通过（13.1s，本轮夜间复核）。
+
+- 只有当上述走查通过，且以下材料都存在并与当前联调方式一致时，夜间自动化才应判定整站完成：
+  - `docs/deployment-runbook.md`
+  - `docs/release-checklist.md`
+  - `docs/demo-script.md`
+
 ## 角色模型
 
 - 经理：读取需求、拆分任务、派发、审核、收口
@@ -57,6 +82,7 @@ cd /Users/mac/Documents/New\ project
 - 当前轮次结束后，`supervisor` 会自动启动下一轮
 - 如果单轮执行超时、保活进程退出或状态文件异常，`supervisor` 会自动自愈
 - `supervisor` 会在每轮结束后执行一次“整站完成判定”；若所有机器可判定验收项都满足，则自动停止，不再继续下一轮
+- 整站完成判定以当前产品边界为准；已被明确降级为纯前端或非夜间目标的模块，不应继续作为阻塞项
 - 当判定整站已完成时，会自动发一条飞书通知：`ShareHub 夜间推进已全部完成`
 - 夜间值守使用独立 `output/overnight/codex-home` 作为 `CODEX_HOME`，避免和桌面会话共享状态库
 - 到 09:00 后 supervisor 自动退出
@@ -65,6 +91,10 @@ cd /Users/mac/Documents/New\ project
 - `hourly-run` 通过 `output/overnight/state/hourly-run.lock` 保证同一时刻只会有一个轮次执行；重复触发时会直接跳过，不再并发拉起第二轮
 - `hourly-run` 启动时会先把自身脚本复制到 `output/overnight/state/hourly-run.exec.sh` 再执行，避免值守过程中脚本被覆盖后同一轮前后逻辑漂移
 - 每轮代码成功后会自动启动前后端，并执行对应模块的 Playwright 浏览器 smoke；联调失败则本轮失败，不按成功态继续推进
+- 完成判定会区分模块边界：资源、路线、个人中心、后台治理等继续按真接口联调验收；简历模块按纯前端页面验收
+- 当批次 1-3 收口后，夜间自动化会继续进入“批次 4：全站浏览器走查 + 收尾材料”
+- 批次 4 会执行全站 Playwright 走查；若失败，则进入“修复 -> 回归 -> 再走查”的闭环
+- 当全站走查通过且部署 / 发布 / 演示材料齐备时，才判定整站真正完成
 - 当浏览器 smoke 成功后，会继续派发一个独立前端跟进子代理，只处理本轮已通过联调的模块对应前端页面，并推送到独立前端分支
 - 浏览器联调优先走 cloud-dev 后端；若缺少 PostgreSQL/Redis 密码，则自动回落到本机 smoke profile，避免整夜因环境变量缺失直接停摆
 - 浏览器 smoke 在健康检查成功后，还会对前后端分别做一次短时稳定性校验，避免服务刚启动即退出却被误判为可用

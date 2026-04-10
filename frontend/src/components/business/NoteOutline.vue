@@ -1,5 +1,5 @@
 <template>
-  <div class="outline glass-panel">
+  <div class="outline glass-panel" data-testid="note-outline">
     <h4>目录</h4>
     <ul>
       <li v-for="item in items" :key="item">{{ item }}</li>

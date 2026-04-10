@@ -1,5 +1,5 @@
 <template>
-  <div v-if="loading" class="page-shell detail-grid">
+  <div v-if="loading" class="page-shell detail-grid" data-testid="note-detail-loading">
     <section class="detail-main">
       <BaseSkeleton height="14rem" />
       <BaseSkeleton height="12rem" />
@@ -10,23 +10,34 @@
     </aside>
   </div>
 
-  <div class="page-shell detail-grid" v-else-if="note">
-    <section class="detail-main">
+  <div class="page-shell detail-grid" v-else-if="note" data-testid="note-detail-page">
+    <section class="detail-main" data-testid="note-detail-main">
       <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
         <template #actions>
-          <BaseButton disabled>收藏笔记待接接口</BaseButton>
-          <BaseButton variant="secondary" disabled>举报待接接口</BaseButton>
+          <BaseButton disabled>收藏待接后端</BaseButton>
+          <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
         </template>
       </HeroBanner>
 
-      <div class="glass-panel interaction-pending" data-testid="note-detail-interaction-pending">
-        <p class="interaction-pending__title">互动能力待接后端</p>
-        <p>当前页面已切到真实笔记详情读取，点赞、收藏、举报接口尚未提供，已移除本地模拟成功反馈。</p>
-      </div>
+      <InteractionBar
+        :likes="0"
+        :favorites="0"
+        disable-like
+        disable-favorite
+        like-label="点赞待接后端"
+        favorite-label="收藏待接后端"
+        @report="reportVisible = true"
+      />
 
-      <article class="glass-panel markdown-panel" v-html="renderedHtml"></article>
+      <BaseEmpty
+        title="互动说明"
+        description="当前批次仅收口真实详情读取与举报闭环，点赞和收藏按钮已禁用，待后端提供对应接口后再开放。"
+        data-testid="note-detail-interaction-hint"
+      />
 
-      <div class="glass-panel panel">
+      <article class="glass-panel markdown-panel" data-testid="note-detail-content" v-html="renderedHtml"></article>
+
+      <div class="glass-panel panel" data-testid="note-detail-related">
         <div class="section-heading">
           <h2>相关推荐</h2>
           <p>当前接口尚未返回相关推荐，后续可继续补齐关联笔记能力。</p>
@@ -42,19 +53,28 @@
       </div>
     </section>
 
-    <aside class="detail-side">
+    <aside class="detail-side" data-testid="note-detail-side">
       <NoteOutline :items="noteOutline" />
       <BaseEmpty title="笔记状态" :description="noteStatusDescription" />
     </aside>
+
+    <ReportDialog
+      v-model:reason="reportReason"
+      :visible="reportVisible"
+      :submitting="reporting"
+      :error-message="reportErrorMessage"
+      @close="closeReportDialog"
+      @submit="submitReport"
+    />
   </div>
 
-  <div v-else-if="notFound" class="page-shell">
+  <div v-else-if="notFound" class="page-shell" data-testid="note-detail-not-found">
     <BaseErrorState title="笔记不存在" description="可能已删除、当前账号不可见，或你访问了他人的笔记。">
       <BaseButton @click="router.push('/community')">返回社区</BaseButton>
     </BaseErrorState>
   </div>
 
-  <div v-else class="page-shell">
+  <div v-else class="page-shell" data-testid="note-detail-error">
     <BaseErrorState title="笔记加载失败" description="服务暂时不可用，请稍后刷新重试。" />
   </div>
 </template>
@@ -63,17 +83,26 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import { fetchNoteDetail, type NoteDTO } from '@/api/notes'
+import { createReport } from '@/api/reports'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import HeroBanner from '@/components/business/HeroBanner.vue'
+import InteractionBar from '@/components/business/InteractionBar.vue'
 import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
+import ReportDialog from '@/components/business/ReportDialog.vue'
+import { useAppStore } from '@/stores/app'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
+const appStore = useAppStore()
+const reportVisible = ref(false)
+const reportReason = ref('')
+const reporting = ref(false)
+const reportErrorMessage = ref('')
 const loading = ref(true)
 const notFound = ref(false)
 const note = ref<NoteDTO | null>(null)
@@ -117,6 +146,49 @@ async function loadNote() {
     }
   } finally {
     loading.value = false
+  }
+}
+
+function closeReportDialog() {
+  if (reporting.value) {
+    return
+  }
+  reportVisible.value = false
+  reportReason.value = ''
+  reportErrorMessage.value = ''
+}
+
+async function submitReport() {
+  if (!note.value || reporting.value) {
+    return
+  }
+
+  if (!reportReason.value.trim()) {
+    reportErrorMessage.value = '请填写举报原因'
+    return
+  }
+
+  reporting.value = true
+  reportErrorMessage.value = ''
+
+  try {
+    const report = await createReport({
+      targetType: 'NOTE',
+      noteId: note.value.id,
+      reason: reportReason.value.trim()
+    })
+    appStore.showToast('举报已提交', `举报 #${report.id} 已进入后台处理队列`)
+    closeReportDialog()
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      reportErrorMessage.value = error.response?.data?.msg || error.response?.data?.message || '举报提交失败，请稍后重试'
+    } else {
+      reportErrorMessage.value = error instanceof Error && error.message.trim()
+        ? error.message
+        : '举报提交失败，请稍后重试'
+    }
+  } finally {
+    reporting.value = false
   }
 }
 
@@ -169,17 +241,6 @@ onMounted(() => {
 .markdown-panel,
 .panel {
   padding: var(--space-6);
-}
-
-.interaction-pending {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4);
-}
-
-.interaction-pending__title {
-  margin: 0;
-  font-weight: 600;
 }
 
 .markdown-panel :deep(h1),

@@ -13,7 +13,7 @@
           placeholder="例如：RAG 评测 checklist"
           data-testid="publish-resource-title"
         />
-        <BaseSelect v-model="form.category" label="资料分类" :options="categoryOptions" />
+        <BaseSelect v-model="form.category" label="资料分类" :options="publishCategoryOptions" />
         <BaseInput
           v-model="form.tags"
           label="标签"
@@ -79,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -93,11 +94,10 @@ import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
 const uploadMode = ref('file')
-// 分类选项改用真实接口的前端常量，避免依赖 mock 资源
-const categoryOptions = resourceCategoryOptions
+const publishCategoryOptions = resourceCategoryOptions
   .filter((item) => item !== '全部')
   .map((item) => ({ label: item, value: item }))
-const defaultCategory = categoryOptions[0]?.value || ''
+const defaultCategory = computed(() => publishCategoryOptions[0]?.value || '')
 const selectedFile = ref<File | null>(null)
 const isSubmitting = ref(false)
 const validationMessage = ref('')
@@ -105,7 +105,7 @@ const lastPublishedId = ref<number | null>(null)
 const uploadedFileName = ref('')
 const form = reactive({
   title: '',
-  category: defaultCategory,
+  category: defaultCategory.value,
   tags: '',
   url: '',
   summary: ''
@@ -163,12 +163,22 @@ function validateForm() {
 
 function resetForm() {
   form.title = ''
-  form.category = defaultCategory
+  form.category = defaultCategory.value
   form.tags = ''
   form.url = ''
   form.summary = ''
   selectedFile.value = null
   validationMessage.value = ''
+}
+
+function resolveSubmitError(error: unknown, fallbackMessage: string) {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.msg || error.response?.data?.message || fallbackMessage
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+  return fallbackMessage
 }
 
 async function saveDraft() {
@@ -202,6 +212,8 @@ async function saveDraft() {
 
     lastPublishedId.value = created.id
     appStore.showToast('草稿已保存', `资源 #${created.id} 已通过真实接口创建`)
+  } catch (error) {
+    validationMessage.value = resolveSubmitError(error, '草稿保存失败，请稍后重试')
   } finally {
     isSubmitting.value = false
   }
@@ -240,6 +252,8 @@ async function submitReview() {
     lastPublishedId.value = published.id
     appStore.showToast('提交成功', `资源 #${published.id} 已进入公开展示`)
     resetForm()
+  } catch (error) {
+    validationMessage.value = resolveSubmitError(error, '资料提交失败，请稍后重试')
   } finally {
     isSubmitting.value = false
   }

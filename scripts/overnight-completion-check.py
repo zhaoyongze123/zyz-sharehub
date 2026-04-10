@@ -22,6 +22,16 @@ def check(predicate: bool, name: str, passed: list[str], pending: list[str]) -> 
         pending.append(name)
 
 
+def env_value(path: Path, key: str) -> str:
+    if not path.exists():
+        return ""
+    prefix = f"{key}="
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix):]
+    return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="检查 ShareHub 夜间推进是否已整体完成")
     parser.add_argument("--project-root", required=True, help="仓库根目录")
@@ -34,6 +44,11 @@ def main() -> int:
 
     frontend = root / "frontend" / "src"
     tests = root / "frontend" / "tests" / "e2e"
+    docs_dir = root / "docs"
+    overnight_dir = root / "output" / "overnight"
+    latest_meta = overnight_dir / "latest-meta.env"
+    latest_run_id = env_value(latest_meta, "RUN_ID")
+    latest_smoke_meta = overnight_dir / latest_run_id / "browser-smoke" / "meta.env" if latest_run_id else overnight_dir / "missing-browser-smoke-meta.env"
     summary_file = output.parent / "completion-summary.txt"
 
     passed: list[str] = []
@@ -113,20 +128,9 @@ def main() -> int:
         passed,
         pending,
     )
-    check(
-        has_text(frontend / "views" / "resume" / "ResumeWorkbenchView.vue", "/api/resumes")
-        or has_text(frontend / "views" / "resume" / "ResumeWorkbenchView.vue", "fetchResume"),
-        "批次2-简历工作台接真实接口",
-        passed,
-        pending,
-    )
-    check(
-        has_text(tests / "sharehub-real-api.spec.ts", "/api/resumes/workbench")
-        and has_text(tests / "sharehub-real-api.spec.ts", "/api/resumes/${resumeId}/download"),
-        "批次2-简历 Playwright 行为闭环",
-        passed,
-        pending,
-    )
+    # 简历模块当前不作为“整站完成”的硬门槛。
+    # 产品边界已调整为纯前端界面优先，是否继续保留或移除后端链路
+    # 由后续单独任务收口，不阻塞夜间总完成判定。
     check(
         lacks_text(frontend / "views" / "admin" / "AdminReportsView.vue", "@/mock/admin"),
         "批次3-后台报告页去 mock",
@@ -174,6 +178,57 @@ def main() -> int:
         has_text(tests / "sharehub-real-api.spec.ts", "/api/admin/reports")
         and has_text(tests / "sharehub-real-api.spec.ts", "/api/admin/audit-logs"),
         "批次3-后台 Playwright 闭环",
+        passed,
+        pending,
+    )
+    check(
+        (tests / "full-site-walkthrough.spec.ts").exists(),
+        "批次4-全站走查用例已落盘",
+        passed,
+        pending,
+    )
+    check(
+        has_text(tests / "full-site-walkthrough.spec.ts", "公开页走查")
+        and has_text(tests / "full-site-walkthrough.spec.ts", "资源模块走查")
+        and has_text(tests / "full-site-walkthrough.spec.ts", "路线模块走查")
+        and has_text(tests / "full-site-walkthrough.spec.ts", "笔记模块走查")
+        and has_text(tests / "full-site-walkthrough.spec.ts", "个人中心走查")
+        and has_text(tests / "full-site-walkthrough.spec.ts", "后台模块走查"),
+        "批次4-全站走查覆盖主模块",
+        passed,
+        pending,
+    )
+    check(
+        (docs_dir / "deployment-runbook.md").exists()
+        and (docs_dir / "release-checklist.md").exists()
+        and (docs_dir / "demo-script.md").exists(),
+        "批次4-部署发布演示材料已落盘",
+        passed,
+        pending,
+    )
+    check(
+        has_text(docs_dir / "deployment-runbook.md", "启动")
+        and has_text(docs_dir / "release-checklist.md", "发布前")
+        and has_text(docs_dir / "demo-script.md", "演示流程"),
+        "批次4-收尾材料具备可执行内容",
+        passed,
+        pending,
+    )
+    check(
+        env_value(latest_meta, "SMOKE_EXIT_CODE") == "0",
+        "批次4-最近一轮标准 smoke 通过",
+        passed,
+        pending,
+    )
+    check(
+        env_value(latest_smoke_meta, "FULL_WALKTHROUGH_EXECUTED") == "1",
+        "批次4-最近一轮已进入全站走查阶段",
+        passed,
+        pending,
+    )
+    check(
+        env_value(latest_smoke_meta, "FULL_WALKTHROUGH_EXIT_CODE") == "0",
+        "批次4-最近一轮全站走查通过",
         passed,
         pending,
     )

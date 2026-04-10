@@ -2,7 +2,7 @@
   <div class="admin-view">
     <div class="section-heading">
       <h1>审计日志</h1>
-      <p>查看后台真实治理动作、操作人和目标对象。</p>
+      <p>查看后台真实治理动作、关联对象与操作人。</p>
     </div>
 
     <section v-if="loading" class="glass-panel panel panel-state">
@@ -12,7 +12,7 @@
     <BaseErrorState
       v-else-if="error"
       title="审计日志加载失败"
-      description="暂时无法读取真实审计日志，请稍后重试。"
+      description="暂时无法读取真实治理日志，请稍后重试。"
     />
 
     <section v-else-if="auditItems.length" class="glass-panel panel">
@@ -20,21 +20,17 @@
         <thead>
           <tr>
             <th>治理动作</th>
-            <th>关联目标</th>
+            <th>关联对象</th>
             <th>操作人</th>
             <th>记录时间</th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="item in auditItems"
-            :key="item.id"
-            :data-testid="`admin-audit-row-${item.id}`"
-          >
+          <tr v-for="item in auditItems" :key="item.id" :data-testid="`admin-audit-log-row-${item.id}`">
             <td>{{ item.action }}</td>
             <td>{{ item.target }}</td>
             <td>{{ item.operatorKey }}</td>
-            <td>{{ item.createdAt }}</td>
+            <td>{{ item.createdAt || '待补时间' }}</td>
           </tr>
         </tbody>
       </BaseTable>
@@ -43,7 +39,7 @@
     <BaseEmpty
       v-else
       title="暂无审计日志"
-      description="当前真实审计日志为空。"
+      description="当前真实治理动作列表为空。"
     />
   </div>
 </template>

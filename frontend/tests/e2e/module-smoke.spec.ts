@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type Response } from '@playwright/test'
 
 const enabledModules = new Set(
   (process.env.PLAYWRIGHT_MODULES || 'public').split(',').map((item) => item.trim()).filter(Boolean)
@@ -8,23 +8,16 @@ const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:1808
 const userKey = process.env.PLAYWRIGHT_USER_KEY || 'playwright-user'
 const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
-function userHeaders(user = userKey) {
-  return {
-    'X-User-Key': user,
-    'Content-Type': 'application/json'
-  }
-}
-
 async function loginAs(page: Page, role: 'user' | 'admin') {
-  await page.addInitScript((selectedRole) => {
+  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
     window.localStorage.setItem('sharebase.role', selectedRole)
     window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
     window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
     window.localStorage.setItem('sharebase.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', 'dev-admin-token')
+      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
     }
-  }, role)
+  }, { selectedRole: role, adminTokenValue: adminToken })
 }
 
 function shouldRun(name: string) {
@@ -55,19 +48,25 @@ async function browserFetch(page: Page, path: string, headers: Record<string, st
   })
 }
 
-async function createPublishedNote(request: Parameters<typeof test>[0]['request'], title: string) {
-  const response = await request.post(`${apiBaseUrl}/api/notes`, {
-    headers: userHeaders(),
-    data: {
-      title,
-      contentMd: `# ${title}\n\n这是 smoke 用例写入的真实正文。\n\n## 第一节\nSmoke detail paragraph`,
-      visibility: 'PUBLIC',
-      status: 'PUBLISHED'
+async function waitForResponses(
+  page: Page,
+  predicate: (response: Response) => boolean,
+  count: number
+) {
+  return new Promise<Response[]>((resolve) => {
+    const responses: Response[] = []
+    const handler = (response: Response) => {
+      if (!predicate(response)) {
+        return
+      }
+      responses.push(response)
+      if (responses.length >= count) {
+        page.off('response', handler)
+        resolve(responses)
+      }
     }
+    page.on('response', handler)
   })
-  expect(response.ok()).toBeTruthy()
-  const body = await response.json()
-  return body.data.id as number
 }
 
 test('backend health 可用', async ({ request }) => {
@@ -128,6 +127,23 @@ test('资源模块 smoke', async ({ page }) => {
   await page.locator('article', { hasText: resource.title }).first().getByRole('link', { name: '查看详情' }).click()
   await expect(page.getByRole('heading', { name: resource.title })).toBeVisible()
   await expect(page.getByText(`下载 ${resource.downloadCount}`)).toBeVisible()
+
+  const reportReason = `Smoke resource report ${Date.now()}`
+  await loginAs(page, 'user')
+  await page.reload()
+  const reportResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/reports') && response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '举报' }).click()
+  await page.getByLabel('举报原因').fill(reportReason)
+  await page.getByRole('button', { name: '提交举报' }).click()
+  const reportResponse = await reportResponsePromise
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetType).toBe('RESOURCE')
+  expect(reportBody.data.targetId).toBe(resource.id)
+  expect(reportBody.data.reason).toBe(reportReason)
 })
 
 test('路线模块 smoke', async ({ page }) => {
@@ -158,11 +174,131 @@ test('路线模块 smoke', async ({ page }) => {
   await expect(page.getByText('节点进度结构')).toBeVisible()
 })
 
-test('社区笔记模块 smoke', async ({ page, request }) => {
-  test.skip(!shouldRun('notes'))
-  const noteTitle = `Smoke Note ${Date.now()}`
-  const noteId = await createPublishedNote(request, noteTitle)
+test('资料发布真实写入 smoke', async ({ page, request }) => {
+  test.skip(!shouldRun('resources'))
+  const resourceTitle = `Smoke Publish Resource ${Date.now()}`
+
   await loginAs(page, 'user')
+  await page.goto('/publish/resource')
+  await expect(page.locator('main').getByRole('heading', { name: '发布资料' })).toBeVisible()
+
+  await page.getByTestId('publish-resource-title').fill(resourceTitle)
+  await page.getByTestId('publish-resource-tags').fill('smoke,resource')
+  await page.getByTestId('publish-resource-summary').fill('通过 smoke 用例验证资料发布真实写入。')
+  await page.getByTestId('publish-resource-file').setInputFiles({
+    name: 'smoke-guide.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('smoke-resource-pdf')
+  })
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/publish') &&
+    !response.url().includes('/attachment')
+  )
+  const attachmentResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources/') &&
+    response.url().includes('/attachment') &&
+    response.request().method() === 'POST'
+  )
+  const publishResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/resources/') &&
+    response.url().includes('/publish') &&
+    response.request().method() === 'POST'
+  )
+
+  await page.getByTestId('publish-resource-submit').click()
+
+  const createResponse = await createResponsePromise
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const resourceId = createBody.data.id as number
+
+  const attachmentResponse = await attachmentResponsePromise
+  expect(attachmentResponse.ok()).toBeTruthy()
+  const attachmentBody = await attachmentResponse.json()
+  expect(attachmentBody.data.resourceId).toBe(resourceId)
+  expect(attachmentBody.data.file.filename).toBe('smoke-guide.pdf')
+
+  const publishResponse = await publishResponsePromise
+  expect(publishResponse.ok()).toBeTruthy()
+  const publishBody = await publishResponse.json()
+  expect(publishBody.data.id).toBe(resourceId)
+
+  await expect(page.getByTestId('publish-resource-result')).toContainText(`资源 ID：${resourceId}`)
+  await expect(page.getByTestId('publish-resource-result')).toContainText('附件：smoke-guide.pdf')
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/resources/${resourceId}$`))
+  await expect(page.getByRole('heading', { name: resourceTitle })).toBeVisible()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/resources/${resourceId}`)
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.id).toBe(resourceId)
+  expect(detailBody.data.title).toBe(resourceTitle)
+  expect(detailBody.data.status).toBe('PUBLISHED')
+  expect(detailBody.data.objectKey).toBeTruthy()
+})
+
+test('路线发布真实写入 smoke', async ({ page, request }) => {
+  test.skip(!shouldRun('roadmaps'))
+  const roadmapTitle = `Smoke Publish Roadmap ${Date.now()}`
+
+  await loginAs(page, 'user')
+  await page.goto('/publish/roadmap')
+  await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
+  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
+
+  await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
+  await page.getByTestId('publish-roadmap-summary').fill('通过 smoke 用例验证路线创建与节点追加真实写入。')
+  await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')
+  await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：写入节点')
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps') &&
+    response.request().method() === 'POST' &&
+    !response.url().includes('/nodes')
+  )
+  const nodeResponsesPromise = waitForResponses(page, (response) =>
+    response.url().includes('/api/roadmaps/') &&
+    response.url().includes('/nodes') &&
+    response.request().method() === 'POST'
+  , 2)
+
+  await page.getByTestId('publish-roadmap-submit').click()
+
+  const createResponse = await createResponsePromise
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const roadmapId = createBody.data.id as number
+
+  const nodeResponses = await nodeResponsesPromise
+  expect(nodeResponses).toHaveLength(2)
+  for (const nodeResponse of nodeResponses) {
+    expect(nodeResponse.ok()).toBeTruthy()
+    expect(nodeResponse.url()).toContain(`/api/roadmaps/${roadmapId}/nodes`)
+  }
+
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${roadmapId}`)
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')
+  await page.getByRole('link', { name: '查看详情页' }).click()
+  await expect(page).toHaveURL(new RegExp(`/roadmaps/${roadmapId}$`))
+  await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
+  await expect(page.getByText('阶段 1：创建主体')).toBeVisible()
+  await expect(page.getByText('阶段 2：写入节点')).toBeVisible()
+
+  const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${roadmapId}`)
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.data.roadmap.id).toBe(roadmapId)
+  expect(detailBody.data.roadmap.title).toBe(roadmapTitle)
+  expect(detailBody.data.roadmap.status).toBe('PUBLISHED')
+  expect(detailBody.data.nodes).toHaveLength(2)
+})
+
+test('社区笔记模块 smoke', async ({ page }) => {
+  test.skip(!shouldRun('notes'))
   await page.goto('/community')
   await expect(page.getByText('AI 资源类别')).toBeVisible()
 
@@ -173,20 +309,77 @@ test('社区笔记模块 smoke', async ({ page, request }) => {
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+})
 
-  const detailResponse = await browserFetch(page, `/api/notes/${noteId}`, userHeaders())
-  expect(detailResponse.ok).toBeTruthy()
-  expect(detailResponse.status).toBe(200)
-  expect(detailResponse.json?.success).toBeTruthy()
-  expect(detailResponse.json?.data?.title).toBe(noteTitle)
+test('笔记详情真实读取 smoke', async ({ page, request }) => {
+  test.skip(!shouldRun('notes'))
+  const noteTitle = `Smoke Note ${Date.now()}`
+  const createResponse = await request.post(`${apiBaseUrl}/api/notes`, {
+    headers: {
+      'X-User-Key': userKey,
+      'Content-Type': 'application/json'
+    },
+    data: {
+      title: noteTitle,
+      contentMd: `# ${noteTitle}\n\n这是 smoke 用例写入的真实正文。\n\n## 小节\nSmoke detail paragraph`,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED'
+    }
+  })
+  expect(createResponse.ok()).toBeTruthy()
+  const createBody = await createResponse.json()
+  const noteId = createBody.data.id as number
 
+  const detailResponsePromise = page.waitForResponse((response) =>
+    response.url().includes(`/api/notes/${noteId}`) && response.request().method() === 'GET'
+  )
   await page.goto(`/notes/${noteId}`)
-  await expect(page.locator('.detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
-  await expect(page.locator('.markdown-panel')).toContainText('这是 smoke 用例写入的真实正文。')
-  await expect(page.locator('.outline')).toContainText('第一节')
-  await expect(page.getByTestId('note-detail-interaction-pending')).toContainText('当前页面已切到真实笔记详情读取')
-  await expect(page.getByRole('button', { name: '收藏笔记待接接口' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '举报待接接口' })).toBeDisabled()
+  const detailResponse = await detailResponsePromise
+  expect(detailResponse.ok()).toBeTruthy()
+  const detailBody = await detailResponse.json()
+  expect(detailBody.success).toBeTruthy()
+  expect(detailBody.data.id).toBe(noteId)
+  expect(detailBody.data.visibility).toBe('PUBLIC')
+  expect(detailBody.data.status).toBe('PUBLISHED')
+  await expect(page.getByTestId('note-detail-page')).toBeVisible()
+  await expect(page.getByTestId('note-detail-main').getByRole('heading', { name: noteTitle }).first()).toBeVisible()
+  await expect(page.getByText('这是 smoke 用例写入的真实正文。').first()).toBeVisible()
+  await expect(page.getByText('Smoke detail paragraph').first()).toBeVisible()
+  await expect(page.getByTestId('note-detail-content')).toContainText('这是 smoke 用例写入的真实正文。')
+  await expect(page.getByTestId('note-detail-content')).toContainText('Smoke detail paragraph')
+  await expect(page.getByTestId('note-outline')).toContainText('小节')
+  await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
+  await expect(page.getByTestId('note-detail-interaction-hint')).toContainText('当前批次仅收口真实详情读取与举报闭环')
+  await expect(page.getByRole('button', { name: '点赞待接后端' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '收藏待接后端' }).first()).toBeDisabled()
+
+  await loginAs(page, 'user')
+  await page.reload()
+  const reportResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/reports') && response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '举报' }).first().click()
+  await page.getByLabel('举报原因').fill('Smoke note detail report')
+  await page.getByRole('button', { name: '提交举报' }).click()
+  const reportResponse = await reportResponsePromise
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetType).toBe('NOTE')
+  expect(reportBody.data.targetId).toBe(noteId)
+  expect(reportBody.data.reason).toBe('Smoke note detail report')
+
+  const adminReportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
+    headers: {
+      'X-Admin-Token': adminToken
+    }
+  })
+  expect(adminReportsResponse.ok()).toBeTruthy()
+  const adminReportsBody = await adminReportsResponse.json()
+  const createdReport = (adminReportsBody.data.items as Array<{ targetType: string, targetId: number, reason: string }>).find((item) =>
+    item.targetType === 'NOTE' && item.targetId === noteId && item.reason === 'Smoke note detail report'
+  )
+  expect(createdReport).toBeTruthy()
 })
 
 test('简历模块 smoke', async ({ page }) => {
@@ -236,7 +429,7 @@ test('简历模块 smoke', async ({ page }) => {
   const summaryBefore = await summary.textContent()
   const totalBefore = Number(summaryBefore?.match(/累计\s+(\d+)/)?.[1] ?? '0')
 
-  await page.getByTestId('resume-server-template-select').selectOption('modern')
+  await page.getByRole('combobox').nth(1).selectOption('modern')
 
   const generateResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/resumes/generate') && response.request().method() === 'POST'
@@ -443,13 +636,64 @@ test('后台模块 smoke', async ({ page }) => {
   await page.goto('/admin')
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
 
-  const apiResponse = await browserFetch(page, '/api/admin/reports?page=1&pageSize=5', {
+  const apiResponse = await browserFetch(page, '/api/admin/reports?page=1&pageSize=20', {
     'X-Admin-Token': adminToken
   })
   expect(apiResponse.ok).toBeTruthy()
   expect(apiResponse.status).toBe(200)
   expect(apiResponse.json?.success).toBeTruthy()
   expect(Array.isArray(apiResponse.json?.data?.items)).toBeTruthy()
+  const reportItems = apiResponse.json?.data?.items ?? []
+  const openReports = reportItems.filter((item: { status?: string }) =>
+    item.status === 'OPEN' || item.status === '待处理'
+  )
+  await expect(page.getByTestId('admin-dashboard-stat-open-reports')).toContainText(String(openReports.length))
+  if (openReports[0]) {
+    await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText(
+      `${openReports[0].targetType} #${openReports[0].targetId}`
+    )
+  } else {
+    await expect(page.getByTestId('admin-dashboard-stat-top-target')).toContainText('暂无')
+  }
+
+  const auditResponse = await browserFetch(page, '/api/admin/audit-logs?page=1&pageSize=5', {
+    'X-Admin-Token': adminToken
+  })
+  expect(auditResponse.ok).toBeTruthy()
+  expect(auditResponse.status).toBe(200)
+  expect(auditResponse.json?.success).toBeTruthy()
+  expect(Array.isArray(auditResponse.json?.data?.items)).toBeTruthy()
+  const auditItems = auditResponse.json?.data?.items ?? []
+  const firstAuditLog = auditItems[0]
+  const expectedLatestAction = firstAuditLog
+    ? firstAuditLog.action
+      .split('_')
+      .filter(Boolean)
+      .map((segment: string) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
+      .join(' ')
+    : '暂无治理动作'
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-value')).toContainText(String(Math.min(auditItems.length, 5)))
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText(expectedLatestAction)
+
+  const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=20', {
+    'X-Admin-Token': adminToken
+  })
+  expect(usersResponse.ok).toBeTruthy()
+  expect(usersResponse.status).toBe(200)
+  expect(usersResponse.json?.success).toBeTruthy()
+  expect(Array.isArray(usersResponse.json?.data?.items)).toBeTruthy()
+  const managedUsers = usersResponse.json?.data?.items ?? []
+  const bannedUsers = managedUsers.filter((item: { status?: string }) =>
+    item.status === 'BANNED' || item.status === '已封禁'
+  )
+  const expectedMeta = firstAuditLog
+    ? `最近动作 ${expectedLatestAction} · 已加载 ${reportItems.length} 条举报`
+    : `已加载 ${reportItems.length} 条举报 / ${managedUsers.length} 个用户`
+  await expect(page.getByTestId('admin-dashboard-meta')).toContainText(expectedMeta)
+  const userStatCard = page.getByTestId('admin-dashboard-stat-users')
+  await expect(userStatCard).toContainText('后台可管用户')
+  await expect(userStatCard).toContainText(`已封禁 ${bannedUsers.length}`)
+  await expect(page.getByTestId('admin-dashboard-stat-users-value')).toContainText(String(managedUsers.length))
 
   const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {
     'X-User-Key': userKey
@@ -466,6 +710,49 @@ test('后台模块 smoke', async ({ page }) => {
   )
   await expect(page.getByRole('cell', { name: firstResource.category || firstResource.type || '未分类' }).first()).toBeVisible()
   await expect(page.getByTestId('admin-taxonomy-readonly').first()).toBeVisible()
+
+  await page.goto('/admin/reports')
+  await expect(page.getByRole('heading', { name: '举报处理' })).toBeVisible()
+  const firstReport = reportItems[0]
+  if (firstReport) {
+    const reportRow = page.getByTestId(`admin-report-row-${firstReport.id}`)
+    await expect(reportRow).toContainText(firstReport.reason)
+    await expect(reportRow).toContainText(firstReport.reporter)
+    await expect(reportRow).toContainText(`${firstReport.targetType} #${firstReport.targetId}`)
+
+    if (firstReport.status === 'OPEN') {
+      const resolveResponsePromise = page.waitForResponse((response) =>
+        response.url().includes(`/api/admin/reports/${firstReport.id}/resolve`) && response.request().method() === 'POST'
+      )
+      await page.getByTestId(`admin-report-resolve-${firstReport.id}`).click()
+      const resolveResponse = await resolveResponsePromise
+      expect(resolveResponse.ok()).toBeTruthy()
+      const resolveBody = await resolveResponse.json()
+      expect(resolveBody.success).toBeTruthy()
+      await expect(reportRow).toContainText('已处理')
+    }
+  } else {
+    await expect(page.getByText('暂无举报数据')).toBeVisible()
+  }
+
+  await page.goto('/admin/audit-logs')
+  await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible()
+  if (firstAuditLog) {
+    await expect(page.getByTestId(`admin-audit-log-row-${firstAuditLog.id}`)).toContainText(
+      `${firstAuditLog.targetType} #${firstAuditLog.targetId}`
+    )
+  } else {
+    await expect(page.getByText('暂无审计日志')).toBeVisible()
+  }
+
+  await page.goto('/admin/users')
+  await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible()
+  const firstUser = usersResponse.json?.data?.items?.[0]
+  if (firstUser) {
+    await expect(page.locator('tbody tr').filter({ hasText: firstUser.login }).first()).toContainText(firstUser.login)
+  } else {
+    await expect(page.getByText('暂无用户数据')).toBeVisible()
+  }
 })
 
 test('管理员拦截 smoke', async ({ page }) => {
