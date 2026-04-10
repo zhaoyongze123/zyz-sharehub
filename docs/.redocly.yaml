@@ -1,0 +1,8 @@
+apis:
+  sharehub:
+    root: ./openapi.yaml
+
+rules:
+  operation-summary: error
+  operation-operationId: off
+  no-unused-components: warn
