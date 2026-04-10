@@ -52,6 +52,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { fetchRoadmaps, type RoadmapListItem } from '@/api/roadmaps'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
@@ -67,10 +68,12 @@ const loadError = ref(false)
 
 const categoryOptions = [
   { label: '全部路线', value: '全部' },
-  { label: '后端架构', value: '后端' },
-  { label: '前端工程', value: '前端' },
-  { label: '基础底座', value: '基础' }
+  { label: '已发布', value: 'PUBLISHED' },
+  { label: '草稿', value: 'DRAFT' },
+  { label: '私密', value: 'PRIVATE' }
 ]
+
+const normalizedKeyword = computed(() => keyword.value.trim().toLowerCase())
 
 const filteredRoadmaps = computed(() => {
   return roadmaps.value.filter((item) => {

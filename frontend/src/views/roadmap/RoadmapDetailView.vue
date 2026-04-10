@@ -1,9 +1,9 @@
 <template>
   <div class="page-shell detail-grid" v-if="status === 'ready' && roadmap">
     <section class="detail-main">
-      <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.summary">
+      <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.summary || roadmap.description || ''">
         <template #actions>
-          <BaseButton @click="markComplete">标记本阶段完成</BaseButton>
+          <BaseButton :loading="updating" @click="markComplete">标记本阶段完成</BaseButton>
           <BaseButton variant="secondary" @click="favoriteRoadmap">收藏路线</BaseButton>
         </template>
       </HeroBanner>
@@ -97,10 +97,11 @@
     <BaseSkeleton height="24rem" />
   </div>
 </template>
-
+ 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { fetchRoadmapDetail, updateRoadmapProgress, type RoadmapDetail, type RoadmapNode } from '@/api/roadmaps'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
@@ -148,9 +149,35 @@ async function loadRoadmapDetail() {
   }
 }
 
-function markComplete() {
-  progress.value = Math.min(100, progress.value + 18)
-  appStore.showToast('进度已更新', `当前路线完成度 ${progress.value}%`)
+async function loadDetail() {
+  loading.value = true
+  loadError.value = null
+  try {
+    const data = await fetchRoadmapDetail(route.params.id as string)
+    roadmap.value = data
+  } catch (error: any) {
+    loadError.value = error?.message ?? '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function markComplete() {
+  if (!roadmap.value) return
+  const next = Math.min(100, (roadmap.value.progress?.progressPercent ?? 0) + 20)
+  updating.value = true
+  try {
+    await updateRoadmapProgress(roadmap.value.id, { progressPercent: next })
+    roadmap.value.progress = {
+      ...(roadmap.value.progress || {}),
+      progressPercent: next
+    }
+    appStore.showToast('进度已更新', `当前路线完成度 ${next}%`)
+  } catch (error: any) {
+    appStore.showToast('进度更新失败', error?.response?.data?.message || error?.message || '请稍后重试', 'error')
+  } finally {
+    updating.value = false
+  }
 }
 
 function favoriteRoadmap() {

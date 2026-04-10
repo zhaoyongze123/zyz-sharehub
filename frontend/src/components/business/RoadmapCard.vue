@@ -1,12 +1,13 @@
 <template>
   <article class="roadmap-card glass-panel">
-    <BaseTag tone="accent">{{ item.level }}</BaseTag>
+    <BaseTag tone="accent">{{ item.status ?? item.level ?? '路线' }}</BaseTag>
     <h3>{{ item.title }}</h3>
-    <p>{{ item.summary }}</p>
+    <p>{{ item.summary ?? item.description ?? '暂无简介' }}</p>
     <div class="roadmap-card__meta">
-      <span>{{ item.author }}</span>
-      <span>{{ item.stageCount }} 个阶段</span>
-      <span>{{ item.followers }} 人跟学</span>
+      <span>{{ item.ownerName || item.author || '社区贡献者' }}</span>
+      <span v-if="item.visibility">可见性：{{ item.visibility }}</span>
+      <span>{{ item.nodeCount ?? item.stageCount ?? 0 }} 个阶段</span>
+      <span>{{ item.followers ?? '0' }} 人跟学</span>
     </div>
     <RouterLink :to="`/roadmaps/${item.id}`">进入路线</RouterLink>
   </article>
@@ -20,11 +21,16 @@ defineProps<{
   item: {
     id: number
     title: string
-    summary: string
-    author: string
-    level: string
-    stageCount: number
-    followers: string
+    summary?: string | null
+    description?: string | null
+    author?: string | null
+    level?: string | null
+    ownerName?: string | null
+    nodeCount?: number | null
+    stageCount?: number | null
+    followers?: number | string | null
+    visibility?: string | null
+    status?: string | null
   }
 }>()
 </script>
