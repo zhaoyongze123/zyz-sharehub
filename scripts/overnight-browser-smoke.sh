@@ -20,11 +20,24 @@ STANDARD_SMOKE_SPECS=(
   "tests/e2e/module-smoke.spec.ts"
   "tests/e2e/sharehub-real-api.spec.ts"
 )
+ADMIN_ALLOWED_ROUTES=(
+  "/admin"
+  "/admin/reports"
+  "/admin/reviews"
+  "/admin/users"
+  "/admin/audit-logs"
+)
 
 BACKEND_PORT="${OVERNIGHT_BACKEND_PORT:-18080}"
 FRONTEND_PORT="${OVERNIGHT_FRONTEND_PORT:-14173}"
 BACKEND_BASE_URL="http://127.0.0.1:${BACKEND_PORT}"
 FRONTEND_BASE_URL="http://127.0.0.1:${FRONTEND_PORT}"
+ADMIN_SMOKE_EXIT_CODE=1
+ADMIN_GATE_EXIT_CODE=1
+STANDARD_SMOKE_EXIT_CODE=1
+FAILURE_REASON=""
+LAST_HEALTH_STAGE="bootstrap"
+FINAL_EXIT_CODE=1
 
 mkdir -p "${SMOKE_DIR}"
 
@@ -34,8 +47,41 @@ log() {
 
 gate_check() {
   local message="$1"
+  FAILURE_REASON="${message}"
   log "后台门禁失败：${message}"
   ADMIN_GATE_EXIT_CODE=1
+}
+
+record_failure() {
+  local message="$1"
+  FAILURE_REASON="${message}"
+  log "${message}"
+}
+
+write_meta() {
+  cat > "${META_FILE}" <<EOF
+BACKEND_PORT=${BACKEND_PORT}
+FRONTEND_PORT=${FRONTEND_PORT}
+MODULES=${MODULES:-unknown}
+BACKEND_BASE_URL=${BACKEND_BASE_URL}
+FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
+BACKEND_MODE=${BACKEND_MODE:-unknown}
+ADMIN_AUTOPILOT_MODE=${ADMIN_AUTOPILOT_MODE}
+ADMIN_REQUIRE_POSTGRES=${ADMIN_REQUIRE_POSTGRES}
+ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE}
+ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}
+STANDARD_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
+FINAL_EXIT_CODE=${FINAL_EXIT_CODE}
+LAST_HEALTH_STAGE=${LAST_HEALTH_STAGE}
+FAILURE_REASON=${FAILURE_REASON}
+EOF
+}
+
+has_enabled_property() {
+  local path="$1"
+  local key="$2"
+  [[ -f "${path}" ]] || return 1
+  rg -q "^[[:space:]]*${key}:[[:space:]]*true[[:space:]]*$" "${path}"
 }
 
 can_use_cloud_dev() {
@@ -118,6 +164,14 @@ kill_port_process() {
 }
 
 cleanup() {
+  FINAL_EXIT_CODE=$?
+  if [[ ${FINAL_EXIT_CODE} -eq 0 ]]; then
+    ADMIN_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
+    if [[ ${ADMIN_GATE_EXIT_CODE} -eq 0 ]]; then
+      FAILURE_REASON="${FAILURE_REASON:-none}"
+    fi
+  fi
+  write_meta
   if [[ -n "${FRONTEND_PID:-}" ]] && kill -0 "${FRONTEND_PID}" >/dev/null 2>&1; then
     kill "${FRONTEND_PID}" >/dev/null 2>&1 || true
     wait "${FRONTEND_PID}" 2>/dev/null || true
@@ -132,6 +186,7 @@ trap cleanup EXIT
 
 MODULES="${PLAYWRIGHT_MODULES:-admin,backend}"
 log "本轮浏览器 smoke 模块：${MODULES}"
+log "后台专项目标页面：${ADMIN_ALLOWED_ROUTES[*]}"
 
 kill_port_process "${BACKEND_PORT}"
 kill_port_process "${FRONTEND_PORT}"
@@ -149,23 +204,26 @@ BACKEND_PID=$!
 printf '%s\n' "${BACKEND_MODE}" > "${BACKEND_MODE_FILE}"
 log "后端已启动，PID=${BACKEND_PID}，模式=${BACKEND_MODE}"
 
+LAST_HEALTH_STAGE="health"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health" "${BACKEND_PID}" "后端" 120 2; then
-  log "后端健康检查失败，请查看 ${BACKEND_LOG}"
+  record_failure "后端健康检查失败，请查看 ${BACKEND_LOG}"
   exit 1
 fi
 
 if ! wait_for_stable_url "${BACKEND_BASE_URL}/actuator/health" "${BACKEND_PID}" "后端" 2 1; then
-  log "后端稳定性校验失败，请查看 ${BACKEND_LOG}"
+  record_failure "后端稳定性校验失败，请查看 ${BACKEND_LOG}"
   exit 1
 fi
 
+LAST_HEALTH_STAGE="readiness"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/readiness" "${BACKEND_PID}" "后端 readiness" 60 2; then
-  log "后端 readiness 检查失败，请查看 ${BACKEND_LOG}"
+  record_failure "后端 readiness 检查失败，请查看 ${BACKEND_LOG}"
   exit 1
 fi
 
+LAST_HEALTH_STAGE="liveness"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/liveness" "${BACKEND_PID}" "后端 liveness" 60 2; then
-  log "后端 liveness 检查失败，请查看 ${BACKEND_LOG}"
+  record_failure "后端 liveness 检查失败，请查看 ${BACKEND_LOG}"
   exit 1
 fi
 
@@ -174,13 +232,14 @@ nohup bash -lc "cd '${FRONTEND_DIR}' && npm run dev -- --host 127.0.0.1 --port $
 FRONTEND_PID=$!
 log "前端已启动，PID=${FRONTEND_PID}"
 
+LAST_HEALTH_STAGE="frontend-health"
 if ! wait_for_url "${FRONTEND_BASE_URL}" "${FRONTEND_PID}" "前端" 90 2; then
-  log "前端健康检查失败，请查看 ${FRONTEND_LOG}"
+  record_failure "前端健康检查失败，请查看 ${FRONTEND_LOG}"
   exit 1
 fi
 
 if ! wait_for_stable_url "${FRONTEND_BASE_URL}" "${FRONTEND_PID}" "前端" 3 1; then
-  log "前端稳定性校验失败，请查看 ${FRONTEND_LOG}"
+  record_failure "前端稳定性校验失败，请查看 ${FRONTEND_LOG}"
   exit 1
 fi
 
@@ -201,6 +260,14 @@ ADMIN_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
 ADMIN_GATE_EXIT_CODE=0
 
 if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
+  if ! has_enabled_property "${PROJECT_ROOT}/backend/src/main/resources/application-cloud-dev.yml" "dev-token-enabled"; then
+    gate_check "application-cloud-dev.yml 未显式开启 dev token"
+  fi
+
+  if has_enabled_property "${PROJECT_ROOT}/backend/src/main/resources/application.yml" "dev-token-enabled"; then
+    gate_check "application.yml 仍默认开启 dev token"
+  fi
+
   if ! rg -q "jdbc:postgresql" "${PROJECT_ROOT}/backend/src/main/resources/application.yml"; then
     gate_check "application.yml 未使用 PostgreSQL JDBC"
   fi
@@ -224,6 +291,10 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
     gate_check "auth/me 未返回 isAdmin=true"
   fi
 
+  if curl -fsS -H "X-Admin-Token:dev-admin-token" "${BACKEND_BASE_URL}/api/admin/reports?page=1&pageSize=1" >/dev/null 2>&1; then
+    gate_check "生产环境错误接受了 X-Admin-Token"
+  fi
+
   if ! curl -fsS "${BACKEND_BASE_URL}/actuator/health/readiness" >/dev/null 2>&1; then
     gate_check "readiness probe 不可用"
   fi
@@ -235,29 +306,25 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
   if rg -q "PLAYWRIGHT_ADMIN_TOKEN" "${FRONTEND_DIR}/tests/e2e/module-smoke.spec.ts" "${FRONTEND_DIR}/tests/e2e/sharehub-real-api.spec.ts"; then
     gate_check "后台 Playwright 仍依赖 PLAYWRIGHT_ADMIN_TOKEN"
   fi
+
+  if rg -q "/admin/taxonomy|full-site-walkthrough\\.spec\\.ts" \
+    "${FRONTEND_DIR}/tests/e2e/module-smoke.spec.ts" \
+    "${FRONTEND_DIR}/tests/e2e/sharehub-real-api.spec.ts" \
+    "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"; then
+    gate_check "后台 smoke 仍包含非专项页面或全站走查"
+  fi
 fi
 
 if [[ ${STANDARD_SMOKE_EXIT_CODE} -ne 0 ]]; then
-  log "Playwright smoke 失败，退出码=${STANDARD_SMOKE_EXIT_CODE}"
+  record_failure "Playwright smoke 失败，退出码=${STANDARD_SMOKE_EXIT_CODE}"
   exit "${STANDARD_SMOKE_EXIT_CODE}"
 fi
 
 if [[ ${ADMIN_GATE_EXIT_CODE} -ne 0 ]]; then
+  FAILURE_REASON="${FAILURE_REASON:-后台门禁失败}"
   exit "${ADMIN_GATE_EXIT_CODE}"
 fi
-
-cat > "${META_FILE}" <<EOF
-BACKEND_PORT=${BACKEND_PORT}
-FRONTEND_PORT=${FRONTEND_PORT}
-MODULES=${MODULES}
-BACKEND_BASE_URL=${BACKEND_BASE_URL}
-FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
-BACKEND_MODE=${BACKEND_MODE}
-ADMIN_AUTOPILOT_MODE=${ADMIN_AUTOPILOT_MODE}
-ADMIN_REQUIRE_POSTGRES=${ADMIN_REQUIRE_POSTGRES}
-ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE}
-ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}
-STANDARD_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
-EOF
+FAILURE_REASON="none"
+LAST_HEALTH_STAGE="completed"
 
 log "Playwright smoke 执行完成"
