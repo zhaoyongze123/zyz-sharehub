@@ -210,7 +210,7 @@ async function loadDashboard() {
   try {
     const [reportsResponse, auditResponse, usersResponse] = await Promise.all([
       fetchAdminReports(1, 20),
-      fetchAdminAuditLogs(1, 20),
+      fetchAdminAuditLogs(1, 5),
       fetchAdminUsers(1, 20)
     ])
     reportItems.value = reportsResponse.items

@@ -652,7 +652,7 @@ test('后台模块 smoke', async ({ page }) => {
       .map((segment: string) => `${segment[0]}${segment.slice(1).toLowerCase()}`)
       .join(' ')
     : '暂无治理动作'
-  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-value')).toContainText(String(auditItems.length))
+  await expect(page.getByTestId('admin-dashboard-stat-audit-actions-value')).toContainText(String(Math.min(auditItems.length, 5)))
   await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText(expectedLatestAction)
 
   const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=20', {
@@ -699,6 +699,18 @@ test('后台模块 smoke', async ({ page }) => {
     await expect(reportRow).toContainText(firstReport.reason)
     await expect(reportRow).toContainText(firstReport.reporter)
     await expect(reportRow).toContainText(`${firstReport.targetType} #${firstReport.targetId}`)
+
+    if (firstReport.status === 'OPEN') {
+      const resolveResponsePromise = page.waitForResponse((response) =>
+        response.url().includes(`/api/admin/reports/${firstReport.id}/resolve`) && response.request().method() === 'POST'
+      )
+      await page.getByTestId(`admin-report-resolve-${firstReport.id}`).click()
+      const resolveResponse = await resolveResponsePromise
+      expect(resolveResponse.ok()).toBeTruthy()
+      const resolveBody = await resolveResponse.json()
+      expect(resolveBody.success).toBeTruthy()
+      await expect(reportRow).toContainText('已处理')
+    }
   } else {
     await expect(page.getByText('暂无举报数据')).toBeVisible()
   }
