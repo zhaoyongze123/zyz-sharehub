@@ -405,6 +405,8 @@ const currentTemplate = computed<TemplateKey>({
     currentDraft.value.templateKey = value
     currentDraft.value.document.templateKey = value
   }
+
+  void reloadResumeWorkbench()
 })
 
 const currentSections = computed<ResumeSection[]>({

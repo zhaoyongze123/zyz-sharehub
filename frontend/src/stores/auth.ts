@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { defineStore } from 'pinia'
+import { fetchMe, type MeData } from '@/api/me'
 
 export interface UserProfile {
   id: number
@@ -43,7 +44,9 @@ function buildDevHeaders() {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     initialized: false,
-    profile: null as UserProfile | null
+    profile: null as UserProfile | null,
+    me: null as MeData | null,
+    loading: false
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.profile),
@@ -109,8 +112,8 @@ export const useAuthStore = defineStore('auth', {
     updateProfile(data: Partial<UserProfile>) {
       if (this.profile) {
         Object.assign(this.profile, data)
-        if (data.nickname) {
-          window.localStorage.setItem('sharebase.nickname', data.nickname)
+        if (data.nickname || data.login) {
+          window.localStorage.setItem('sharebase.nickname', data.nickname || data.login || '')
         }
         if (data.headline) {
           window.localStorage.setItem('sharebase.headline', data.headline)
