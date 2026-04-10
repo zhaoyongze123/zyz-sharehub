@@ -1,5 +1,6 @@
 package com.sharehub.admin;
 
+import com.sharehub.auth.RequestAccessService;
 import com.sharehub.config.AdminTokenFilter;
 import com.sharehub.interaction.InteractionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 public class AdminControllerIntegrationTest {
 
+    private static final String ADMIN_LOGIN = "playwright-admin";
+
     @Autowired
     private MockMvc mvc;
 
@@ -42,12 +45,14 @@ public class AdminControllerIntegrationTest {
     void cleanup() throws Exception {
         Files.deleteIfExists(Path.of("data/interaction.json"));
         jdbcTemplate.update("DELETE FROM admin_audit_logs");
+        jdbcTemplate.update("DELETE FROM admin_accounts");
         jdbcTemplate.update("DELETE FROM reports");
         jdbcTemplate.update("DELETE FROM comments");
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM likes");
         jdbcTemplate.update("DELETE FROM resources");
         jdbcTemplate.update("DELETE FROM users");
+        seedAdminAccount();
     }
 
     @Test
@@ -97,6 +102,15 @@ public class AdminControllerIntegrationTest {
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
 
         mvc.perform(get("/api/admin/users"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    @Test
+    void adminEndpointsRejectNonAdminUserWithoutDevToken() throws Exception {
+        insertUser("plain-user");
+
+        mvc.perform(get("/api/admin/reports").header(RequestAccessService.USER_KEY_HEADER, "plain-user"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
     }
@@ -224,11 +238,11 @@ public class AdminControllerIntegrationTest {
     }
 
     private MockHttpServletRequestBuilder adminGet(String uri) {
-        return get(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
+        return get(uri).header(RequestAccessService.USER_KEY_HEADER, ADMIN_LOGIN);
     }
 
     private MockHttpServletRequestBuilder adminPost(String uri) {
-        return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
+        return post(uri).header(RequestAccessService.USER_KEY_HEADER, ADMIN_LOGIN);
     }
 
     private long insertResource(String title) {
@@ -277,5 +291,18 @@ public class AdminControllerIntegrationTest {
             Timestamp.from(Instant.now())
         );
         return jdbcTemplate.queryForObject("SELECT id FROM comments ORDER BY id DESC LIMIT 1", Long.class);
+    }
+
+    private void seedAdminAccount() {
+        jdbcTemplate.update(
+            """
+                INSERT INTO admin_accounts (
+                    user_login, status, granted_by, granted_at, remark, created_at, updated_at
+                ) VALUES (?, 'ACTIVE', ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            ADMIN_LOGIN,
+            "admin-test",
+            "admin integration test"
+        );
     }
 }

@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,6 +38,9 @@ class AuthControllerIntegrationTest {
     @Autowired
     private UserProfileRepository userProfileRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
@@ -47,7 +51,19 @@ class AuthControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("OK"))
             .andExpect(jsonPath("$.message").value("OK"))
             .andExpect(jsonPath("$.data.login").value(USER_KEY))
-            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
+    }
+
+    @Test
+    void shouldExposeAdminFlagForWhitelistedAdmin() throws Exception {
+        String adminLogin = "auth-admin";
+        grantAdmin(adminLogin);
+
+        mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, adminLogin))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(adminLogin))
+            .andExpect(jsonPath("$.data.isAdmin").value(true));
     }
 
     @Test
@@ -218,5 +234,18 @@ class AuthControllerIntegrationTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("USER_BANNED"))
             .andExpect(jsonPath("$.message").value("USER_BANNED"));
+    }
+
+    private void grantAdmin(String login) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO admin_accounts (
+                    user_login, status, granted_by, granted_at, remark, created_at, updated_at
+                ) VALUES (?, 'ACTIVE', ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            login,
+            "auth-test",
+            "auth integration test"
+        );
     }
 }
