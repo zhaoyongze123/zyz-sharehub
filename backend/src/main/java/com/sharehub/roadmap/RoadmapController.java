@@ -1,8 +1,13 @@
 package com.sharehub.roadmap;
 
+import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
+import com.sharehub.common.NotFoundException;
+import com.sharehub.common.PageResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -11,42 +16,83 @@ import java.util.*;
 @RequestMapping("/api/roadmaps")
 public class RoadmapController {
 
-    private final InMemoryStore store;
-    private final Map<Long, List<RoadmapNodeDto>> nodes = new HashMap<>();
-    private final Map<Long, Map<String, Object>> progress = new HashMap<>();
+    private final RoadmapService service;
+    private final RequestAccessService requestAccessService;
+    private final UserProfileRepository userProfileRepository;
 
-    public RoadmapController(InMemoryStore store) {
-        this.store = store;
+    public RoadmapController(
+        RoadmapService service,
+        RequestAccessService requestAccessService,
+        UserProfileRepository userProfileRepository
+    ) {
+        this.service = service;
+        this.requestAccessService = requestAccessService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @PostMapping
-    public ApiResponse<RoadmapDto> create(@Valid @RequestBody RoadmapDto req) {
-        long id = store.nextId();
-        RoadmapDto saved = new RoadmapDto(id, req.title(), req.description(), req.visibility(), "PUBLISHED");
-        store.roadmaps.put(id, saved);
-        return ApiResponse.ok(saved);
+    public ApiResponse<RoadmapDto> create(
+        Authentication authentication,
+        HttpServletRequest request,
+        @Valid @RequestBody RoadmapDto req
+    ) {
+        return ApiResponse.ok(service.create(requireActiveUser(authentication, request), req));
     }
 
     @GetMapping
-    public ApiResponse<List<Object>> list() {
-        return ApiResponse.ok(new ArrayList<>(store.roadmaps.values()));
+    public ApiResponse<PageResponse<RoadmapDto>> list(
+        @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int pageSize) {
+        return ApiResponse.ok(service.list(page, pageSize));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Object> detail(@PathVariable Long id) {
-        return ApiResponse.ok(store.roadmaps.get(id));
+    public ApiResponse<RoadmapDetailResponse> detail(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        RoadmapDetailResponse detail = service.detail(id, resolveActiveUser(authentication, request));
+        if (detail == null) {
+            throw new NotFoundException("ROADMAP_NOT_FOUND");
+        }
+        return ApiResponse.ok(detail);
     }
 
     @PostMapping("/{id}/nodes")
-    public ApiResponse<List<RoadmapNodeDto>> addNode(@PathVariable Long id, @Valid @RequestBody RoadmapNodeDto req) {
-        RoadmapNodeDto node = new RoadmapNodeDto(store.nextId(), req.parentId(), req.title(), req.orderNo(), req.resourceId(), req.noteId());
-        nodes.computeIfAbsent(id, k -> new ArrayList<>()).add(node);
-        return ApiResponse.ok(nodes.get(id));
+    public ApiResponse<List<RoadmapNodeDto>> addNode(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @Valid @RequestBody RoadmapNodeDto req
+    ) {
+        return ApiResponse.ok(service.addNode(requireActiveUser(authentication, request), id, req));
     }
 
     @PostMapping("/{id}/progress")
-    public ApiResponse<Map<String, Object>> progress(@PathVariable Long id, @RequestBody Map<String, Object> req) {
-        progress.put(id, req);
-        return ApiResponse.ok(progress.get(id));
+    public ApiResponse<Map<String, Object>> progress(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @RequestBody Map<String, Object> req
+    ) {
+        return ApiResponse.ok(service.updateProgress(requireActiveUser(authentication, request), id, req));
+    }
+
+    private String resolveActiveUser(Authentication authentication, HttpServletRequest request) {
+        Optional<String> resolvedUser = requestAccessService.resolveUser(authentication, request);
+        if (resolvedUser.isEmpty()) {
+            return null;
+        }
+        String userKey = resolvedUser.get();
+        userProfileRepository.upsert(userKey, userKey, null);
+        userProfileRepository.ensureActive(userKey);
+        return userKey;
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String ownerKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(ownerKey, ownerKey, null);
+        userProfileRepository.ensureActive(ownerKey);
+        return ownerKey;
     }
 }

@@ -1,88 +1,1845 @@
 openapi: 3.0.3
 info:
   title: ShareHub API
-  version: 0.1.0
+  version: 0.2.0
+servers:
+  - url: http://localhost:8080
 paths:
   /api/auth/github/login:
     get:
       summary: 获取 GitHub 登录地址
+      responses:
+        '200':
+          description: 成功
+  /api/auth/github/callback:
+    get:
+      summary: GitHub OAuth 回调占位说明
+      description: 实际 OAuth 回调由 Spring Security 处理，当前接口仅返回联调提示信息
+      responses:
+        '200':
+          description: 成功；响应体为 JSON 提示信息
   /api/auth/me:
     get:
       summary: 获取当前用户
+      description: 需要登录态，支持 OAuth 会话或本地联调头 X-User-Key
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me:
+    get:
+      summary: 个人中心聚合信息
+      description: 需要登录后才会返回完整的用户统计，联调可通过 X-User-Key 透传用户标识；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/resources:
+    get:
+      summary: 获取我的资料列表
+      description: 当前实现按请求用户返回自己的资料工作台数据，默认不限定发布态；可通过 `status`、`visibility` 过滤草稿或已发布数据。联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`visibility` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: visibility
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/roadmaps:
+    get:
+      summary: 获取我的路线列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoadmapWorkbenchPageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/favorites:
+    get:
+      summary: 获取我的收藏资料列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/notes:
+    get:
+      summary: 获取我的笔记列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/resumes:
+    get:
+      summary: 获取我的简历分页列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: templateKey
+          in: query
+          schema:
+            type: string
+          description: 按模板筛选
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 按模板名或文件名模糊筛选
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/avatar:
+    post:
+      summary: 上传用户头像
+      description: 需要登录后提交，支持 OAuth 会话或本地联调头 X-User-Key；当前复用文件存储能力，`owner` 取当前登录用户，`category=AVATAR`，`referenceType=USER_AVATAR`，`referenceId` 为当前用户标识；真实实现校验文件非空、文件名存在且大小不超过 5MB；成功后返回文件元数据，其中 `contentType` 始终有值，上传缺省或非法时回落为 `application/octet-stream`
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredFileUploadResponse'
+        '400':
+          description: 文件校验失败（错误码可能为 `FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/files/upload:
+    post:
+      summary: 直传文件到文件存储
+      description: 当前为底层文件存储接口，不走登录鉴权；调用方需自行传入 `owner`、`category`、`referenceType`、`referenceId`，真实实现仅校验文件非空、文件名存在、引用归属存在且大小不超过 5MB；成功后返回文件元数据，其中 `contentType` 始终有值，上传缺省或非法时回落为 `application/octet-stream`
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - owner
+                - category
+                - referenceType
+                - referenceId
+                - file
+              properties:
+                owner:
+                  type: string
+                category:
+                  type: string
+                  enum:
+                    - AVATAR
+                    - RESOURCE_ATTACHMENT
+                    - RESUME_PDF
+                referenceType:
+                  type: string
+                referenceId:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredFileUploadResponse'
+        '400':
+          description: 文件校验失败（错误码可能为 `FILE_OWNER_REQUIRED`、`FILE_REFERENCE_REQUIRED`、`FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/files/{id}:
+    get:
+      summary: 下载文件
+      description: 当前为匿名可访问下载接口，按文件 `id` 直接返回二进制内容；`Content-Type` 优先使用入库时的 `contentType`，若为空、`NULL` 或非法则回落到 `application/octet-stream`；`Content-Disposition` 固定为附件下载；文件不存在时返回空 body 的 `404`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 成功
+          headers:
+            Content-Type:
+              description: 真实返回值按入库时的 `contentType` 决定；若为空、`NULL` 或非法则回落到 `application/octet-stream`
+              schema:
+                type: string
+            Content-Disposition:
+              description: 固定为 `attachment; filename="{原始文件名}"`
+              schema:
+                type: string
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 文件不存在
   /api/resources:
+    get:
+      summary: 资料分页列表
+      description: 当前公开资料列表默认只返回 `PUBLISHED`；`status` 为空字符串、仅空白，或裁剪后没有有效状态项时按未传处理，带前后空白时会先裁剪再参与筛选；`category` 当前映射到资源 `type` 字段；`sortBy=latest` 按 `updatedAt DESC`，`sortBy=hot` 按点赞数降序再按更新时间降序
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 12
+        - in: query
+          name: keyword
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: visibility
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: 当前实现映射到资源 `type` 字段
+        - in: query
+          name: tag
+          schema:
+            type: string
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [latest, hot]
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 创建资料
+      description: 需要当前用户身份，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/resources/featured:
     get:
-      summary: 资料列表
+      summary: 获取首页推荐资料
+      responses:
+        '200':
+          description: 成功
   /api/resources/{id}:
     get:
-      summary: 资料详情
+      summary: 获取资料详情
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资料不存在
+        '410':
+          description: 资料已下架
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: 更新资料
+      description: 当前实现只允许 owner 更新自己的资料；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: 删除资料
+      description: 当前实现只允许 owner 删除自己的资料；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 资料不存在（错误码 `NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resources/{id}/publish:
     post:
       summary: 发布资料
+      description: 当前实现只允许 owner 发布自己的资料；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/resources/{id}/related:
+    get:
+      summary: 获取相关推荐资料
+      description: 当前按同分类或标签交集进行基础推荐，最多返回 4 条已发布资源
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资料不存在（错误码 `RESOURCE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/resources/{id}/attachment:
+    post:
+      summary: 上传资料附件
+      description: 当前实现只允许 owner 上传自己的资料附件；联调可通过 `X-User-Key` 指定用户；用户被封禁返回 `403 USER_BANNED`，非 owner 返回 `403 RESOURCE_FORBIDDEN`；成功后返回 `resourceId` 与文件元数据，其中 `file.contentType` 始终有值，上传缺省或非法时回落为 `application/octet-stream`
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceAttachmentUploadResponse'
+        '400':
+          description: 文件校验失败（错误码可能为 `FILE_NAME_REQUIRED`、`FILE_EMPTY`、`FILE_TOO_LARGE`、`FILE_READ_ERROR`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁或无权操作（错误码 `USER_BANNED`/`RESOURCE_FORBIDDEN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 资料不存在（错误码 `RESOURCE_NOT_FOUND`）
   /api/roadmaps:
+    get:
+      summary: 路线分页列表
+      description: 当前列表仍返回全量路线，`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底，且返回结果按 `id` 倒序排列
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 创建路线
-    get:
-      summary: 路线列表
+      description: 需要当前用户身份；创建记录的 owner 固定取请求用户，联调可通过 `X-User-Key` 指定用户；`status` 未传、为 `null`、空字符串或仅空白时默认补成 `PUBLISHED`，带前后空白时会先裁剪再保存；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/roadmaps/{id}:
     get:
-      summary: 路线详情
+      summary: 获取路线详情
+      description: 路线详情当前不做 owner 限制；返回体中的 `progress` 按当前请求用户读取，联调可通过 `X-User-Key` 指定用户；同一路线切换到其他用户或未写入进度时返回空对象；如果请求里显式带了已封禁用户，则返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+        '404':
+          description: 路线不存在（错误码 `ROADMAP_NOT_FOUND`）
   /api/roadmaps/{id}/nodes:
     post:
-      summary: 新增路线节点
+      summary: 给路线新增节点
+      description: 需要当前用户身份；只允许路线 owner 新增节点，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`，非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+        '404':
+          description: 路线不存在或非 owner（错误码 `ROADMAP_NOT_FOUND`）
   /api/roadmaps/{id}/progress:
     post:
-      summary: 更新学习进度
+      summary: 更新路线学习进度
+      description: 需要当前用户身份；进度按请求用户隔离写入，且只允许路线 owner 更新，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`，非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+        '404':
+          description: 路线不存在或非 owner（错误码 `ROADMAP_NOT_FOUND`）
   /api/notes:
+    get:
+      summary: 笔记分页列表
+      description: 需要当前用户身份；当前实现只返回请求用户自己的笔记；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`；`status` 传空字符串或仅空白时按未传处理，不额外收窄结果；带前后空白时会先裁剪再参与筛选
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       summary: 创建笔记
-    get:
-      summary: 笔记列表
+      description: 需要当前用户身份；创建后笔记归属当前请求用户；`status` 未传、为 `null`、空字符串或仅空白时默认保存为 `DRAFT`，带前后空白时会先裁剪再保存；`visibility` 为 `null`、空字符串或仅空白时按未传处理，最终存为 `null`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteUpsertRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/notes/{id}:
     get:
-      summary: 笔记详情
+      summary: 获取笔记详情
+      description: 需要当前用户身份；当前实现只允许访问自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       summary: 更新笔记
+      description: 需要当前用户身份；当前实现只允许更新自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理；`status` 传 `null`、空字符串或仅空白时按未传处理，保留原状态；带前后空白时会先裁剪再保存；`visibility` 传 `null`、空字符串或仅空白时按未传处理，最终存为 `null`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteUpsertRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoteResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       summary: 删除笔记
+      description: 需要当前用户身份；当前实现只允许删除自己的笔记；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`，访问他人笔记时按不存在处理
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 笔记不存在（错误码 `NOTE_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resumes/generate:
     post:
-      summary: 生成简历
+      summary: 生成简历 PDF
+      description: 当前实现按请求用户生成简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`templateKey` 未传、为空、`null` 或仅空白时会回落为 `default`；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumeGenerateRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/resumes:
+    get:
+      summary: 获取我的简历分页列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status`、`templateKey`、`keyword` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: templateKey
+          in: query
+          schema:
+            type: string
+          description: 按模板筛选
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 按模板名或文件名模糊筛选
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resumes/{id}:
     get:
-      summary: 简历详情
+      summary: 获取简历生成记录
+      description: 当前实现只返回当前用户拥有的简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 简历不存在或非 owner（错误码 `RESUME_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: 删除简历记录
+      description: 当前实现只允许当前用户删除自己的简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: string
+                    example: DELETED
+                  message:
+                    type: string
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 简历不存在或非 owner（错误码 `RESUME_NOT_FOUND`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resumes/{id}/download:
     get:
-      summary: 下载简历
+      summary: 下载简历 PDF
+      description: 当前实现只允许当前用户下载自己的简历，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          headers:
+            Content-Type:
+              description: 优先使用文件记录中的 `contentType`；若为空、`NULL` 或非法则回落到 `application/octet-stream`
+              schema:
+                type: string
+            Content-Disposition:
+              description: 固定为 `attachment; filename="{原始文件名}"`
+              schema:
+                type: string
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 简历不存在/非 owner 时返回错误码 `RESUME_NOT_FOUND`；若底层文件记录已丢失则返回空 body 的 `404`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                resumeNotFound:
+                  summary: 简历不存在或非 owner
+                  value:
+                    success: false
+                    code: RESUME_NOT_FOUND
+                    message: RESUME_NOT_FOUND
+  /api/resumes/workbench:
+    get:
+      summary: 获取我的简历工作台聚合信息
+      description: 当前实现按请求用户聚合数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`templateBreakdown` 按数量倒序返回，数量相同时按 `templateKey` 升序稳定排序；`recentItems` 按创建时间倒序返回，时间相同时按 `id` 倒序稳定排序，且最多返回最近 5 条；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeWorkbenchResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/resources/{id}/comments:
+    get:
+      summary: 获取资源评论树
+      responses:
+        '200':
+          description: 成功
     post:
       summary: 发表评论
+      description: 需要当前用户身份；评论内容为空时返回 `400 COMMENT_CONTENT_REQUIRED`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 评论内容为空（错误码 `COMMENT_CONTENT_REQUIRED`）
+        '404':
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/comments/{id}/reply:
     post:
       summary: 回复评论
+      description: 需要当前用户身份；评论内容为空时返回 `400 COMMENT_CONTENT_REQUIRED`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 评论内容为空（错误码 `COMMENT_CONTENT_REQUIRED`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+        '404':
+          description: 父评论不存在（错误码 `COMMENT_NOT_FOUND`）
   /api/resources/{id}/favorite:
     post:
       summary: 收藏资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+    delete:
+      summary: 取消收藏资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/resources/{id}/like:
     post:
       summary: 点赞资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+    delete:
+      summary: 取消点赞资料
+      description: 需要当前用户身份；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+  /api/resources/{id}/interactions:
+    get:
+      summary: 获取资源互动聚合计数
+      responses:
+        '200':
+          description: 成功
   /api/reports:
     post:
       summary: 举报内容
+      description: 需要当前用户身份；`reason` 未传、为空字符串或仅空白时回落为 `无`；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 资源不存在（错误码 `RESOURCE_NOT_FOUND`）
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
   /api/admin/reports:
     get:
       summary: 举报列表
+      description: 仅管理员可查看，支持分页+状态+目标类型筛选
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: 页码
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: 分页大小
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: 按举报状态筛选（OPEN / RESOLVED）
+        - name: targetType
+          in: query
+          schema:
+            type: string
+          description: 按目标类型筛选（如 RESOURCE）
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/audit-logs:
+    get:
+      summary: 操作审计日志列表
+      description: 管理员专用接口，按 actor/action/目标类型可筛选
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: 页码
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: 分页大小
+        - name: action
+          in: query
+          schema:
+            type: string
+          description: 单个操作类型（如 BLOCK_RESOURCE）
+        - name: targetType
+          in: query
+          schema:
+            type: string
+          description: 目标类型筛选（如 RESOURCE / COMMENT）
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/reports/{id}/resolve:
     post:
       summary: 处理举报
+      description: 管理员接口，修改举报状态为 RESOLVED
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 举报不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/resources/{id}/block:
     post:
       summary: 下架资料
+      description: 管理员可标记资料为 blocked
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 资料不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/resources/{id}/restore:
+    post:
+      summary: 恢复资料
+      description: 管理员将资料从 blocked 状态恢复
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 资料不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/users:
+    get:
+      summary: 获取后台用户列表
+      description: 管理员读取用户列表，返回真实昵称、登录标识与状态
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/admin/users/{id}/ban:
     post:
       summary: 封禁用户
+      description: 管理员接口，将用户状态标记为 BANNED，并写入一条 `BAN_USER` 审计日志
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/users/{id}/unban:
+    post:
+      summary: 解封用户
+      description: 管理员将用户重新置为活跃，并写入一条 `UNBAN_USER` 审计日志
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/comments/{id}/hide:
+    post:
+      summary: 隐藏评论
+      description: 管理员接口，隐藏评论后前端不再展示
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 评论不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/comments/{id}/restore:
+    post:
+      summary: 恢复评论
+      description: 管理员恢复隐藏的评论
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: 缺失或错误的 X-Admin-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 评论不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        code:
+          type: string
+          description: 业务错误码，便于前端区分类型
+        message:
+          type: string
+          description: 出错提示
+    UserProfileDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        login:
+          type: string
+        name:
+          type: string
+          nullable: true
+        avatarFileId:
+          type: string
+          format: uuid
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        status:
+          type: string
+    MeDto:
+      type: object
+      properties:
+        profile:
+          $ref: '#/components/schemas/UserProfileDto'
+        myResourceCount:
+          type: integer
+          format: int64
+        myFavoriteCount:
+          type: integer
+          format: int64
+        myRoadmapCount:
+          type: integer
+          format: int64
+        myNoteCount:
+          type: integer
+          format: int64
+        myResumeCount:
+          type: integer
+          format: int64
+        recentResourceCount:
+          type: integer
+          format: int64
+        publishedResourceCount:
+          type: integer
+          format: int64
+        draftNoteCount:
+          type: integer
+          format: int64
+        generatedResumeCount:
+          type: integer
+          format: int64
+    MeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/MeDto'
+        message:
+          type: string
+    StoredFileUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/StoredFileDto'
+    ResumeGenerateRequest:
+      type: object
+      properties:
+        templateKey:
+          type: string
+          description: 简历模板标识；未传、`null`、空字符串或仅空白时回落为 `default`
+    ResumeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ResumeDto'
+        message:
+          type: string
+    ResumePageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: 总记录数
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResumeDto'
+        message:
+          type: string
+    ResumeWorkbenchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ResumeWorkbenchDto'
+        message:
+          type: string
+    ResumeDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        templateKey:
+          type: string
+        status:
+          type: string
+          description: 当前生成状态，如 GENERATED
+        fileId:
+          type: string
+          format: uuid
+        fileUrl:
+          type: string
+          description: 实际返回下载链接 `/api/resumes/{id}/download`
+        fileName:
+          type: string
+          nullable: true
+          description: 关联文件记录存在时返回文件名；若底层文件记录已丢失则为 `null`
+        fileSize:
+          type: integer
+          format: int64
+          nullable: true
+          description: 关联文件记录存在时返回文件大小；若底层文件记录已丢失则为 `null`
+        fileCreatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 关联文件记录存在时返回文件创建时间；若底层文件记录已丢失则为 `null`
+        fileUpdatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 关联文件记录存在时返回文件更新时间；若底层文件记录已丢失则为 `null`
+    ResourceDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          nullable: true
+          items:
+            type: string
+        externalUrl:
+          type: string
+          nullable: true
+        objectKey:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        author:
+          type: string
+          nullable: true
+        likes:
+          type: integer
+          format: int64
+        favorites:
+          type: integer
+          format: int64
+        downloadCount:
+          type: integer
+          format: int64
+    ResourcePageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResourceDto'
+        message:
+          type: string
+    NoteDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        contentMd:
+          type: string
+        visibility:
+          type: string
+          nullable: true
+          description: 可见性；传空字符串或仅空白时最终存为 null
+        status:
+          type: string
+          nullable: true
+          description: 笔记状态；创建时未传或空白会回落为 DRAFT
+      required:
+        - id
+        - title
+        - contentMd
+    NoteUpsertRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        contentMd:
+          type: string
+        visibility:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+      required:
+        - title
+        - contentMd
+    NoteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/NoteDto'
+        message:
+          type: string
+    NotePageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/NoteDto'
+        message:
+          type: string
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: string
+          example: DELETED
+        message:
+          type: string
+    ResumeWorkbenchDto:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        generatedCount:
+          type: integer
+          format: int64
+        templateBreakdown:
+          type: array
+          description: 按模板聚合后的统计列表，按数量倒序返回
+          items:
+            $ref: '#/components/schemas/ResumeTemplateBreakdownDto'
+        recentItems:
+          type: array
+          description: 最近生成的简历记录，按创建时间倒序返回，最多 5 条
+          items:
+            $ref: '#/components/schemas/ResumeDto'
+    ResumeTemplateBreakdownDto:
+      type: object
+      properties:
+        templateKey:
+          type: string
+        count:
+          type: integer
+          format: int64
+    RoadmapWorkbenchDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        nodeCount:
+          type: integer
+        completedNodeCount:
+          type: integer
+        progressPercent:
+          type: integer
+    RoadmapWorkbenchPageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoadmapWorkbenchDto'
+        message:
+          type: string
+    ResourceAttachmentUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            resourceId:
+              type: integer
+              format: int64
+            file:
+              $ref: '#/components/schemas/StoredFileDto'
+    StoredFileDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner:
+          type: string
+        category:
+          type: string
+          enum:
+            - AVATAR
+            - RESOURCE_ATTACHMENT
+            - RESUME_PDF
+        referenceType:
+          type: string
+        referenceId:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+          description: 入库时的 `contentType`；若上传时缺省或非法则回落到 `application/octet-stream`
+        size:
+          type: integer
+          format: int64
+        checksum:
+          type: string
+          description: SHA-256 十六进制摘要
+        downloadUrl:
+          type: string
+          description: 文件下载地址，形如 `/api/files/{uuid}`
+        createdAt:
+          type: string
+          format: date-time

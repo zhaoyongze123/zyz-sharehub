@@ -1,92 +1,156 @@
 <template>
-  <div class="page-shell detail-grid" v-if="note">
+  <div v-if="loading" class="page-shell detail-grid">
     <section class="detail-main">
-      <HeroBanner kicker="笔记详情" :title="note.title" :description="note.summary">
+      <BaseSkeleton height="14rem" />
+      <BaseSkeleton height="12rem" />
+      <BaseSkeleton height="10rem" />
+    </section>
+    <aside class="detail-side">
+      <BaseSkeleton height="10rem" />
+    </aside>
+  </div>
+
+  <div class="page-shell detail-grid" v-else-if="note">
+    <section class="detail-main">
+      <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
         <template #actions>
-          <BaseButton @click="favoriteNote">收藏笔记</BaseButton>
-          <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
+          <BaseButton disabled>收藏笔记待接接口</BaseButton>
+          <BaseButton variant="secondary" disabled>举报待接接口</BaseButton>
         </template>
       </HeroBanner>
 
-      <InteractionBar :likes="likes" :favorites="favorites" @like="likeNote" @favorite="favoriteNote" @report="reportVisible = true" />
+      <div class="glass-panel interaction-pending" data-testid="note-detail-interaction-pending">
+        <p class="interaction-pending__title">互动能力待接后端</p>
+        <p>当前页面已切到真实笔记详情读取，点赞、收藏、举报接口尚未提供，已移除本地模拟成功反馈。</p>
+      </div>
 
       <article class="glass-panel markdown-panel" v-html="renderedHtml"></article>
 
       <div class="glass-panel panel">
         <div class="section-heading">
           <h2>相关推荐</h2>
-          <p>继续阅读相关的工程笔记。</p>
+          <p>当前接口尚未返回相关推荐，后续可继续补齐关联笔记能力。</p>
         </div>
-        <div class="related-grid">
+        <div v-if="relatedNotes.length" class="related-grid">
           <NoteCard v-for="item in relatedNotes" :key="item.id" :item="item" />
         </div>
+        <BaseEmpty
+          v-else
+          title="暂无相关推荐"
+          description="当前仅收口真实详情读取；关联笔记待后端提供独立查询接口后继续补齐。"
+        />
       </div>
     </section>
 
     <aside class="detail-side">
-      <NoteOutline :items="note.outline" />
-      <BaseEmpty title="关联资料" description="联调后可展示引用资料与路线的精确关系。" />
+      <NoteOutline :items="noteOutline" />
+      <BaseEmpty title="笔记状态" :description="noteStatusDescription" />
     </aside>
+  </div>
 
-    <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
+  <div v-else-if="notFound" class="page-shell">
+    <BaseErrorState title="笔记不存在" description="可能已删除、当前账号不可见，或你访问了他人的笔记。">
+      <BaseButton @click="router.push('/community')">返回社区</BaseButton>
+    </BaseErrorState>
   </div>
 
   <div v-else class="page-shell">
-    <BaseErrorState title="笔记不存在" description="可能已删除或当前账号不可见。" />
+    <BaseErrorState title="笔记加载失败" description="服务暂时不可用，请稍后刷新重试。" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import axios from 'axios'
+import { fetchNoteDetail, type NoteDTO } from '@/api/notes'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import HeroBanner from '@/components/business/HeroBanner.vue'
-import InteractionBar from '@/components/business/InteractionBar.vue'
 import NoteCard from '@/components/business/NoteCard.vue'
 import NoteOutline from '@/components/business/NoteOutline.vue'
-import ReportDialog from '@/components/business/ReportDialog.vue'
-import { notes } from '@/mock/notes'
-import { useAppStore } from '@/stores/app'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
-const appStore = useAppStore()
-const reportVisible = ref(false)
-const reportReason = ref('')
-const likes = ref(86)
-const favorites = ref(112)
+const router = useRouter()
+const loading = ref(true)
+const notFound = ref(false)
+const note = ref<NoteDTO | null>(null)
 
-const note = computed(() => notes.find((item) => String(item.id) === String(route.params.id)))
-const relatedNotes = computed(() => notes.filter((item) => item.id !== note.value?.id).slice(0, 2))
+const noteSummary = computed(() => extractSummary(note.value?.contentMd || ''))
+const noteOutline = computed(() => extractOutline(note.value?.contentMd || ''))
+const noteStatusDescription = computed(() => {
+  if (!note.value) return '笔记状态读取中'
+  const status = note.value.status?.trim() || '未标记'
+  const visibility = note.value.visibility?.trim() || '仅自己可见'
+  return `当前状态 ${status}，可见性 ${visibility}`
+})
+const relatedNotes = computed<
+  Array<{ id: number, title: string, summary: string, updatedAt: string, status: string, tags: string[] }>
+>(() => [])
 const renderedHtml = computed(() => {
   if (!note.value) return ''
-  return note.value.content
+  return note.value.contentMd
     .split('\n')
     .map((line) => {
-      if (line.startsWith('# ')) return `<h1>${line.slice(2)}</h1>`
-      if (line.startsWith('## ')) return `<h2>${line.slice(3)}</h2>`
+      const safeLine = escapeHtml(line)
+      if (line.startsWith('# ')) return `<h1>${escapeHtml(line.slice(2))}</h1>`
+      if (line.startsWith('## ')) return `<h2>${escapeHtml(line.slice(3))}</h2>`
       if (!line.trim()) return '<br />'
-      return `<p>${line}</p>`
+      return `<p>${safeLine}</p>`
     })
     .join('')
 })
 
-function likeNote() {
-  likes.value += 1
-  appStore.showToast('已点赞', '这篇笔记已加入你的点赞记录')
+async function loadNote() {
+  loading.value = true
+  notFound.value = false
+  note.value = null
+
+  try {
+    note.value = await fetchNoteDetail(Number(route.params.id))
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? (error.response?.status ?? 0) : 0
+    if (status === 404) {
+      notFound.value = true
+    }
+  } finally {
+    loading.value = false
+  }
 }
 
-function favoriteNote() {
-  favorites.value += 1
-  appStore.showToast('已收藏', '可在个人中心继续回看')
+function extractSummary(content: string) {
+  const firstParagraph = content
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith('#'))
+  return firstParagraph || '当前笔记暂无摘要，已直接展示真实正文。'
 }
 
-function submitReport() {
-  reportVisible.value = false
-  appStore.showToast('举报已提交', reportReason.value || '已进入处理队列')
-  reportReason.value = ''
+function extractOutline(content: string) {
+  const headings = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('## '))
+    .map((line) => line.slice(3))
+  return headings.length ? headings : ['正文']
 }
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+watch(() => route.params.id, () => {
+  void loadNote()
+})
+
+onMounted(() => {
+  void loadNote()
+})
 </script>
 
 <style scoped lang="scss">
@@ -105,6 +169,17 @@ function submitReport() {
 .markdown-panel,
 .panel {
   padding: var(--space-6);
+}
+
+.interaction-pending {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.interaction-pending__title {
+  margin: 0;
+  font-weight: 600;
 }
 
 .markdown-panel :deep(h1),

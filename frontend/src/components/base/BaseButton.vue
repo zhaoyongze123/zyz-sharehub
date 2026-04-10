@@ -1,8 +1,9 @@
 <template>
   <button
     class="base-button"
-    :class="[`base-button--${variant}`, `base-button--${size}`, { 'is-block': block }]"
+    :class="[`base-button--${variant}`, `base-button--${size}`, { 'is-block': block, 'is-disabled': disabled }]"
     :type="nativeType"
+    :disabled="disabled"
   >
     <slot />
   </button>
@@ -15,12 +16,14 @@ withDefaults(
     size?: 'sm' | 'md' | 'lg'
     block?: boolean
     nativeType?: 'button' | 'submit' | 'reset'
+    disabled?: boolean
   }>(),
   {
     variant: 'primary',
     size: 'md',
     block: false,
-    nativeType: 'button'
+    nativeType: 'button',
+    disabled: false
   }
 )
 </script>
@@ -35,6 +38,14 @@ withDefaults(
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: transform var(--duration-fast) var(--easing-standard), box-shadow var(--duration-fast) var(--easing-standard), background var(--duration-fast) var(--easing-standard);
+}
+
+.base-button:disabled,
+.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .base-button:hover {

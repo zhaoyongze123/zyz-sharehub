@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: cloud-dev
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:55432}/${POSTGRES_DB:sharehub_dev}
+    username: ${POSTGRES_USER:sharehub_dev}
+    password: ${POSTGRES_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:56379}
+      password: ${REDIS_PASSWORD}

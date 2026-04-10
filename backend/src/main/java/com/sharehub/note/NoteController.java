@@ -1,51 +1,92 @@
 package com.sharehub.note;
 
+import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
+import com.sharehub.common.PageResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/notes")
 public class NoteController {
 
-    private final InMemoryStore store;
+    private final NoteRepository repository;
+    private final RequestAccessService requestAccessService;
+    private final UserProfileRepository userProfileRepository;
 
-    public NoteController(InMemoryStore store) {
-        this.store = store;
+    public NoteController(
+        NoteRepository repository,
+        RequestAccessService requestAccessService,
+        UserProfileRepository userProfileRepository
+    ) {
+        this.repository = repository;
+        this.requestAccessService = requestAccessService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @PostMapping
-    public ApiResponse<NoteDto> create(@Valid @RequestBody NoteDto req) {
-        long id = store.nextId();
-        NoteDto saved = new NoteDto(id, req.title(), req.contentMd(), req.visibility(), "PUBLISHED");
-        store.notes.put(id, saved);
+    public ApiResponse<NoteDto> create(
+        Authentication authentication,
+        HttpServletRequest request,
+        @Valid @RequestBody NoteDto req
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        NoteDto toSave = new NoteDto(null, req.title(), req.contentMd(), req.visibility(), req.status());
+        NoteDto saved = repository.save(ownerKey, toSave);
         return ApiResponse.ok(saved);
     }
 
     @GetMapping
-    public ApiResponse<List<Object>> list() {
-        return ApiResponse.ok(new ArrayList<>(store.notes.values()));
+    public ApiResponse<PageResponse<NoteDto>> list(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(repository.listByOwner(ownerKey, status, page, pageSize));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Object> detail(@PathVariable Long id) {
-        return ApiResponse.ok(store.notes.get(id));
+    public ApiResponse<NoteDto> detail(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(repository.findOwned(id, ownerKey));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<NoteDto> update(@PathVariable Long id, @Valid @RequestBody NoteDto req) {
-        NoteDto saved = new NoteDto(id, req.title(), req.contentMd(), req.visibility(), req.status());
-        store.notes.put(id, saved);
-        return ApiResponse.ok(saved);
+    public ApiResponse<NoteDto> update(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @Valid @RequestBody NoteDto req
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        NoteDto updated = repository.upsertOwned(id, ownerKey, req);
+        return ApiResponse.ok(updated);
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<String> delete(@PathVariable Long id) {
-        store.notes.remove(id);
+    public ApiResponse<String> delete(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        repository.deleteOwned(id, ownerKey);
         return ApiResponse.ok("DELETED");
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String login = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(login, login, null);
+        userProfileRepository.ensureActive(login);
+        return login;
     }
 }

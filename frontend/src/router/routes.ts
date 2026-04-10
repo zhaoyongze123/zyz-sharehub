@@ -99,13 +99,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'resume',
         name: 'resume',
         component: () => import('@/views/resume/ResumeWorkbenchView.vue'),
-        meta: { title: '简历工作台', fullHeight: true }
+        meta: { title: '简历工作台', fullHeight: true, auth: true }
       },
       {
         path: 'me',
         name: 'me',
         component: () => import('@/views/user/ProfileView.vue'),
-        meta: { title: '个人帐户' }
+        meta: { title: '个人帐户', auth: true }
       }
     ]
   },
@@ -131,6 +131,12 @@ export const routes: RouteRecordRaw[] = [
         name: 'admin-reports',
         component: () => import('@/views/admin/AdminReportsView.vue'),
         meta: { title: '举报处理' }
+      },
+      {
+        path: 'audit-logs',
+        name: 'admin-audit-logs',
+        component: () => import('@/views/admin/AdminAuditLogsView.vue'),
+        meta: { title: '审计日志' }
       },
       {
         path: 'users',

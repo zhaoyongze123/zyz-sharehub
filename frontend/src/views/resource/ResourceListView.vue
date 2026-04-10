@@ -42,7 +42,7 @@
       <!-- Right Content Area -->
       <main class="results-area">
         <div class="results-header">
-          <span class="results-count">找到 {{ filteredResources.length }} 个资源</span>
+          <span class="results-count">找到 {{ total }} 个资源</span>
           <div class="sort-control">
             <span class="sort-label">排序：</span>
             <select v-model="sortBy" class="sort-select">
@@ -59,11 +59,11 @@
           <BaseSkeleton v-for="item in 6" :key="item" height="16rem" />
         </div>
         <div v-else class="resource-grid">
-          <ResourceCard v-for="item in pagedResources" :key="item.id" :item="item" />
+          <ResourceCard v-for="item in resources" :key="item.id" :item="item" />
         </div>
 
-        <div class="pagination-wrap" v-if="filteredResources.length > pageSize">
-          <BasePagination :page="pageNum" :page-size="pageSize" :total="filteredResources.length" @update:page="pageNum = $event" />
+        <div class="pagination-wrap" v-if="total > pageSize">
+          <BasePagination :page="pageNum" :page-size="pageSize" :total="total" @update:page="pageNum = $event" />
         </div>
       </main>
     </div>
@@ -71,14 +71,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BasePagination from '@/components/base/BasePagination.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import ResourceCard from '@/components/business/ResourceCard.vue'
-import { resourceCategories, resources, resourceTags } from '@/mock/resources'
+import { fetchResources, resourceCategoryOptions, type ResourceItem } from '@/api/resources'
 
 const route = useRoute()
 const keyword = ref(String(route.query.keyword || ''))
@@ -87,46 +87,56 @@ const sortBy = ref('latest')
 const selectedTag = ref('全部')
 const pageNum = ref(1)
 const pageSize = 9
+const resources = ref<ResourceItem[]>([])
+const total = ref(0)
+const loading = ref(false)
+const loadError = ref(false)
 
-const categoryOptions = resourceCategories.map((item) => ({ label: item, value: item }))
+const categoryOptions = resourceCategoryOptions.map((item) => ({ label: item, value: item }))
 const sortOptions = [
   { label: '最新优先', value: 'latest' },
   { label: '最热优先', value: 'hot' }
 ]
-
-const filteredResources = computed(() => {
-  const list = resources.filter((item) => {
-    const matchKeyword = !keyword.value || `${item.title}${item.summary}${item.tags.join(' ')}`.toLowerCase().includes(keyword.value.toLowerCase())
-    const matchCategory = category.value === '全部' || item.category === category.value
-    const matchTag = selectedTag.value === '全部' || item.tags.includes(selectedTag.value)
-    return matchKeyword && matchCategory && matchTag
-  })
-
-  return [...list].sort((a, b) => {
-    if (sortBy.value === 'hot') {
-      return b.likes - a.likes
-    }
-    return b.updatedAt.localeCompare(a.updatedAt)
-  })
-})
-
-const pagedResources = computed(() => {
-  const start = (pageNum.value - 1) * pageSize
-  return filteredResources.value.slice(start, start + pageSize)
-})
+const resourceTags = computed(() => ['全部', ...new Set(resources.value.flatMap((item) => item.tags))])
 
 const status = computed(() => {
-  if (keyword.value === 'error') return 'error'
-  if (keyword.value === 'loading') return 'loading'
-  if (!filteredResources.value.length) return 'empty'
+  if (loading.value) return 'loading'
+  if (loadError.value) return 'error'
+  if (!resources.value.length) return 'empty'
   return 'ready'
 })
 
-watchEffect(() => {
-  if (pageNum.value > Math.ceil(filteredResources.value.length / pageSize) && filteredResources.value.length) {
-    pageNum.value = 1
+async function loadResources() {
+  loading.value = true
+  loadError.value = false
+
+  try {
+    const response = await fetchResources({
+      page: pageNum.value - 1,
+      pageSize,
+      keyword: keyword.value.trim(),
+      category: category.value,
+      tag: selectedTag.value,
+      sortBy: sortBy.value as 'latest' | 'hot'
+    })
+    resources.value = response.items
+    total.value = response.total
+  } catch (error) {
+    resources.value = []
+    total.value = 0
+    loadError.value = true
+  } finally {
+    loading.value = false
   }
+}
+
+watch([keyword, category, selectedTag, sortBy], () => {
+  pageNum.value = 1
 })
+
+watch([keyword, category, selectedTag, sortBy, pageNum], () => {
+  void loadResources()
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">

@@ -7,6 +7,21 @@ export const apiClient = axios.create({
   timeout: 15000
 })
 
+apiClient.interceptors.request.use((config) => {
+  const savedRole = window.localStorage.getItem('sharebase.role')
+  const savedNickname = window.localStorage.getItem('sharebase.nickname')
+
+  if (savedRole === 'admin') {
+    config.headers['X-Admin-Token'] = window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token'
+  }
+
+  if (savedRole === 'user' || savedRole === 'admin') {
+    config.headers['X-User-Key'] = window.localStorage.getItem('sharebase.userKey') || savedNickname || 'frontend-local-user'
+  }
+
+  return config
+})
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

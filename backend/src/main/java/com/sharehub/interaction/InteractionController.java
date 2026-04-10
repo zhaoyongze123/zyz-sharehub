@@ -1,56 +1,127 @@
 package com.sharehub.interaction;
 
+import com.sharehub.auth.RequestAccessService;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
-import com.sharehub.common.InMemoryStore;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api")
 public class InteractionController {
 
-    private final InMemoryStore store;
+    private final InteractionRepository repository;
+    private final RequestAccessService requestAccessService;
+    private final UserProfileRepository userProfileRepository;
 
-    public InteractionController(InMemoryStore store) {
-        this.store = store;
+    public InteractionController(
+        InteractionRepository repository,
+        RequestAccessService requestAccessService,
+        UserProfileRepository userProfileRepository
+    ) {
+        this.repository = repository;
+        this.requestAccessService = requestAccessService;
+        this.userProfileRepository = userProfileRepository;
     }
 
     @PostMapping("/resources/{id}/comments")
-    public ApiResponse<Map<String, Object>> comment(@PathVariable Long id, @RequestBody Map<String, Object> req) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("resourceId", id);
-        result.put("commentId", store.nextId());
-        result.put("content", req.get("content"));
-        return ApiResponse.ok(result);
+    public ApiResponse<InteractionRepository.CommentRecord> comment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @RequestBody Map<String, String> req
+    ) {
+        String author = requireActiveUser(authentication, request);
+        InteractionRepository.CommentRecord comment = repository.saveComment(id, req.get("content"), null, author);
+        return ApiResponse.ok(comment);
+    }
+
+    @GetMapping("/resources/{id}/comments")
+    public ApiResponse<java.util.List<CommentNodeDto>> comments(@PathVariable Long id) {
+        return ApiResponse.ok(repository.listCommentTreeByResource(id));
     }
 
     @PostMapping("/comments/{id}/reply")
-    public ApiResponse<Map<String, Object>> reply(@PathVariable Long id, @RequestBody Map<String, Object> req) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("parentCommentId", id);
-        result.put("commentId", store.nextId());
-        result.put("content", req.get("content"));
-        return ApiResponse.ok(result);
+    public ApiResponse<InteractionRepository.CommentRecord> reply(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @RequestBody Map<String, String> req
+    ) {
+        String author = requireActiveUser(authentication, request);
+        InteractionRepository.CommentRecord reply = repository.saveComment(id, req.get("content"), id, author);
+        return ApiResponse.ok(reply);
     }
 
     @PostMapping("/resources/{id}/favorite")
-    public ApiResponse<String> favorite(@PathVariable Long id) {
-        return ApiResponse.ok("FAVORITED_" + id);
+    public ApiResponse<Map<String, Object>> favorite(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.addFavorite(id, userKey);
+        return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
+    }
+
+    @DeleteMapping("/resources/{id}/favorite")
+    public ApiResponse<Map<String, Object>> unfavorite(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.removeFavorite(id, userKey);
+        return ApiResponse.ok(Map.of("resourceId", id, "favorites", total));
     }
 
     @PostMapping("/resources/{id}/like")
-    public ApiResponse<String> like(@PathVariable Long id) {
-        return ApiResponse.ok("LIKED_" + id);
+    public ApiResponse<Map<String, Object>> like(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.addLike(id, userKey);
+        return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
+    }
+
+    @DeleteMapping("/resources/{id}/like")
+    public ApiResponse<Map<String, Object>> unlike(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.removeLike(id, userKey);
+        return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
+    }
+
+    @GetMapping("/resources/{id}/interactions")
+    public ApiResponse<InteractionSummaryDto> interactions(@PathVariable Long id) {
+        return ApiResponse.ok(repository.summarizeResource(id));
     }
 
     @PostMapping("/reports")
-    public ApiResponse<Map<String, Object>> report(@RequestBody Map<String, Object> req) {
-        long id = store.nextId();
-        req.put("id", id);
-        req.put("status", "OPEN");
-        store.reports.put(id, req);
-        return ApiResponse.ok(req);
+    public ApiResponse<InteractionRepository.ReportRecord> report(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestBody Map<String, String> req
+    ) {
+        String reporter = requireActiveUser(authentication, request);
+        long resourceId = Long.parseLong(req.getOrDefault("resourceId", "0"));
+        String reason = req.getOrDefault("reason", "无");
+        InteractionRepository.ReportRecord report = repository.saveReport(resourceId, reason, reporter);
+        return ApiResponse.ok(report);
+    }
+
+    private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
+        String userKey = requestAccessService.requireUser(authentication, request);
+        userProfileRepository.upsert(userKey, userKey, null);
+        userProfileRepository.ensureActive(userKey);
+        return userKey;
     }
 }

@@ -4,6 +4,33 @@ server:
 spring:
   application:
     name: sharehub-backend
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:55432}/${POSTGRES_DB:sharehub_dev}
+    username: ${POSTGRES_USER:sharehub_dev}
+    password: ${POSTGRES_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:56379}
+      password: ${REDIS_PASSWORD:}
+      repositories:
+        enabled: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 management:
   endpoints:
@@ -22,3 +49,5 @@ sharehub:
       bucket: ${DO_SPACES_BUCKET:}
       access-key: ${DO_SPACES_ACCESS_KEY:}
       secret-key: ${DO_SPACES_SECRET_KEY:}
+    file:
+      max-size: 5242880

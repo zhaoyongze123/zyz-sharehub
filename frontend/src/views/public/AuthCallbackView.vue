@@ -24,16 +24,34 @@ const authStore = useAuthStore()
 const message = ref('正在校验授权状态并恢复回跳目标页。')
 
 function retry() {
-  window.location.reload()
+  message.value = '正在重新校验授权状态并恢复回跳目标页。'
+  void restoreSession()
+}
+
+async function restoreSession() {
+  try {
+    authStore.initialized = false
+    const profile = await authStore.syncProfileFromServer()
+    authStore.initialized = true
+
+    if (!profile) {
+      message.value = '未从 `/api/auth/me` 恢复到真实身份，请重新发起登录。'
+      return
+    }
+
+    message.value = '真实登录状态已恢复，正在跳转。'
+    await router.replace(String(route.query.redirect || '/'))
+  } catch {
+    authStore.profile = null
+    authStore.initialized = true
+    message.value = '登录回调校验失败，请确认后端会话有效后重试。'
+  }
 }
 
 onMounted(() => {
-  const role = route.query.role === 'admin' ? 'admin' : 'user'
   window.setTimeout(() => {
-    authStore.loginAs(role)
-    message.value = '登录状态已恢复，正在跳转。'
-    router.replace(String(route.query.redirect || '/'))
-  }, 900)
+    void restoreSession()
+  }, 300)
 })
 </script>
 

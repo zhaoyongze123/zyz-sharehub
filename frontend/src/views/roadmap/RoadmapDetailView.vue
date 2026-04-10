@@ -1,5 +1,5 @@
 <template>
-  <div class="page-shell detail-grid" v-if="roadmap">
+  <div class="page-shell detail-grid" v-if="status === 'ready' && roadmap">
     <section class="detail-main">
       <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.summary">
         <template #actions>
@@ -13,7 +13,7 @@
           <h2>节点进度结构</h2>
           <p>点击每个阶段节点，即可查看具体的内容、学习资源与讨论。</p>
         </div>
-        <RoadmapTimeline :items="roadmapTimeline" @node-click="openNodeDetail" />
+        <RoadmapTimeline :items="roadmap.timeline" @node-click="openNodeDetail" />
       </div>
 
       <div class="glass-panel panel">
@@ -21,23 +21,27 @@
           <h2>关联资料</h2>
           <p>路线中的关键节点可以直接跳到相关资料或笔记。</p>
         </div>
-        <div class="related-grid">
-          <ResourceCard v-for="item in resources.slice(0, 2)" :key="item.id" :item="item" />
+        <div v-if="roadmap.relatedResources.length" class="related-grid">
+          <ResourceCard v-for="item in roadmap.relatedResources.slice(0, 2)" :key="item.id" :item="item" />
         </div>
+        <BaseEmpty v-else title="暂无关联资料" description="当前路线节点还没有绑定公开资料。" />
       </div>
 
       <div class="glass-panel panel">
         <div class="section-heading">
-          <h2>评论互动</h2>
-          <p>路线讨论和问题记录统一沉淀。</p>
+          <h2>路线状态</h2>
+          <p>优先展示真实路线状态与节点数量，评论互动后续再接入。</p>
         </div>
-        <CommentList :items="resourceComments" />
+        <BaseEmpty
+          :title="`当前状态 ${roadmap.status}`"
+          :description="`公开范围 ${roadmap.visibility}，共 ${roadmap.timeline.length} 个节点。`"
+        />
       </div>
     </section>
 
     <aside class="detail-side">
-      <BaseEmpty title="阶段进度" :description="`当前模拟进度 ${progress}%`" />
-      <BaseEmpty title="联动" description="后续可接已完成节点、路线收藏和评论接口。" />
+      <BaseEmpty title="阶段进度" :description="`当前真实进度 ${progress}%`" />
+      <BaseEmpty title="联动" description="已切到真实路线详情读取，收藏与评论仍待接后端。" />
     </aside>
 
     <!-- Node Detail Modal -->
@@ -67,15 +71,15 @@
           
           <div class="node-resources" v-if="selectedNodeIndex !== null">
             <strong>相关学习资料：</strong>
-            <div class="resource-preview" v-if="resources[selectedNodeIndex]">
+            <div class="resource-preview" v-if="selectedResource">
               <div class="i-carbon-document resource-icon"></div>
               <div class="resource-info">
-                <span class="resource-title">{{ resources[selectedNodeIndex].title }}</span>
-                <span class="resource-meta">{{ resources[selectedNodeIndex].type }} · {{ resources[selectedNodeIndex].rating }}分</span>
+                <span class="resource-title">{{ selectedResource.title }}</span>
+                <span class="resource-meta">{{ selectedResource.fileType }} · {{ selectedResource.downloadCount }} 下载</span>
               </div>
-<button class="view-btn" @click="goToResource(resources[selectedNodeIndex].id)">查看</button>
+              <button class="view-btn" @click="goToResource(selectedResource.id)">查看</button>
             </div>
-            <p v-else class="text-muted text-sm">暂无专属资料关联</p>
+            <p v-else class="text-muted text-sm">当前节点未绑定公开资料</p>
           </div>
         </div>
         <div class="modal-footer">
@@ -86,34 +90,63 @@
     </div>
   </div>
 
-  <div v-else class="page-shell">
+  <div v-else-if="status === 'error'" class="page-shell">
     <BaseErrorState title="路线不存在" description="请返回路线广场重新选择。" />
+  </div>
+  <div v-else class="page-shell">
+    <BaseSkeleton height="24rem" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
-import CommentList from '@/components/business/CommentList.vue'
+import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import HeroBanner from '@/components/business/HeroBanner.vue'
 import ResourceCard from '@/components/business/ResourceCard.vue'
 import RoadmapTimeline from '@/components/business/RoadmapTimeline.vue'
-import { resourceComments, resources } from '@/mock/resources'
-import { roadmapTimeline, roadmaps } from '@/mock/roadmaps'
+import { fetchRoadmapDetail, type RoadmapDetail, type RoadmapTimelineItem } from '@/api/roadmaps'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
-const roadmap = computed(() => roadmaps.find((item) => String(item.id) === String(route.params.id)))
-const progress = ref(46)
+const roadmap = ref<RoadmapDetail | null>(null)
+const progress = ref(0)
+const loading = ref(true)
+const loadError = ref(false)
+const status = computed(() => {
+  if (loading.value) return 'loading'
+  if (loadError.value || !roadmap.value) return 'error'
+  return 'ready'
+})
 
-// Node modal state
-const selectedNode = ref<any>(null)
+const selectedNode = ref<RoadmapTimelineItem | null>(null)
 const selectedNodeIndex = ref<number | null>(null)
+const selectedResource = computed(() => {
+  if (selectedNodeIndex.value === null) return null
+  return roadmap.value?.relatedResources.find((item) => item.id === selectedNode.value?.resourceId) ?? null
+})
+
+async function loadRoadmapDetail() {
+  loading.value = true
+  loadError.value = false
+
+  try {
+    const detail = await fetchRoadmapDetail(String(route.params.id))
+    roadmap.value = detail
+    progress.value = detail.progressPercent
+  } catch {
+    roadmap.value = null
+    progress.value = 0
+    loadError.value = true
+  } finally {
+    loading.value = false
+  }
+}
 
 function markComplete() {
   progress.value = Math.min(100, progress.value + 18)
@@ -124,7 +157,7 @@ function favoriteRoadmap() {
   appStore.showToast('已收藏路线', '后续可在个人中心继续学习')
 }
 
-function openNodeDetail(node: any, index: number) {
+function openNodeDetail(node: RoadmapTimelineItem, index: number) {
   selectedNode.value = node
   selectedNodeIndex.value = index
 }
@@ -135,9 +168,11 @@ function closeNodeDetail() {
 }
 
 function startLearningNode() {
+  if (!selectedNode.value) return
+
   appStore.showToast('学习开启', `已为您加载《${selectedNode.value.title}》的课程资料`)
-  if (selectedNodeIndex.value !== null && resources[selectedNodeIndex.value]) {
-    router.push({ name: 'resource-detail', params: { id: resources[selectedNodeIndex.value].id } })
+  if (selectedResource.value) {
+    router.push({ name: 'resource-detail', params: { id: selectedResource.value.id } })
   }
   closeNodeDetail()
 }
@@ -146,6 +181,10 @@ function goToResource(id: number) {
   router.push({ name: 'resource-detail', params: { id } })
   closeNodeDetail()
 }
+
+watch(() => route.params.id, () => {
+  void loadRoadmapDetail()
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">
