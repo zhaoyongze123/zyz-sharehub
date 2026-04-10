@@ -43,6 +43,7 @@ npx playwright test tests/e2e/full-site-walkthrough.spec.ts
 - 检查 `/actuator/health`
 - 检查首页可访问
 - 检查资源详情页可打开
+- 检查资源详情页举报可写入真实后台队列
 - 检查路线详情页可打开
 - 检查资料发布与路线创建页可完成真实写入
 - 检查后台页面权限拦截正常

@@ -61,7 +61,14 @@
       <BaseEmpty title="状态覆盖" description="若访问不存在的资料，请直接改 URL 为不存在 id，会显示 404 态。" />
     </aside>
 
-    <ReportDialog v-model:reason="reportReason" :visible="reportVisible" @close="reportVisible = false" @submit="submitReport" />
+    <ReportDialog
+      v-model:reason="reportReason"
+      :visible="reportVisible"
+      :submitting="reporting"
+      :error-message="reportErrorMessage"
+      @close="closeReportDialog"
+      @submit="submitReport"
+    />
   </div>
 
   <div v-else-if="notFound" class="page-shell">
@@ -79,6 +86,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { createReport } from '@/api/reports'
 import { fetchRelatedResources, fetchResourceDetail, type ResourceItem } from '@/api/resources'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
@@ -98,6 +106,8 @@ const router = useRouter()
 const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
+const reporting = ref(false)
+const reportErrorMessage = ref('')
 const loading = ref(true)
 const notFound = ref(false)
 const resource = ref<ResourceItem | null>(null)
@@ -146,10 +156,47 @@ function downloadResource() {
   appStore.showToast('下载任务已启动', '联调后这里会接真实下载流')
 }
 
-function submitReport() {
-  reportVisible.value = false
-  appStore.showToast('举报已提交', reportReason.value || '已进入后台处理队列')
+function closeReportDialog() {
+  if (reporting.value) {
+    return
+  }
   reportReason.value = ''
+  reportErrorMessage.value = ''
+  reportVisible.value = false
+}
+
+async function submitReport() {
+  if (!resource.value || reporting.value) {
+    return
+  }
+
+  if (!reportReason.value.trim()) {
+    reportErrorMessage.value = '请填写举报原因'
+    return
+  }
+
+  reporting.value = true
+  reportErrorMessage.value = ''
+
+  try {
+    const report = await createReport({
+      targetType: 'RESOURCE',
+      resourceId: resource.value.id,
+      reason: reportReason.value.trim()
+    })
+    closeReportDialog()
+    appStore.showToast('举报已提交', `举报 #${report.id} 已进入后台处理队列`)
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      reportErrorMessage.value = error.response?.data?.msg || error.response?.data?.message || '举报提交失败，请稍后重试'
+    } else {
+      reportErrorMessage.value = error instanceof Error && error.message.trim()
+        ? error.message
+        : '举报提交失败，请稍后重试'
+    }
+  } finally {
+    reporting.value = false
+  }
 }
 
 watch(() => route.params.id, () => {

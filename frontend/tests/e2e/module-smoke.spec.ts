@@ -127,6 +127,23 @@ test('资源模块 smoke', async ({ page }) => {
   await page.locator('article', { hasText: resource.title }).first().getByRole('link', { name: '查看详情' }).click()
   await expect(page.getByRole('heading', { name: resource.title })).toBeVisible()
   await expect(page.getByText(`下载 ${resource.downloadCount}`)).toBeVisible()
+
+  const reportReason = `Smoke resource report ${Date.now()}`
+  await loginAs(page, 'user')
+  await page.reload()
+  const reportResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/reports') && response.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: '举报' }).click()
+  await page.getByLabel('举报原因').fill(reportReason)
+  await page.getByRole('button', { name: '提交举报' }).click()
+  const reportResponse = await reportResponsePromise
+  expect(reportResponse.ok()).toBeTruthy()
+  const reportBody = await reportResponse.json()
+  expect(reportBody.success).toBeTruthy()
+  expect(reportBody.data.targetType).toBe('RESOURCE')
+  expect(reportBody.data.targetId).toBe(resource.id)
+  expect(reportBody.data.reason).toBe(reportReason)
 })
 
 test('路线模块 smoke', async ({ page }) => {

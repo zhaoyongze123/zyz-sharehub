@@ -61,6 +61,8 @@
     <ReportDialog
       v-model:reason="reportReason"
       :visible="reportVisible"
+      :submitting="reporting"
+      :error-message="reportErrorMessage"
       @close="closeReportDialog"
       @submit="submitReport"
     />
@@ -100,6 +102,7 @@ const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
 const reporting = ref(false)
+const reportErrorMessage = ref('')
 const loading = ref(true)
 const notFound = ref(false)
 const note = ref<NoteDTO | null>(null)
@@ -147,8 +150,12 @@ async function loadNote() {
 }
 
 function closeReportDialog() {
+  if (reporting.value) {
+    return
+  }
   reportVisible.value = false
   reportReason.value = ''
+  reportErrorMessage.value = ''
 }
 
 async function submitReport() {
@@ -156,18 +163,30 @@ async function submitReport() {
     return
   }
 
+  if (!reportReason.value.trim()) {
+    reportErrorMessage.value = '请填写举报原因'
+    return
+  }
+
   reporting.value = true
+  reportErrorMessage.value = ''
 
   try {
     const report = await createReport({
       targetType: 'NOTE',
       noteId: note.value.id,
-      reason: reportReason.value
+      reason: reportReason.value.trim()
     })
     appStore.showToast('举报已提交', `举报 #${report.id} 已进入后台处理队列`)
     closeReportDialog()
   } catch (error) {
-    console.error(error)
+    if (axios.isAxiosError(error)) {
+      reportErrorMessage.value = error.response?.data?.msg || error.response?.data?.message || '举报提交失败，请稍后重试'
+    } else {
+      reportErrorMessage.value = error instanceof Error && error.message.trim()
+        ? error.message
+        : '举报提交失败，请稍后重试'
+    }
   } finally {
     reporting.value = false
   }
