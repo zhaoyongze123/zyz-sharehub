@@ -53,6 +53,10 @@ interface StoredFileDto {
   downloadUrl: string
 }
 
+export interface UpdateMyProfilePayload {
+  name: string
+}
+
 export interface MeDashboardData {
   profile: {
     id: number
@@ -93,6 +97,8 @@ export interface MeDashboardData {
   }>
 }
 
+export type MeSummaryData = Pick<MeDashboardData, 'profile' | 'stats'>
+
 function normalizeCount(value: number | null | undefined) {
   return typeof value === 'number' ? value : 0
 }
@@ -101,23 +107,8 @@ function formatDate(value: string | null | undefined) {
   return value ? value.slice(0, 10) : '未知时间'
 }
 
-export async function fetchMeDashboard(): Promise<MeDashboardData> {
-  const [meResponse, resourcesResponse, notesResponse, resumesResponse] = await Promise.all([
-    apiClient.get<ApiResponse<MeDto>>('/me'),
-    apiClient.get<ApiResponse<PagedData<ResourceDto>>>('/me/resources', {
-      params: { page: 1, pageSize: 5 }
-    }),
-    apiClient.get<ApiResponse<PagedData<NoteDto>>>('/me/notes', {
-      params: { page: 1, pageSize: 5 }
-    }),
-    apiClient.get<ApiResponse<PagedData<ResumeDto>>>('/me/resumes', {
-      params: { page: 1, pageSize: 5 }
-    })
-  ])
-
-  const me = meResponse.data.data
+function mapSummary(me: MeDto): MeSummaryData {
   const profile = me.profile
-
   return {
     profile: {
       id: profile?.id ?? 0,
@@ -136,26 +127,66 @@ export async function fetchMeDashboard(): Promise<MeDashboardData> {
       publishedResources: normalizeCount(me.publishedResourceCount),
       draftNotes: normalizeCount(me.draftNoteCount),
       generatedResumes: normalizeCount(me.generatedResumeCount)
-    },
-    recentResources: (resourcesResponse.data.data.items ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      status: item.status?.trim() || 'UNKNOWN',
-      visibility: item.visibility?.trim() || 'UNKNOWN',
-      updatedAt: formatDate(item.updatedAt)
-    })),
-    recentNotes: (notesResponse.data.data.items ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      status: item.status?.trim() || 'UNKNOWN'
-    })),
-    recentResumes: (resumesResponse.data.data.items ?? []).map((item) => ({
-      id: item.id,
-      templateKey: item.templateKey,
-      status: item.status?.trim() || 'UNKNOWN',
-      fileName: item.fileName?.trim() || `resume-${item.id}.pdf`,
-      updatedAt: formatDate(item.fileUpdatedAt)
-    }))
+    }
+  }
+}
+
+export async function fetchMeSummary(): Promise<MeSummaryData> {
+  const response = await apiClient.get<ApiResponse<MeDto>>('/me')
+  return mapSummary(response.data.data)
+}
+
+export async function fetchMyRecentResources(pageSize = 5) {
+  const response = await apiClient.get<ApiResponse<PagedData<ResourceDto>>>('/me/resources', {
+    params: { page: 1, pageSize }
+  })
+  return (response.data.data.items ?? []).map((item) => ({
+    id: item.id,
+    title: item.title,
+    status: item.status?.trim() || 'UNKNOWN',
+    visibility: item.visibility?.trim() || 'UNKNOWN',
+    updatedAt: formatDate(item.updatedAt)
+  }))
+}
+
+export async function fetchMyRecentNotes(pageSize = 5) {
+  const response = await apiClient.get<ApiResponse<PagedData<NoteDto>>>('/me/notes', {
+    params: { page: 1, pageSize }
+  })
+  return (response.data.data.items ?? []).map((item) => ({
+    id: item.id,
+    title: item.title,
+    status: item.status?.trim() || 'UNKNOWN'
+  }))
+}
+
+export async function fetchMyRecentResumes(pageSize = 5) {
+  const response = await apiClient.get<ApiResponse<PagedData<ResumeDto>>>('/me/resumes', {
+    params: { page: 1, pageSize }
+  })
+  return (response.data.data.items ?? []).map((item) => ({
+    id: item.id,
+    templateKey: item.templateKey,
+    status: item.status?.trim() || 'UNKNOWN',
+    fileName: item.fileName?.trim() || `resume-${item.id}.pdf`,
+    updatedAt: formatDate(item.fileUpdatedAt)
+  }))
+}
+
+export async function fetchMeDashboard(): Promise<MeDashboardData> {
+  const [summary, recentResources, recentNotes, recentResumes] = await Promise.all([
+    fetchMeSummary(),
+    fetchMyRecentResources(5),
+    fetchMyRecentNotes(5),
+    fetchMyRecentResumes(5)
+  ])
+
+  return {
+    profile: summary.profile,
+    stats: summary.stats,
+    recentResources,
+    recentNotes,
+    recentResumes
   }
 }
 
@@ -169,5 +200,15 @@ export async function uploadMyAvatar(file: File) {
     }
   })
 
+  return response.data.data
+}
+
+export async function updateMyProfile(payload: UpdateMyProfilePayload) {
+  const response = await apiClient.put<ApiResponse<UserProfileDto>>('/me/profile', payload)
+  return response.data.data
+}
+
+export async function deleteMyAvatar() {
+  const response = await apiClient.delete<ApiResponse<UserProfileDto>>('/me/avatar')
   return response.data.data
 }

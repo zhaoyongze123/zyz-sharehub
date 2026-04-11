@@ -6,6 +6,7 @@ import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,7 +47,14 @@ public class NoteController {
         @RequestParam(defaultValue = "1") int page,
         @RequestParam(defaultValue = "10") int pageSize,
         @RequestParam(required = false) String status) {
-        String ownerKey = requireActiveUser(authentication, request);
+        Optional<String> resolvedUser = requestAccessService.resolveUser(authentication, request);
+        if (resolvedUser.isEmpty()) {
+            return ApiResponse.ok(repository.listPublicPublished(page, pageSize));
+        }
+
+        String ownerKey = resolvedUser.get();
+        userProfileRepository.upsert(ownerKey, ownerKey, null);
+        userProfileRepository.ensureActive(ownerKey);
         return ApiResponse.ok(repository.listByOwner(ownerKey, status, page, pageSize));
     }
 

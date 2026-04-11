@@ -1,6 +1,6 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="markTitle markDesc">
-  <title id="markTitle">ShareBase Mark</title>
-  <desc id="markDesc">Abstract node mark for ShareBase.</desc>
+  <title id="markTitle">ShareHub Mark</title>
+  <desc id="markDesc">Abstract node mark for ShareHub.</desc>
   <defs>
     <linearGradient id="markGrad" x1="12" y1="14" x2="52" y2="54" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#0F172A"/>

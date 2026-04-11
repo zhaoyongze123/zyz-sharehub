@@ -6,12 +6,12 @@ const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
 async function loginAs(page: Page, role: 'user' | 'admin') {
   await page.addInitScript(({ selectedRole, adminTokenValue }) => {
-    window.localStorage.setItem('sharebase.role', selectedRole)
-    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
-    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
-    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
+    window.localStorage.setItem('sharehub.role', selectedRole)
+    window.localStorage.setItem('sharehub.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
+    window.localStorage.setItem('sharehub.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
+    window.localStorage.setItem('sharehub.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
+      window.localStorage.setItem('sharehub.adminToken', adminTokenValue)
     }
   }, { selectedRole: role, adminTokenValue: adminToken })
 }

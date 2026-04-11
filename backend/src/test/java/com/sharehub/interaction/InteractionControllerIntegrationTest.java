@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -23,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-@SpringBootTest
+@SpringBootTest(properties = "sharehub.admin.dev-token-enabled=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class InteractionControllerIntegrationTest {
@@ -56,20 +57,23 @@ public class InteractionControllerIntegrationTest {
     void commentReplyFavoriteLikeReportPersisted() throws Exception {
         long resourceId = createResource("互动资源");
         var commentPayload = mapper.writeValueAsString(Map.of("content", "hello"));
-        mvc.perform(post("/api/resources/" + resourceId + "/comments")
+        MvcResult commentResult = mvc.perform(post("/api/resources/" + resourceId + "/comments")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(commentPayload))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.resourceId").value(resourceId));
+            .andExpect(jsonPath("$.data.resourceId").value(resourceId))
+            .andReturn();
+
+        long rootCommentId = mapper.readTree(commentResult.getResponse().getContentAsString()).path("data").path("id").asLong();
 
         var replyPayload = mapper.writeValueAsString(Map.of("content", "reply"));
-        mvc.perform(post("/api/comments/1/reply")
+        mvc.perform(post("/api/comments/" + rootCommentId + "/reply")
                         .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(replyPayload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.parentId").value(1))
+                .andExpect(jsonPath("$.data.parentId").value(rootCommentId))
                 .andExpect(jsonPath("$.data.resourceId").value(resourceId));
 
         mvc.perform(post("/api/resources/" + resourceId + "/favorite")

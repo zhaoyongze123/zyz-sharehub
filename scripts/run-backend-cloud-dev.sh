@@ -2,11 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-if [[ -f "${PROJECT_ROOT}/backend/.env.cloud-dev.local" ]]; then
-  # shellcheck disable=SC1091
-  source "${PROJECT_ROOT}/backend/.env.cloud-dev.local"
-fi
+source "${PROJECT_ROOT}/scripts/load-env.sh"
+load_env_stack "${PROJECT_ROOT}/backend" ".env.cloud-dev" ".env.cloud-dev.local"
 
 : "${POSTGRES_PASSWORD:?请先设置 POSTGRES_PASSWORD，或写入 backend/.env.cloud-dev.local}"
 : "${REDIS_PASSWORD:?请先设置 REDIS_PASSWORD，或写入 backend/.env.cloud-dev.local}"

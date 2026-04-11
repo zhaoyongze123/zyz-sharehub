@@ -169,11 +169,74 @@ public class InteractionRepository {
         if (resourceIds == null || resourceIds.isEmpty()) {
             return Map.of();
         }
+        List<Long> ids = new ArrayList<>(new LinkedHashSet<>(resourceIds));
+        Map<Long, Long> commentCounts = queryResourceCountMap(
+            "SELECT resource_id, COUNT(*) AS cnt FROM comments WHERE status = 'VISIBLE' AND resource_id IN (%s) GROUP BY resource_id",
+            ids
+        );
+        Map<Long, Long> favoriteCounts = queryResourceCountMap(
+            "SELECT resource_id, COUNT(*) AS cnt FROM favorites WHERE note_id IS NULL AND resource_id IN (%s) GROUP BY resource_id",
+            ids
+        );
+        Map<Long, Long> likeCounts = queryResourceCountMap(
+            "SELECT resource_id, COUNT(*) AS cnt FROM likes WHERE note_id IS NULL AND resource_id IN (%s) GROUP BY resource_id",
+            ids
+        );
+        Map<Long, Long> reportCounts = queryTargetCountMap(
+            "SELECT target_id, COUNT(*) AS cnt FROM reports WHERE target_type = 'RESOURCE' AND target_id IN (%s) GROUP BY target_id",
+            ids
+        );
+
         Map<Long, InteractionSummaryDto> result = new HashMap<>();
-        for (Long resourceId : resourceIds) {
-            result.put(resourceId, summarizeResource(resourceId));
+        for (Long resourceId : ids) {
+            result.put(
+                resourceId,
+                new InteractionSummaryDto(
+                    resourceId,
+                    commentCounts.getOrDefault(resourceId, 0L),
+                    favoriteCounts.getOrDefault(resourceId, 0L),
+                    likeCounts.getOrDefault(resourceId, 0L),
+                    reportCounts.getOrDefault(resourceId, 0L)
+                )
+            );
         }
         return result;
+    }
+
+    private Map<Long, Long> queryResourceCountMap(String sqlTemplate, List<Long> resourceIds) {
+        if (resourceIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(",", resourceIds.stream().map(id -> "?").toList());
+        String sql = sqlTemplate.formatted(placeholders);
+        List<Map.Entry<Long, Long>> rows = jdbcTemplate.query(
+            sql,
+            (resultSet, rowNum) -> Map.entry(resultSet.getLong(1), resultSet.getLong(2)),
+            resourceIds.toArray()
+        );
+        Map<Long, Long> counts = new HashMap<>();
+        for (Map.Entry<Long, Long> row : rows) {
+            counts.put(row.getKey(), row.getValue());
+        }
+        return counts;
+    }
+
+    private Map<Long, Long> queryTargetCountMap(String sqlTemplate, List<Long> targetIds) {
+        if (targetIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(",", targetIds.stream().map(id -> "?").toList());
+        String sql = sqlTemplate.formatted(placeholders);
+        List<Map.Entry<Long, Long>> rows = jdbcTemplate.query(
+            sql,
+            (resultSet, rowNum) -> Map.entry(resultSet.getLong(1), resultSet.getLong(2)),
+            targetIds.toArray()
+        );
+        Map<Long, Long> counts = new HashMap<>();
+        for (Map.Entry<Long, Long> row : rows) {
+            counts.put(row.getKey(), row.getValue());
+        }
+        return counts;
     }
 
     public CommentRecord hideComment(Long commentId) {

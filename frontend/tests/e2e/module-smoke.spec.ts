@@ -6,18 +6,16 @@ const enabledModules = new Set(
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
 const userKey = process.env.PLAYWRIGHT_USER_KEY || 'playwright-user'
-const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
+const adminUserKey = process.env.PLAYWRIGHT_ADMIN_USER_KEY || 'playwright-admin'
 
 async function loginAs(page: Page, role: 'user' | 'admin') {
-  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
-    window.localStorage.setItem('sharebase.role', selectedRole)
-    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
-    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
-    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
-    if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
-    }
-  }, { selectedRole: role, adminTokenValue: adminToken })
+  await page.addInitScript(({ selectedRole, currentUserKey }) => {
+    window.localStorage.setItem('sharehub.role', selectedRole)
+    window.localStorage.setItem('sharehub.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
+    window.localStorage.setItem('sharehub.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
+    window.localStorage.setItem('sharehub.userKey', currentUserKey)
+    window.localStorage.removeItem('sharehub.adminToken')
+  }, { selectedRole: role, currentUserKey: role === 'admin' ? adminUserKey : userKey })
 }
 
 function shouldRun(name: string) {
@@ -371,7 +369,7 @@ test('笔记详情真实读取 smoke', async ({ page, request }) => {
 
   const adminReportsResponse = await request.get(`${apiBaseUrl}/api/admin/reports?page=1&pageSize=20`, {
     headers: {
-      'X-Admin-Token': adminToken
+      'X-User-Key': adminUserKey
     }
   })
   expect(adminReportsResponse.ok()).toBeTruthy()
@@ -495,7 +493,7 @@ test('个人中心模块 smoke', async ({ page }) => {
   const authMeBody = await authMeResponse.json()
   expect(authMeBody.success).toBeTruthy()
   expect(authMeBody.data?.login).toBeTruthy()
-  await expect(page.getByRole('heading', { name: '个人资料' })).toBeVisible()
+  await expect(page.getByTestId('profile-stat-grid')).toBeVisible({ timeout: 15000 })
   await expect(page.getByRole('heading', { name: '个人帐户' })).toBeVisible()
 
   const meResponse = await browserFetch(page, '/api/me', {
@@ -526,7 +524,19 @@ test('个人中心模块 smoke', async ({ page }) => {
   await expect(page.getByTestId('profile-stat-value-favorites-roadmaps')).toHaveText(
     `${meResponse.json?.data?.myFavoriteCount ?? 0} / ${meResponse.json?.data?.myRoadmapCount ?? 0}`
   )
-  await expect(page.getByRole('button', { name: '资料编辑待接写接口' })).toBeDisabled()
+
+  const updatedDisplayName = `Playwright User ${Date.now()}`
+  const profileUpdateResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/me/profile') && response.request().method() === 'PUT'
+  )
+  await page.getByTestId('profile-name-input').fill(updatedDisplayName)
+  await page.getByTestId('profile-save').click()
+  const profileUpdateResponse = await profileUpdateResponsePromise
+  expect(profileUpdateResponse.ok()).toBeTruthy()
+  const profileUpdateBody = await profileUpdateResponse.json()
+  expect(profileUpdateBody.success).toBeTruthy()
+  expect(profileUpdateBody.data?.name).toBe(updatedDisplayName)
+  await expect(page.getByTestId('console-sidebar-name')).toHaveText(updatedDisplayName)
 
   const avatarResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/auth/avatar') && response.request().method() === 'POST'
@@ -546,6 +556,17 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(avatarBody.data?.downloadUrl).toContain('/api/files/')
   await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
   await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
+
+  const deleteAvatarResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/me/avatar') && response.request().method() === 'DELETE'
+  )
+  await page.getByTestId('profile-avatar-delete').click()
+  const deleteAvatarResponse = await deleteAvatarResponsePromise
+  expect(deleteAvatarResponse.ok()).toBeTruthy()
+  const deleteAvatarBody = await deleteAvatarResponse.json()
+  expect(deleteAvatarBody.success).toBeTruthy()
+  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveCount(0)
+  await expect(page.getByTestId('console-sidebar-avatar-fallback')).toBeVisible()
 
   const resourcesResponse = await browserFetch(page, '/api/me/resources?page=1&pageSize=5', {
     'X-User-Key': userKey
@@ -585,9 +606,9 @@ test('个人中心模块 smoke', async ({ page }) => {
   expect(reloadAuthMeBody.success).toBeTruthy()
   expect(reloadAuthMeBody.data?.login).toBe(authMeBody.data.login)
   await expect(page.getByText(`@${meResponse.json.data.profile.login}`)).toBeVisible()
-  await expect(page.getByTestId('console-sidebar-name')).toHaveText(expectedDisplayName)
-  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveAttribute('src', /\/api\/files\//)
-  await expect(page.getByTestId('console-sidebar-avatar')).toHaveAttribute('src', /\/api\/files\//)
+  await expect(page.getByTestId('console-sidebar-name')).toHaveText(updatedDisplayName)
+  await expect(page.getByTestId('profile-avatar').locator('img')).toHaveCount(0)
+  await expect(page.getByTestId('console-sidebar-avatar-fallback')).toBeVisible()
 })
 
 test('个人中心在 auth/me 失效时回跳登录页', async ({ page }) => {
@@ -637,7 +658,7 @@ test('后台模块 smoke', async ({ page }) => {
   await expect(page.getByText('管理中心仪表盘')).toBeVisible()
 
   const apiResponse = await browserFetch(page, '/api/admin/reports?page=1&pageSize=20', {
-    'X-Admin-Token': adminToken
+    'X-User-Key': adminUserKey
   })
   expect(apiResponse.ok).toBeTruthy()
   expect(apiResponse.status).toBe(200)
@@ -657,7 +678,7 @@ test('后台模块 smoke', async ({ page }) => {
   }
 
   const auditResponse = await browserFetch(page, '/api/admin/audit-logs?page=1&pageSize=5', {
-    'X-Admin-Token': adminToken
+    'X-User-Key': adminUserKey
   })
   expect(auditResponse.ok).toBeTruthy()
   expect(auditResponse.status).toBe(200)
@@ -676,7 +697,7 @@ test('后台模块 smoke', async ({ page }) => {
   await expect(page.getByTestId('admin-dashboard-stat-audit-actions-detail')).toContainText(expectedLatestAction)
 
   const usersResponse = await browserFetch(page, '/api/admin/users?page=1&pageSize=20', {
-    'X-Admin-Token': adminToken
+    'X-User-Key': adminUserKey
   })
   expect(usersResponse.ok).toBeTruthy()
   expect(usersResponse.status).toBe(200)
@@ -695,21 +716,18 @@ test('后台模块 smoke', async ({ page }) => {
   await expect(userStatCard).toContainText(`已封禁 ${bannedUsers.length}`)
   await expect(page.getByTestId('admin-dashboard-stat-users-value')).toContainText(String(managedUsers.length))
 
-  const resourceResponse = await browserFetch(page, '/api/resources?page=0&pageSize=100', {
-    'X-User-Key': userKey
-  })
-  expect(resourceResponse.ok).toBeTruthy()
-  expect(resourceResponse.json?.success).toBeTruthy()
-  const firstResource = resourceResponse.json?.data?.items?.[0]
-  expect(firstResource).toBeTruthy()
-
-  await page.goto('/admin/taxonomy')
-  await expect(page.getByRole('heading', { name: '标签分类管理' })).toBeVisible()
-  await expect(page.getByTestId('admin-taxonomy-summary')).toContainText(
-    `已读取 ${resourceResponse.json?.data?.items?.length ?? 0} / ${resourceResponse.json?.data?.total ?? 0} 条真实资料`
-  )
-  await expect(page.getByRole('cell', { name: firstResource.category || firstResource.type || '未分类' }).first()).toBeVisible()
-  await expect(page.getByTestId('admin-taxonomy-readonly').first()).toBeVisible()
+  await page.goto('/admin/reviews')
+  await expect(page.getByRole('heading', { name: '内容审核' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '驳回未开放' })).toBeDisabled()
+  const firstReview = reportItems[0]
+  if (firstReview) {
+    const reviewRow = page.getByTestId(`admin-reviews-row-${firstReview.id}`)
+    await expect(reviewRow).toContainText(firstReview.reason)
+    await expect(reviewRow).toContainText(firstReview.reporter)
+    await expect(reviewRow).toContainText(`${firstReview.targetType} #${firstReview.targetId}`)
+  } else {
+    await expect(page.getByText('暂无审核数据')).toBeVisible()
+  }
 
   await page.goto('/admin/reports')
   await expect(page.getByRole('heading', { name: '举报处理' })).toBeVisible()

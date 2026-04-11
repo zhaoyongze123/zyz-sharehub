@@ -15,8 +15,20 @@ frontend/test-results/
 
 # Env
 .env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+scripts/.env
+scripts/.env.*
 *.local
 deploy/.env.prod
+!*.example
+!backend/*.example
+!frontend/*.example
+!scripts/*.example
+!deploy/*.example
 deploy/certbot/
 
 # Workspace data

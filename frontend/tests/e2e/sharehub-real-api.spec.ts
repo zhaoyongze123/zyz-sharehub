@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Response } from '@playwright/test'
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || 'http://127.0.0.1:18080'
-const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
+const adminUserKey = process.env.PLAYWRIGHT_ADMIN_USER_KEY || 'playwright-admin'
 const enabledModules = new Set(
   (process.env.PLAYWRIGHT_MODULES || 'all')
     .split(',')
@@ -22,7 +22,7 @@ function userHeaders(userKey = 'playwright-user') {
 
 function adminHeaders() {
   return {
-    'X-Admin-Token': process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token',
+    'X-User-Key': adminUserKey,
     'Content-Type': 'application/json'
   }
 }
@@ -150,15 +150,13 @@ async function createPublicRoadmap(
 }
 
 async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 'admin') {
-  await page.addInitScript(({ selectedRole, adminTokenValue }) => {
-    window.localStorage.setItem('sharebase.role', selectedRole)
-    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
-    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
-    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
-    if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
-    }
-  }, { selectedRole: role, adminTokenValue: adminToken })
+  await page.addInitScript(({ selectedRole, selectedUserKey }) => {
+    window.localStorage.setItem('sharehub.role', selectedRole)
+    window.localStorage.setItem('sharehub.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
+    window.localStorage.setItem('sharehub.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
+    window.localStorage.setItem('sharehub.userKey', selectedUserKey)
+    window.localStorage.removeItem('sharehub.adminToken')
+  }, { selectedRole: role, selectedUserKey: role === 'admin' ? adminUserKey : 'playwright-user' })
 }
 
 test.describe.configure({ mode: 'serial' })

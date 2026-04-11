@@ -17,27 +17,69 @@ interface AuthMeResponse {
     name?: string | null
     avatarUrl?: string | null
     status?: string
+    isAdmin?: boolean
   }
+}
+
+const AUTH_CACHE_KEY = 'sharehub.authProfileCache'
+const AUTH_CACHE_TTL_MS = 5 * 60 * 1000
+
+interface CachedAuthProfile {
+  expiresAt: number
+  profile: UserProfile
 }
 
 function getSavedRole(): UserProfile['role'] {
-  return window.localStorage.getItem('sharebase.role') === 'admin' ? 'admin' : 'user'
+  return window.localStorage.getItem('sharehub.role') === 'admin' ? 'admin' : 'user'
 }
 
 function buildDevHeaders() {
-  const savedRole = window.localStorage.getItem('sharebase.role')
-  const savedNickname = window.localStorage.getItem('sharebase.nickname')
+  const savedRole = window.localStorage.getItem('sharehub.role')
+  const savedNickname = window.localStorage.getItem('sharehub.nickname')
   const headers: Record<string, string> = {}
+  const savedAdminToken = window.localStorage.getItem('sharehub.adminToken')
 
-  if (savedRole === 'admin') {
-    headers['X-Admin-Token'] = window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token'
+  if (savedRole === 'admin' && savedAdminToken) {
+    headers['X-Admin-Token'] = savedAdminToken
   }
 
   if (savedRole === 'user' || savedRole === 'admin') {
-    headers['X-User-Key'] = window.localStorage.getItem('sharebase.userKey') || savedNickname || 'frontend-local-user'
+    headers['X-User-Key'] = window.localStorage.getItem('sharehub.userKey') || savedNickname || 'frontend-local-user'
   }
 
   return headers
+}
+
+function readCachedAuthProfile(): UserProfile | null {
+  const raw = window.localStorage.getItem(AUTH_CACHE_KEY)
+  if (!raw) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as CachedAuthProfile
+    if (!parsed || typeof parsed.expiresAt !== 'number' || !parsed.profile) {
+      return null
+    }
+    if (parsed.expiresAt < Date.now()) {
+      return null
+    }
+    return parsed.profile
+  } catch {
+    return null
+  }
+}
+
+function writeCachedAuthProfile(profile: UserProfile) {
+  const payload: CachedAuthProfile = {
+    expiresAt: Date.now() + AUTH_CACHE_TTL_MS,
+    profile
+  }
+  window.localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(payload))
+}
+
+function clearCachedAuthProfile() {
+  window.localStorage.removeItem(AUTH_CACHE_KEY)
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -58,17 +100,18 @@ export const useAuthStore = defineStore('auth', {
 
       if (response.data?.success && currentUser?.login) {
         const nickname = currentUser.name?.trim() || currentUser.login
-        const role = getSavedRole()
+        const role = currentUser.isAdmin ? 'admin' : getSavedRole()
         this.profile = {
           id: currentUser.id ?? 0,
           nickname,
           role,
-          headline: window.localStorage.getItem('sharebase.headline') || 'ShareHub 用户',
+          headline: window.localStorage.getItem('sharehub.headline') || 'ShareHub 用户',
           avatarUrl: currentUser.avatarUrl || undefined
         }
-        window.localStorage.setItem('sharebase.nickname', nickname)
-        window.localStorage.setItem('sharebase.userKey', currentUser.login)
-        window.localStorage.setItem('sharebase.role', role)
+        writeCachedAuthProfile(this.profile)
+        window.localStorage.setItem('sharehub.nickname', nickname)
+        window.localStorage.setItem('sharehub.userKey', currentUser.login)
+        window.localStorage.setItem('sharehub.role', role)
         return this.profile
       }
 
@@ -77,6 +120,16 @@ export const useAuthStore = defineStore('auth', {
     },
     async bootstrap() {
       if (this.initialized) {
+        return
+      }
+
+      const cachedProfile = readCachedAuthProfile()
+      if (cachedProfile) {
+        this.profile = cachedProfile
+        this.initialized = true
+        void this.syncProfileFromServer().catch(() => {
+          // 缓存命中场景下后台刷新失败不阻塞页面进入
+        })
         return
       }
 
@@ -91,38 +144,38 @@ export const useAuthStore = defineStore('auth', {
     loginAs(role: 'user' | 'admin') {
       const nickname = role === 'admin' ? 'Admin Zoe' : 'Alex Chen'
       const headline = role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者'
-      window.localStorage.setItem('sharebase.role', role)
-      window.localStorage.setItem('sharebase.nickname', nickname)
-      window.localStorage.setItem('sharebase.headline', headline)
-      window.localStorage.setItem('sharebase.userKey', nickname)
-      if (role === 'admin') {
-        window.localStorage.setItem('sharebase.adminToken', window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token')
-      }
+      window.localStorage.setItem('sharehub.role', role)
+      window.localStorage.setItem('sharehub.nickname', nickname)
+      window.localStorage.setItem('sharehub.headline', headline)
+      window.localStorage.setItem('sharehub.userKey', nickname)
       this.profile = {
         id: 1,
         nickname,
         role,
         headline
       }
+      writeCachedAuthProfile(this.profile)
       this.initialized = true
     },
     updateProfile(data: Partial<UserProfile>) {
       if (this.profile) {
         Object.assign(this.profile, data)
+        writeCachedAuthProfile(this.profile)
         if (data.nickname) {
-          window.localStorage.setItem('sharebase.nickname', data.nickname)
+          window.localStorage.setItem('sharehub.nickname', data.nickname)
         }
         if (data.headline) {
-          window.localStorage.setItem('sharebase.headline', data.headline)
+          window.localStorage.setItem('sharehub.headline', data.headline)
         }
       }
     },
     logout() {
-      window.localStorage.removeItem('sharebase.role')
-      window.localStorage.removeItem('sharebase.nickname')
-      window.localStorage.removeItem('sharebase.headline')
-      window.localStorage.removeItem('sharebase.userKey')
-      window.localStorage.removeItem('sharebase.adminToken')
+      window.localStorage.removeItem('sharehub.role')
+      window.localStorage.removeItem('sharehub.nickname')
+      window.localStorage.removeItem('sharehub.headline')
+      window.localStorage.removeItem('sharehub.userKey')
+      window.localStorage.removeItem('sharehub.adminToken')
+      clearCachedAuthProfile()
       this.profile = null
       this.initialized = true
     }

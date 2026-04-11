@@ -93,6 +93,37 @@ public class NoteRepository {
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
+    public PageResponse<NoteDto> listPublicPublished(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM notes WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED'",
+            Long.class
+        );
+
+        int offset = (safePage - 1) * safePageSize;
+        List<NoteDto> items = jdbcTemplate.query(
+            """
+                SELECT id, title, content_md, visibility, status
+                FROM notes
+                WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED'
+                ORDER BY updated_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> mapDto(
+                resultSet.getLong("id"),
+                resultSet.getString("title"),
+                resultSet.getString("content_md"),
+                resultSet.getString("visibility"),
+                resultSet.getString("status")
+            ),
+            safePageSize,
+            offset
+        );
+
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
+    }
+
     public NoteDto findOwned(Long id, String ownerKey) {
         return findOptional(id, ownerKey).orElseThrow(() -> new NotFoundException("NOTE_NOT_FOUND"));
     }

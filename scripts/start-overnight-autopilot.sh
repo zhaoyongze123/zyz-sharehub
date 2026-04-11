@@ -2,6 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "${PROJECT_ROOT}/scripts/load-env.sh"
+load_env_stack "${PROJECT_ROOT}/scripts" ".env.overnight" ".env.overnight.local"
 OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
 PID_FILE="${STATE_DIR}/autopilot.pid"

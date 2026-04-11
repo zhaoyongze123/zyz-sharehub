@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sharehub-staging-postgres
+    restart: unless-stopped
+    env_file:
+      - ./.env.staging
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      POSTGRES_DB: ${POSTGRES_DB:-sharehub_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-sharehub_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace_postgres_password}
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sharehub_staging} -d ${POSTGRES_DB:-sharehub_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - staging_internal
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: sharehub-staging-redis
+    restart: unless-stopped
+    env_file:
+      - ./.env.staging
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-replace_redis_password}"]
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-replace_redis_password}", "PING"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - staging_internal
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: zyz-sharehub-backend:latest
+    container_name: sharehub-staging-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.staging
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      APP_ENV: ${APP_ENV:-staging}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-production,oauth}
+      GITHUB_OAUTH_ENABLED: ${GITHUB_OAUTH_ENABLED:-true}
+      SHAREHUB_ADMIN_DEV_TOKEN_ENABLED: ${SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:-false}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sharehub_staging}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sharehub_staging}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace_postgres_password}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-replace_redis_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q 'UP'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - staging_internal
+      - public
+
+volumes:
+  postgres_staging_data:
+  redis_staging_data:
+
+networks:
+  public:
+    external: true
+    name: sharehub-public
+  staging_internal:
+    name: sharehub-staging-internal

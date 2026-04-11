@@ -171,6 +171,15 @@
            <p>没有找到符合条件的 AI 分享内容。</p>
         </div>
       </div>
+
+      <div class="pagination-wrap" v-if="total > pageSize && !activeCategory">
+        <BasePagination
+          :page="pageNum"
+          :page-size="pageSize"
+          :total="total"
+          @update:page="pageNum = $event"
+        />
+      </div>
     </main>
 
     <!-- Markdown Editor Publish Modal -->
@@ -235,6 +244,7 @@ import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchNotes, createNote, type NoteDTO } from '@/api/notes'
 import { useAppStore } from '@/stores/app'
+import BasePagination from '@/components/base/BasePagination.vue'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -302,14 +312,32 @@ const renderedMarkdown = computed(() => {
 
 function mapNoteToTopic(note: NoteDTO) {
   const status = note.status || 'DRAFT'
+  const content = `${note.title || ''} ${note.contentMd || ''}`
+
+  let inferredCategory = 'AI 工具与效能'
+  let inferredColor = 'bg-teal'
+  if (/rag|retrieval|向量|检索|召回|重排/i.test(content)) {
+    inferredCategory = 'AI 应用与 Agent'
+    inferredColor = 'bg-red'
+  } else if (/prompt|提示词|agent|workflow|多代理|编排/i.test(content)) {
+    inferredCategory = '提示词工程'
+    inferredColor = 'bg-green'
+  } else if (/paper|论文|benchmark|评测|实验/i.test(content)) {
+    inferredCategory = '学术与论文'
+    inferredColor = 'bg-yellow'
+  } else if (/llm|大模型|langgraph|autogen|llama/i.test(content)) {
+    inferredCategory = '大模型前沿'
+    inferredColor = 'bg-blue'
+  }
+
   return {
     id: note.id,
     title: note.title || '未命名笔记',
     excerpt: note.contentMd?.slice(0, 120) || '',
-    category: status,
-    categoryColor: status === 'PUBLISHED' ? 'bg-teal' : 'bg-gray',
+    category: inferredCategory,
+    categoryColor: inferredColor,
     hasLink: false,
-    tags: [] as Array<{ label: string; icon?: string }>,
+    tags: [{ label: inferredCategory }] as Array<{ label: string; icon?: string }>,
     author: {
       name: currentUser.name,
       avatar: currentUser.avatar
@@ -335,7 +363,7 @@ const displayedTopics = computed(() => {
   }
 
   if (activeCategory.value) {
-    list = list.filter((t) => t.tags?.some((tag: any) => tag.label === activeCategory.value))
+    list = list.filter((t) => t.category === activeCategory.value)
   }
 
   if (activeTab.value === 'featured') {
@@ -368,7 +396,16 @@ async function fetchList() {
 onMounted(fetchList)
 
 watch(activeTab, () => {
+  pageNum.value = 1
   void fetchList()
+})
+
+watch(pageNum, () => {
+  void fetchList()
+})
+
+watch([currentNav, activeCategory], () => {
+  pageNum.value = 1
 })
 
 function switchNav(nav: string) {

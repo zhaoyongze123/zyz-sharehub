@@ -2,7 +2,9 @@
   <div class="layout">
     <header class="site-header">
       <div class="site-header__inner">
-        <RouterLink class="brand" to="/">ShareBase</RouterLink>
+        <RouterLink class="brand" to="/">
+          <img class="brand-logo" :src="brandLogo" alt="ShareHub" />
+        </RouterLink>
         <nav class="main-nav">
           <RouterLink to="/resources">资料</RouterLink>
           <RouterLink to="/roadmaps">路线</RouterLink>
@@ -19,7 +21,7 @@
     </main>
     <footer class="site-footer">
       <div class="site-footer__inner">
-        <span>© 2026 ShareBase. 让资料、路线、笔记和简历在同一套系统里流动。</span>
+        <span>© 2026 ShareHub. 让资料、路线、笔记和简历在同一套系统里流动。</span>
         <div class="site-footer__links">
           <a href="#">隐私政策</a>
           <a href="#">使用条款</a>
@@ -31,6 +33,7 @@
 
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import brandLogo from '@/assets/logo/sharehub-logo-user.png'
 </script>
 
 <style scoped lang="scss">
@@ -55,9 +58,17 @@ import { RouterLink, RouterView } from 'vue-router'
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
   font-size: var(--font-size-xl);
   font-weight: 800;
   letter-spacing: -0.03em;
+}
+
+.brand-logo {
+  height: 2.5rem;
+  width: auto;
+  display: block;
 }
 
 .main-nav,

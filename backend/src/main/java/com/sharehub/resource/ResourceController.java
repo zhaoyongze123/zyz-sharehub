@@ -114,7 +114,7 @@ public class ResourceController {
                 normalizedVisibility,
                 PageRequest.of(0, Integer.MAX_VALUE, Sort.by(Sort.Direction.DESC, "updatedAt"))
             );
-            List<ResourceDto> sorted = enrichResources(allCandidates.getContent()).stream()
+            List<ResourceDto> sorted = enrichResources(allCandidates.getContent(), true).stream()
                 .sorted(
                     Comparator.comparingLong(ResourceDto::likes).reversed()
                         .thenComparing(ResourceDto::updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -135,13 +135,13 @@ public class ResourceController {
             normalizedVisibility,
             pageable
         );
-        long total = repository.countByVisibleFilters(statuses, normalizedKeyword, normalizedCategory, normalizedTag, normalizedVisibility);
-        return ApiResponse.ok(PageResponse.of(enrichResources(result.getContent()), safePage, safeSize, total));
+        long total = result.getTotalElements();
+        return ApiResponse.ok(PageResponse.of(enrichResources(result.getContent(), false), safePage, safeSize, total));
     }
 
     @GetMapping("/featured")
     public ApiResponse<List<ResourceDto>> featured() {
-        return ApiResponse.ok(enrichResources(repository.findTop6ByPublishedOrderByUpdatedAtDesc()).stream().limit(6).toList());
+        return ApiResponse.ok(enrichResources(repository.findTop6ByPublishedOrderByUpdatedAtDesc(), true).stream().limit(6).toList());
     }
 
     @GetMapping("/{id}")
@@ -167,7 +167,7 @@ public class ResourceController {
             .filter(tag -> !tag.isEmpty())
             .map(String::toLowerCase)
             .collect(Collectors.toSet());
-        List<ResourceDto> related = enrichResources(repository.findPublishedExcludingId(id)).stream()
+        List<ResourceDto> related = enrichResources(repository.findPublishedExcludingId(id), true).stream()
             .filter(item -> isRelated(source, sourceTags, item))
             .sorted(
                 Comparator.comparingInt((ResourceDto item) -> relatedScore(source, sourceTags, item)).reversed()
@@ -233,23 +233,27 @@ public class ResourceController {
         return parsed.isEmpty() ? List.of("PUBLISHED") : parsed;
     }
 
-    private List<ResourceDto> enrichResources(List<ResourceEntity> resources) {
-        Map<Long, InteractionSummaryDto> summaries = interactionRepository.summarizeResources(
-            resources.stream().map(ResourceEntity::getId).collect(Collectors.toSet())
+    private List<ResourceDto> enrichResources(List<ResourceEntity> resources, boolean includeInteractionSummary) {
+        Map<String, UserProfileDto> profiles = userProfileRepository.findByLogins(
+            resources.stream().map(ResourceEntity::getOwnerKey).collect(Collectors.toSet())
         );
+        Map<Long, InteractionSummaryDto> summaries = includeInteractionSummary
+            ? interactionRepository.summarizeResources(resources.stream().map(ResourceEntity::getId).collect(Collectors.toSet()))
+            : Map.of();
         return resources.stream()
-            .map(resource -> toDto(resource, summaries.get(resource.getId())))
+            .map(resource -> toDto(resource, profiles.get(resource.getOwnerKey()), summaries.get(resource.getId())))
             .toList();
     }
 
     private ResourceDto enrichResource(ResourceEntity resource) {
-        return toDto(resource, interactionRepository.summarizeResource(resource.getId()));
+        Optional<UserProfileDto> profile = userProfileRepository.findOptionalByLogin(resource.getOwnerKey());
+        return toDto(resource, profile.orElse(null), interactionRepository.summarizeResource(resource.getId()));
     }
 
-    private ResourceDto toDto(ResourceEntity resource, InteractionSummaryDto summary) {
-        Optional<UserProfileDto> profile = userProfileRepository.findOptionalByLogin(resource.getOwnerKey());
-        String author = profile.map(item -> item.name() == null || item.name().isBlank() ? item.login() : item.name())
-            .orElse(resource.getOwnerKey());
+    private ResourceDto toDto(ResourceEntity resource, UserProfileDto profile, InteractionSummaryDto summary) {
+        String author = profile == null
+            ? resource.getOwnerKey()
+            : (profile.name() == null || profile.name().isBlank() ? profile.login() : profile.name());
         long likes = summary == null ? 0L : summary.likes();
         long favorites = summary == null ? 0L : summary.favorites();
         long downloadCount = resource.getObjectKey() == null || resource.getObjectKey().isBlank() ? 0L : 1L;

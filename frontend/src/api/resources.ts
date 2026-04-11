@@ -5,6 +5,8 @@ export interface ResourceItem {
   id: number
   title: string
   summary: string
+  externalUrl: string
+  objectKey: string
   author: string
   updatedAt: string
   category: string
@@ -21,6 +23,7 @@ interface ResourceDto {
   type: string | null
   category: string | null
   summary: string | null
+  externalUrl?: string | null
   tags: string[] | null
   updatedAt: string | null
   author: string | null
@@ -75,6 +78,8 @@ function normalizeResource(dto: ResourceDto): ResourceItem {
     id: dto.id,
     title: dto.title,
     summary: dto.summary?.trim() || '暂无简介',
+    externalUrl: dto.externalUrl?.trim() || '',
+    objectKey: dto.objectKey?.trim() || '',
     author: dto.author?.trim() || '未知作者',
     updatedAt: dto.updatedAt ? dto.updatedAt.slice(0, 10) : '未知时间',
     category,

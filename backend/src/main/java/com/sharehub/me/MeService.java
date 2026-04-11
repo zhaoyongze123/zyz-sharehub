@@ -19,6 +19,7 @@ import java.time.Instant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -27,6 +28,17 @@ public class MeService {
     private static final String PUBLISHED_STATUS = "PUBLISHED";
     private static final String DRAFT_STATUS = "DRAFT";
     private static final String GENERATED_STATUS = "GENERATED";
+    private static final RowMapper<MeAggregateMetrics> METRICS_ROW_MAPPER = (resultSet, rowNum) -> new MeAggregateMetrics(
+        resultSet.getLong("resource_count"),
+        resultSet.getLong("favorite_count"),
+        resultSet.getLong("roadmap_count"),
+        resultSet.getLong("note_count"),
+        resultSet.getLong("resume_count"),
+        resultSet.getLong("recent_resource_count"),
+        resultSet.getLong("published_resource_count"),
+        resultSet.getLong("draft_note_count"),
+        resultSet.getLong("generated_resume_count")
+    );
 
     private final UserProfileRepository userProfileRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -55,34 +67,48 @@ public class MeService {
     }
 
     public MeDto aggregate(String ownerKey) {
-        UserProfileDto profile = userProfileRepository.upsert(ownerKey, ownerKey, null);
-        Long resourceCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resources WHERE owner_key = ?",
-            Long.class,
-            ownerKey
+        UserProfileDto profile = userProfileRepository.ensureActiveProfile(ownerKey);
+        MeAggregateMetrics metrics = jdbcTemplate.queryForObject(
+            """
+                SELECT
+                  (SELECT COUNT(*) FROM resources WHERE owner_key = ?) AS resource_count,
+                  (SELECT COUNT(*) FROM favorites WHERE user_key = ?) AS favorite_count,
+                  (SELECT COUNT(*) FROM roadmaps WHERE owner_key = ?) AS roadmap_count,
+                  (SELECT COUNT(*) FROM notes WHERE owner_key = ?) AS note_count,
+                  (SELECT COUNT(*) FROM resumes WHERE owner_key = ?) AS resume_count,
+                  (SELECT COUNT(*) FROM resources WHERE owner_key = ? AND created_at >= ?) AS recent_resource_count,
+                  (SELECT COUNT(*) FROM resources WHERE owner_key = ? AND status = ?) AS published_resource_count,
+                  (SELECT COUNT(*) FROM notes WHERE owner_key = ? AND status = ?) AS draft_note_count,
+                  (SELECT COUNT(*) FROM resumes WHERE owner_key = ? AND status = ?) AS generated_resume_count
+                """,
+            METRICS_ROW_MAPPER,
+            ownerKey,
+            ownerKey,
+            ownerKey,
+            ownerKey,
+            ownerKey,
+            ownerKey,
+            Timestamp.from(Instant.now().minus(RECENT_RESOURCE_WINDOW)),
+            ownerKey,
+            PUBLISHED_STATUS,
+            ownerKey,
+            DRAFT_STATUS,
+            ownerKey,
+            GENERATED_STATUS
         );
-        Long favoriteCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM favorites WHERE user_key = ?",
-            Long.class,
-            ownerKey
-        );
-        long safeResourceCount = resourceCount == null ? 0L : resourceCount;
-        long safeFavoriteCount = favoriteCount == null ? 0L : favoriteCount;
-        long recentResourceCount = countResourcesCreatedWithin(ownerKey, RECENT_RESOURCE_WINDOW);
-        long publishedResourceCount = countResourcesByStatus(ownerKey, PUBLISHED_STATUS);
-        long draftNoteCount = countNotesByStatus(ownerKey, DRAFT_STATUS);
-        long generatedResumeCount = countResumesByStatus(ownerKey, GENERATED_STATUS);
+        MeAggregateMetrics safeMetrics = metrics == null ? MeAggregateMetrics.empty() : metrics;
+
         return new MeDto(
             profile,
-            safeResourceCount,
-            safeFavoriteCount,
-            roadmapJdbcRepository.countByOwner(ownerKey),
-            noteRepository.countByOwner(ownerKey),
-            resumeRepository.countByOwner(ownerKey),
-            recentResourceCount,
-            publishedResourceCount,
-            draftNoteCount,
-            generatedResumeCount
+            safeMetrics.resourceCount(),
+            safeMetrics.favoriteCount(),
+            safeMetrics.roadmapCount(),
+            safeMetrics.noteCount(),
+            safeMetrics.resumeCount(),
+            safeMetrics.recentResourceCount(),
+            safeMetrics.publishedResourceCount(),
+            safeMetrics.draftNoteCount(),
+            safeMetrics.generatedResumeCount()
         );
     }
 
@@ -140,44 +166,19 @@ public class MeService {
         return value.trim();
     }
 
-    private long countResourcesByStatus(String ownerKey, String status) {
-        Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND status = ?",
-            Long.class,
-            ownerKey,
-            status
-        );
-        return count == null ? 0L : count;
-    }
-
-    private long countNotesByStatus(String ownerKey, String status) {
-        Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM notes WHERE owner_key = ? AND status = ?",
-            Long.class,
-            ownerKey,
-            status
-        );
-        return count == null ? 0L : count;
-    }
-
-    private long countResumesByStatus(String ownerKey, String status) {
-        Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resumes WHERE owner_key = ? AND status = ?",
-            Long.class,
-            ownerKey,
-            status
-        );
-        return count == null ? 0L : count;
-    }
-
-    private long countResourcesCreatedWithin(String ownerKey, Duration window) {
-        Instant threshold = Instant.now().minus(window);
-        Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND created_at >= ?",
-            Long.class,
-            ownerKey,
-            Timestamp.from(threshold)
-        );
-        return count == null ? 0L : count;
+    private record MeAggregateMetrics(
+        long resourceCount,
+        long favoriteCount,
+        long roadmapCount,
+        long noteCount,
+        long resumeCount,
+        long recentResourceCount,
+        long publishedResourceCount,
+        long draftNoteCount,
+        long generatedResumeCount
+    ) {
+        private static MeAggregateMetrics empty() {
+            return new MeAggregateMetrics(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
+        }
     }
 }

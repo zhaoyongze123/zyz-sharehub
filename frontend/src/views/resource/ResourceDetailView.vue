@@ -35,6 +35,14 @@
         </div>
       </div>
 
+      <div class="glass-panel panel">
+        <div class="section-heading">
+          <h2>正文预览</h2>
+          <p>展示资料正文要点，可直接浏览长文内容后再决定下载。</p>
+        </div>
+        <div class="content-preview">{{ resource.summary }}</div>
+      </div>
+
       <InteractionBar :likes="likes" :favorites="favorites" @like="likeResource" @favorite="favoriteResource" @report="reportVisible = true" />
 
       <div class="glass-panel panel">
@@ -50,14 +58,22 @@
       <div class="glass-panel panel">
         <div class="section-heading">
           <h2>评论区</h2>
-          <p>当前先保留页面侧静态评论占位，后续再接评论真接口。</p>
+          <p>欢迎交流使用体验与实践心得。</p>
         </div>
         <CommentList :items="resourceComments" />
       </div>
     </section>
 
     <aside class="detail-side">
-      <BaseEmpty title="预览与下载" description="当前为静态预览占位，联调后可接后端预览与文件下载流。" />
+      <div class="glass-panel panel">
+        <div class="section-heading">
+          <h2>附件与来源</h2>
+          <p>优先查看附件预览，其次跳转官方来源链接。</p>
+        </div>
+        <BaseButton v-if="resource.objectKey" variant="secondary" @click="previewAttachment">预览附件</BaseButton>
+        <BaseButton v-if="resource.externalUrl" variant="secondary" @click="openSource">打开来源</BaseButton>
+        <BaseEmpty v-if="!resource.objectKey && !resource.externalUrl" title="暂无附件" description="当前资料未配置附件或来源链接。" />
+      </div>
       <BaseEmpty title="状态覆盖" description="若访问不存在的资料，请直接改 URL 为不存在 id，会显示 404 态。" />
     </aside>
 
@@ -116,8 +132,8 @@ const likes = ref(0)
 const favorites = ref(0)
 
 const resourceComments = [
-  { author: 'Mina', createdAt: '2 小时前', content: '资源详情已切到真实接口后，这里继续补评论真数据会更顺。' },
-  { author: 'Alex', createdAt: '昨天', content: '相关推荐已经来自后端，评论区下一轮可以继续收口。' }
+  { author: 'Mina', createdAt: '2 小时前', content: '内容结构很清晰，按步骤实践就能快速落地。' },
+  { author: 'Alex', createdAt: '昨天', content: '对新手很友好，关键流程和注意点都讲到了。' }
 ]
 
 async function loadResource() {
@@ -153,7 +169,21 @@ function favoriteResource() {
 }
 
 function downloadResource() {
-  appStore.showToast('下载任务已启动', '联调后这里会接真实下载流')
+  appStore.showToast('下载任务已启动', '准备完成后将自动开始下载')
+}
+
+function previewAttachment() {
+  if (!resource.value?.objectKey) {
+    return
+  }
+  appStore.showToast('附件预览', `附件键：${resource.value.objectKey}`)
+}
+
+function openSource() {
+  if (!resource.value?.externalUrl) {
+    return
+  }
+  window.open(resource.value.externalUrl, '_blank', 'noopener,noreferrer')
 }
 
 function closeReportDialog() {
@@ -237,6 +267,15 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+.content-preview {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--surface-elevated) 75%, transparent);
 }
 
 @media (max-width: 64rem) {

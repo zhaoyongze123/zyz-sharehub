@@ -267,6 +267,14 @@ a {
   font-weight: 600;
   color: var(--color-text-main);
   letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.page-home .brand-logo {
+  height: 40px;
+  width: auto;
+  display: block;
 }
 
 .page-home .nav-links a {

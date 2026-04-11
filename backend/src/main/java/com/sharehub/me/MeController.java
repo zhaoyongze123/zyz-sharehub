@@ -5,12 +5,17 @@ import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import com.sharehub.note.NoteDto;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resume.ResumeDto;
 import com.sharehub.roadmap.RoadmapWorkbenchDto;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,6 +42,25 @@ public class MeController {
     public ApiResponse<MeDto> getMe(Authentication authentication, HttpServletRequest request) {
         String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.aggregate(ownerKey));
+    }
+
+    @PutMapping("/profile")
+    public ApiResponse<com.sharehub.auth.UserProfileDto> updateProfile(
+        Authentication authentication,
+        HttpServletRequest request,
+        @Valid @RequestBody UpdateProfileRequest body
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(userProfileRepository.updateProfile(ownerKey, body.name()));
+    }
+
+    @DeleteMapping("/avatar")
+    public ApiResponse<com.sharehub.auth.UserProfileDto> deleteAvatar(
+        Authentication authentication,
+        HttpServletRequest request
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(userProfileRepository.updateAvatar(ownerKey, null));
     }
 
     @GetMapping("/resources")
@@ -103,8 +127,10 @@ public class MeController {
 
     private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
         String ownerKey = requestAccessService.requireUser(authentication, request);
-        userProfileRepository.upsert(ownerKey, ownerKey, null);
-        userProfileRepository.ensureActive(ownerKey);
+        userProfileRepository.ensureActiveProfile(ownerKey);
         return ownerKey;
+    }
+
+    public record UpdateProfileRequest(@Size(max = 64) String name) {
     }
 }

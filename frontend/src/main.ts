@@ -1,7 +1,5 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import '@unocss/reset/tailwind.css'
-import 'virtual:uno.css'
 import '@/styles/reset.scss'
 import '@/styles/tokens.scss'
 import '@/styles/motion.scss'

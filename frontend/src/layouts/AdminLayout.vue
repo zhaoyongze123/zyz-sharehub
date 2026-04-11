@@ -1,7 +1,10 @@
 <template>
   <div class="admin-shell">
     <aside class="admin-sidebar">
-      <RouterLink class="brand" to="/admin">ShareBase Admin</RouterLink>
+      <RouterLink class="brand" to="/admin">
+        <img class="brand-logo" :src="brandLogo" alt="ShareHub" />
+        <span>Admin</span>
+      </RouterLink>
       <nav class="admin-nav">
         <RouterLink to="/admin">概览</RouterLink>
         <RouterLink to="/admin/reviews">内容审核</RouterLink>
@@ -19,6 +22,7 @@
 
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import brandLogo from '@/assets/logo/sharehub-logo-user.png'
 </script>
 
 <style scoped lang="scss">
@@ -35,10 +39,17 @@ import { RouterLink, RouterView } from 'vue-router'
 }
 
 .brand {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   margin-bottom: var(--space-8);
   color: white;
   font-weight: 800;
+}
+
+.brand-logo {
+  height: 2.25rem;
+  width: auto;
 }
 
 .admin-nav {

@@ -1,5 +1,5 @@
 (() => {
-  const INTRO_KEY = "sharebase.introPlayed";
+  const INTRO_KEY = "sharehub.introPlayed";
   const mainTitles = [
     "沉淀下一代技术资产",
     "随时复用的体系经验",
@@ -82,7 +82,7 @@
     const phrases = [
       "正在连接你的 AI 工作流...",
       "加载 Agent / MCP / RAG 知识图谱...",
-      "欢迎来到 ShareBase。"
+      "欢迎来到 ShareHub。"
     ];
 
     let phraseIndex = 0;

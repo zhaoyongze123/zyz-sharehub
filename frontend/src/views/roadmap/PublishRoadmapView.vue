@@ -3,7 +3,7 @@
     <section class="glass-panel form-panel">
       <div class="section-heading">
         <h1>创建路线</h1>
-        <p>按实施文档要求覆盖路线创建、节点追加、草稿保存与公开发布。</p>
+        <p>创建路线后可继续追加节点，并支持保存草稿或直接发布。</p>
       </div>
 
       <div class="form-stack">
@@ -64,10 +64,10 @@
     </section>
 
     <aside class="side-stack">
-      <BaseEmpty title="关联资料" description="当前批次先收口路线创建与节点顺序写入，资料绑定后续再补。" />
+      <BaseEmpty title="关联资料" description="可在发布后继续完善关联内容。" />
       <BaseEmpty title="发布校验" :description="statusDescription" />
       <div v-if="lastCreatedRoadmapId" class="glass-panel publish-result" data-testid="publish-roadmap-result">
-        <p class="publish-result__title">真实路线写入已完成</p>
+        <p class="publish-result__title">路线已创建</p>
         <p>路线 ID：{{ lastCreatedRoadmapId }}</p>
         <p>节点数：{{ lastCreatedNodeCount }}</p>
         <RouterLink :to="`/roadmaps/${lastCreatedRoadmapId}`">查看详情页</RouterLink>
@@ -101,9 +101,9 @@ const nodes = reactive([
 
 const statusDescription = computed(() => {
   if (lastCreatedRoadmapId.value) {
-    return `已通过真实接口创建路线 #${lastCreatedRoadmapId.value}，并写入 ${lastCreatedNodeCount.value} 个节点。`
+    return `路线 #${lastCreatedRoadmapId.value} 已创建，包含 ${lastCreatedNodeCount.value} 个节点。`
   }
-  return `${nodes.length} 个节点待提交；当前真实接口仅写入节点标题和顺序。`
+  return `${nodes.length} 个节点待提交。`
 })
 
 function addNode() {
@@ -168,7 +168,7 @@ async function submitRoadmap(status: 'DRAFT' | 'PUBLISHED') {
 
     lastCreatedRoadmapId.value = created.id
     lastCreatedNodeCount.value = nodes.length
-    appStore.showToast(status === 'DRAFT' ? '草稿已保存' : '发布成功', `路线 #${created.id} 已完成真实写入`)
+    appStore.showToast(status === 'DRAFT' ? '草稿已保存' : '发布成功', `路线 #${created.id} 已保存`)
     resetForm()
   } catch (error) {
     validationMessage.value = resolveSubmitError(

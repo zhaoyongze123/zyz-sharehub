@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
@@ -138,6 +138,12 @@ watch([keyword, category, selectedTag, sortBy], () => {
 watch([keyword, category, selectedTag, sortBy, pageNum], () => {
   void loadResources()
 }, { immediate: true })
+
+onMounted(() => {
+  if (!resources.value.length) {
+    void loadResources()
+  }
+})
 </script>
 
 <style scoped lang="scss">

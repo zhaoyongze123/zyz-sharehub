@@ -3,7 +3,7 @@
     <section class="glass-panel form-panel">
       <div class="section-heading">
         <h1>发布资料</h1>
-        <p>按实施文档要求覆盖信息录入、附件上传、外链引用和提交审核。</p>
+        <p>填写资料信息后，可上传附件或添加外链并提交审核。</p>
       </div>
 
       <div class="form-stack">
@@ -69,7 +69,7 @@
       <BaseEmpty title="预览" :description="previewText" />
       <BaseEmpty title="状态说明" :description="statusDescription" />
       <div v-if="lastPublishedId" class="glass-panel publish-result" data-testid="publish-resource-result">
-        <p class="publish-result__title">真实发布已完成</p>
+        <p class="publish-result__title">发布已完成</p>
         <p>资源 ID：{{ lastPublishedId }}</p>
         <p v-if="uploadedFileName">附件：{{ uploadedFileName }}</p>
         <RouterLink :to="`/resources/${lastPublishedId}`">查看详情页</RouterLink>
@@ -130,7 +130,7 @@ const previewText = computed(() => {
 
 const statusDescription = computed(() => {
   if (lastPublishedId.value) {
-    return '资料已通过真实接口创建、上传并提交发布，可继续进入详情页复核。'
+    return '资料已创建并提交发布，可继续进入详情页查看。'
   }
   if (uploadMode.value === 'file') {
     return selectedFile.value ? `待上传附件：${selectedFile.value.name}` : '当前为附件模式，提交时会先创建草稿再上传附件。'
@@ -211,7 +211,7 @@ async function saveDraft() {
     }
 
     lastPublishedId.value = created.id
-    appStore.showToast('草稿已保存', `资源 #${created.id} 已通过真实接口创建`)
+    appStore.showToast('草稿已保存', `资源 #${created.id} 已创建`)
   } catch (error) {
     validationMessage.value = resolveSubmitError(error, '草稿保存失败，请稍后重试')
   } finally {

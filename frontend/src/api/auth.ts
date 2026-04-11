@@ -14,6 +14,7 @@ export interface AuthUserProfileDto {
   avatarFileId: string | null
   avatarUrl: string | null
   status: string
+  isAdmin: boolean
 }
 
 export interface StoredFileDto {

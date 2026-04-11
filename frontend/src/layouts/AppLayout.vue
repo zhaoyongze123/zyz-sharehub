@@ -3,7 +3,9 @@
     <header class="workspace-header">
       <div class="workspace-header__inner">
         <div>
-          <RouterLink class="brand" to="/">ShareBase</RouterLink>
+          <RouterLink class="brand" to="/">
+            <img class="brand-logo" :src="brandLogo" alt="ShareHub" />
+          </RouterLink>
           <p>创作工作台</p>
         </div>
         <nav class="workspace-nav">
@@ -23,6 +25,7 @@
 
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import brandLogo from '@/assets/logo/sharehub-logo-user.png'
 </script>
 
 <style scoped lang="scss">
@@ -60,5 +63,16 @@ import { RouterLink, RouterView } from 'vue-router'
 .workspace-nav a.router-link-active {
   background: rgba(29, 111, 220, 0.08);
   color: var(--color-primary);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand-logo {
+  height: 2.5rem;
+  width: auto;
+  display: block;
 }
 </style>

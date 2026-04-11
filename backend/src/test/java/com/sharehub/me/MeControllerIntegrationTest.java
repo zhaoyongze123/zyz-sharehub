@@ -12,11 +12,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -604,6 +608,61 @@ class MeControllerIntegrationTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"))
             .andExpect(jsonPath("$.message").value("USER_BANNED"));
+    }
+
+    @Test
+    void shouldUpdateMyProfileName() throws Exception {
+        mockMvc.perform(get("/api/me")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/me/profile")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"name":"产品技术负责人"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(USER_KEY))
+            .andExpect(jsonPath("$.data.name").value("产品技术负责人"));
+
+        mockMvc.perform(get("/api/me")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.profile.name").value("产品技术负责人"));
+    }
+
+    @Test
+    void shouldDeleteMyAvatarAfterUpload() throws Exception {
+        MockMultipartFile avatar = new MockMultipartFile(
+            "file",
+            "avatar.png",
+            "image/png",
+            new byte[] {1, 2, 3, 4}
+        );
+
+        mockMvc.perform(multipart("/api/auth/avatar")
+                .file(avatar)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").exists());
+
+        mockMvc.perform(delete("/api/me/avatar")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(USER_KEY));
+
+        mockMvc.perform(get("/api/me")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.profile.login").value(USER_KEY));
+
+        Object avatarFileId = jdbcTemplate.queryForObject(
+            "SELECT avatar_file_id FROM users WHERE login = ?",
+            Object.class,
+            USER_KEY
+        );
+        org.assertj.core.api.Assertions.assertThat(avatarFileId).isNull();
     }
 
     @Test
