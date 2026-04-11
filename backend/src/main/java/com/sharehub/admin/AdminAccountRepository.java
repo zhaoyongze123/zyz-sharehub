@@ -18,31 +18,36 @@ public class AdminAccountRepository {
     }
 
     public boolean isActiveAdmin(String userLogin) {
+        String normalizedLogin = normalizeLogin(userLogin);
+        if (normalizedLogin == null) {
+            return false;
+        }
         Integer count = jdbcTemplate.queryForObject(
             """
                 SELECT COUNT(*)
                 FROM admin_accounts
-                WHERE user_login = ? AND status = 'ACTIVE'
+                WHERE lower(user_login) = ? AND status = 'ACTIVE'
                 """,
             Integer.class,
-            userLogin
+            normalizedLogin
         );
         return count != null && count > 0;
     }
 
     public void grantAdmin(String userLogin, String grantedBy, String remark) {
+        String normalizedLogin = requireNormalizedLogin(userLogin);
         Timestamp now = Timestamp.from(Instant.now());
         int affected = jdbcTemplate.update(
             """
                 UPDATE admin_accounts
                 SET status = 'ACTIVE', granted_by = ?, granted_at = ?, revoked_by = NULL, revoked_at = NULL, remark = ?, updated_at = ?
-                WHERE user_login = ?
+                WHERE lower(user_login) = ?
                 """,
             grantedBy,
             now,
             remark,
             now,
-            userLogin
+            normalizedLogin
         );
         if (affected > 0) {
             return;
@@ -54,7 +59,7 @@ public class AdminAccountRepository {
                 user_login, status, granted_by, granted_at, remark, created_at, updated_at
                 ) VALUES (?, 'ACTIVE', ?, ?, ?, ?, ?)
                 """,
-            userLogin,
+            normalizedLogin,
             grantedBy,
             now,
             remark,
@@ -94,4 +99,23 @@ public class AdminAccountRepository {
         Instant grantedAt,
         String remark
     ) {}
+
+    private String requireNormalizedLogin(String userLogin) {
+        String normalizedLogin = normalizeLogin(userLogin);
+        if (normalizedLogin == null) {
+            throw new IllegalArgumentException("userLogin must not be blank");
+        }
+        return normalizedLogin;
+    }
+
+    private String normalizeLogin(String userLogin) {
+        if (userLogin == null) {
+            return null;
+        }
+        String trimmed = userLogin.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.toLowerCase();
+    }
 }

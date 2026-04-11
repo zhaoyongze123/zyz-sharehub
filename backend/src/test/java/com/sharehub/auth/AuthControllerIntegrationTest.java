@@ -93,6 +93,23 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldExposeAdminFlagForWhitelistedOauthAdminWithCaseMismatchedLogin() throws Exception {
+        String adminLogin = "oauth-auth-admin";
+        grantAdmin(adminLogin);
+
+        mockMvc.perform(
+                get("/api/auth/me")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", "  OAUTH-AUTH-ADMIN  ");
+                        attributes.put("name", "OAuth Auth Admin");
+                    }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value("  OAUTH-AUTH-ADMIN  "))
+            .andExpect(jsonPath("$.data.isAdmin").value(true));
+    }
+
+    @Test
     void shouldNotExposeAdminFlagForPlainOauthUser() throws Exception {
         String oauthLogin = "plain-oauth-user";
 

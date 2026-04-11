@@ -79,6 +79,21 @@ class AdminTokenFilterProdModeIntegrationTest {
     }
 
     @Test
+    void shouldAllowWhitelistedOauthAdminWithCaseMismatchedLoginWhenDevTokenModeDisabled() throws Exception {
+        grantAdmin(ADMIN_LOGIN);
+
+        mockMvc.perform(
+                get("/api/admin/reports")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", "  PROD-OAUTH-ADMIN  ");
+                        attributes.put("name", "Prod OAuth Admin");
+                    }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value("OK"));
+    }
+
+    @Test
     void shouldRejectNonWhitelistedOauthUserWhenDevTokenModeDisabled() throws Exception {
         mockMvc.perform(
                 get("/api/admin/reports")

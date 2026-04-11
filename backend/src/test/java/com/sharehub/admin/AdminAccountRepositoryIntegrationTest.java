@@ -78,4 +78,20 @@ class AdminAccountRepositoryIntegrationTest {
             )
         ).isEqualTo("reactivated");
     }
+
+    @Test
+    void shouldTreatAdminLoginAsCaseInsensitiveAndTrimmed() {
+        jdbcTemplate.update(
+            """
+                INSERT INTO admin_accounts (
+                    user_login, status, granted_by, granted_at, remark, created_at, updated_at
+                ) VALUES (?, 'ACTIVE', ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            "mixed-case-admin",
+            "seed-admin",
+            "case-insensitive lookup"
+        );
+
+        assertThat(adminAccountRepository.isActiveAdmin(" Mixed-Case-Admin ")).isTrue();
+    }
 }
