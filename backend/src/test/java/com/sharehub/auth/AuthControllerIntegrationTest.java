@@ -63,14 +63,14 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
-    void shouldExposeAdminFlagForWhitelistedAdmin() throws Exception {
+    void shouldNotExposeAdminFlagForWhitelistedAdminViaDevHeader() throws Exception {
         String adminLogin = "auth-admin";
         grantAdmin(adminLogin);
 
         mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, adminLogin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.login").value(adminLogin))
-            .andExpect(jsonPath("$.data.isAdmin").value(true));
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
     }
 
     @Test

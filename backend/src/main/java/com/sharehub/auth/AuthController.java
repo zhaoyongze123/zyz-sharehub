@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,7 +61,8 @@ public class AuthController {
         String name = resolveName(authentication, login);
         userProfileRepository.upsert(login, name, null);
         userProfileRepository.ensureActive(login);
-        return ApiResponse.ok(userProfileRepository.findByLogin(login));
+        UserProfileDto profile = userProfileRepository.findByLogin(login);
+        return ApiResponse.ok(withAdminSessionState(profile, authentication));
     }
 
     @PostMapping("/logout")
@@ -99,6 +101,37 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "NOT_LOGGED_IN");
         }
         return requestAccessService.requireUser(authentication, request);
+    }
+
+    private UserProfileDto withAdminSessionState(UserProfileDto profile, Authentication authentication) {
+        return new UserProfileDto(
+            profile.id(),
+            profile.login(),
+            profile.name(),
+            profile.avatarFileId(),
+            profile.avatarUrl(),
+            profile.status(),
+            isAdminSession(authentication, profile.login())
+        );
+    }
+
+    private boolean isAdminSession(Authentication authentication, String login) {
+        if (authentication == null) {
+            return false;
+        }
+
+        boolean alreadyElevated = authentication.getAuthorities().stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch("ROLE_SUPER_ADMIN"::equals);
+        if (alreadyElevated) {
+            return true;
+        }
+
+        if (authentication.getPrincipal() instanceof OAuth2User) {
+            return userProfileRepository.isActiveAdmin(login);
+        }
+
+        return false;
     }
 
 }
