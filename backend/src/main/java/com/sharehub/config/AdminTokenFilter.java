@@ -1,7 +1,6 @@
 package com.sharehub.config;
 
 import com.sharehub.admin.AdminAccountRepository;
-import com.sharehub.auth.RequestAccessService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,18 +25,15 @@ public class AdminTokenFilter extends OncePerRequestFilter {
     private final String expectedToken;
     private final boolean devTokenEnabled;
     private final AdminAccountRepository adminAccountRepository;
-    private final RequestAccessService requestAccessService;
 
     public AdminTokenFilter(
         String expectedToken,
         boolean devTokenEnabled,
-        AdminAccountRepository adminAccountRepository,
-        RequestAccessService requestAccessService
+        AdminAccountRepository adminAccountRepository
     ) {
         this.expectedToken = expectedToken;
         this.devTokenEnabled = devTokenEnabled;
         this.adminAccountRepository = adminAccountRepository;
-        this.requestAccessService = requestAccessService;
     }
 
     @Override
@@ -96,9 +92,6 @@ public class AdminTokenFilter extends OncePerRequestFilter {
             if (login != null && !String.valueOf(login).isBlank()) {
                 return String.valueOf(login);
             }
-        }
-        if (devTokenEnabled) {
-            return requestAccessService.resolveUser(authentication, request).orElse(null);
         }
         return null;
     }

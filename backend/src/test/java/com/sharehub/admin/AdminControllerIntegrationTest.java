@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -115,6 +117,13 @@ public class AdminControllerIntegrationTest {
         insertUser("plain-user");
 
         mvc.perform(get("/api/admin/reports").header(RequestAccessService.USER_KEY_HEADER, "plain-user"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    @Test
+    void adminEndpointsRejectSpoofedWhitelistedUserHeaderEvenWhenDevTokenEnabled() throws Exception {
+        mvc.perform(get("/api/admin/reports").header(RequestAccessService.USER_KEY_HEADER, ADMIN_LOGIN))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
     }
@@ -248,11 +257,18 @@ public class AdminControllerIntegrationTest {
     }
 
     private MockHttpServletRequestBuilder adminGet(String uri) {
-        return get(uri).header(RequestAccessService.USER_KEY_HEADER, ADMIN_LOGIN);
+        return get(uri).with(adminOauth());
     }
 
     private MockHttpServletRequestBuilder adminPost(String uri) {
-        return post(uri).header(RequestAccessService.USER_KEY_HEADER, ADMIN_LOGIN);
+        return post(uri).with(adminOauth());
+    }
+
+    private RequestPostProcessor adminOauth() {
+        return oauth2Login().attributes(attributes -> {
+            attributes.put("login", ADMIN_LOGIN);
+            attributes.put("name", "Playwright Admin");
+        });
     }
 
     private long insertResource(String title) {

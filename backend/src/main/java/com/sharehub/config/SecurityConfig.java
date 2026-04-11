@@ -1,7 +1,6 @@
 package com.sharehub.config;
 
 import com.sharehub.admin.AdminAccountRepository;
-import com.sharehub.auth.RequestAccessService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -59,12 +58,11 @@ public class SecurityConfig {
     @Bean
     public AdminTokenFilter adminTokenFilter(
         Environment environment,
-        AdminAccountRepository adminAccountRepository,
-        RequestAccessService requestAccessService
+        AdminAccountRepository adminAccountRepository
     ) {
         String token = environment.getProperty("sharehub.admin.token", AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
         boolean devTokenEnabled = isAdminDevTokenEnabled(environment);
-        return new AdminTokenFilter(token, devTokenEnabled, adminAccountRepository, requestAccessService);
+        return new AdminTokenFilter(token, devTokenEnabled, adminAccountRepository);
     }
 
     static boolean isAdminDevTokenEnabled(Environment environment) {
