@@ -129,6 +129,21 @@ public class AdminControllerIntegrationTest {
     }
 
     @Test
+    void adminMutationEndpointsRejectNonWhitelistedOauthUserEvenWhenDevTokenEnabled() throws Exception {
+        long userId = insertUser("plain-oauth-user");
+
+        mvc.perform(
+                post("/api/admin/users/" + userId + "/ban")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", "plain-oauth-user");
+                        attributes.put("name", "Plain OAuth User");
+                    }))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    @Test
     void adminRootPathUsesWhitelistAuthentication() throws Exception {
         mvc.perform(adminGet("/api/admin"))
             .andExpect(status().isNotFound());
