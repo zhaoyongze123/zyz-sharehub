@@ -23,7 +23,6 @@ ADMIN_AUTOPILOT="${OVERNIGHT_ADMIN_AUTOPILOT:-1}"
 ADMIN_PARALLEL_MODE="${OVERNIGHT_ADMIN_PARALLEL_MODE:-2way}"
 ADMIN_REQUIRE_POSTGRES="${OVERNIGHT_ADMIN_REQUIRE_POSTGRES:-1}"
 POST_RUN_SMOKE_SCRIPT="${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"
-POST_FRONTEND_FOLLOWUP_SCRIPT="${PROJECT_ROOT}/scripts/overnight-frontend-followup.sh"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
 RAW_LOG_FILE="${RUN_DIR}/codex-output.log"
 META_FILE="${RUN_DIR}/meta.env"
@@ -42,6 +41,7 @@ GATE_LINE_PROMPT_FILE="${RUN_DIR}/gate-line-prompt.txt"
 ADMIN_AUTH_EXIT_CODE="SKIPPED"
 ADMIN_SMOKE_EXIT_CODE="SKIPPED"
 ADMIN_GATE_EXIT_CODE="SKIPPED"
+FRONTEND_FOLLOWUP_EXIT_CODE="DISABLED"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -337,22 +337,12 @@ fi
 
 echo "[$(date '+%F %T')] 后台专项状态码：ADMIN_AUTH_EXIT_CODE=${ADMIN_AUTH_EXIT_CODE} ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE} ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}" | tee -a "${RAW_LOG_FILE}"
 
-if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" && "${ADMIN_AUTOPILOT}" != "1" ]]; then
-  echo "[$(date '+%F %T')] 开始执行前端跟进子代理" | tee -a "${RAW_LOG_FILE}"
-  set +e
-  bash "${POST_FRONTEND_FOLLOWUP_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
-  FRONTEND_FOLLOWUP_EXIT_CODE=${PIPESTATUS[0]}
-  set -e
-  echo "FRONTEND_FOLLOWUP_EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}" >> "${META_FILE}"
-  if [[ ${FRONTEND_FOLLOWUP_EXIT_CODE} -ne 0 ]]; then
-    EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}
-  fi
+if [[ "${ADMIN_AUTOPILOT}" == "1" ]]; then
+  echo "[$(date '+%F %T')] 后台专项模式已启用，已禁用公开站点前端跟进子代理" | tee -a "${RAW_LOG_FILE}"
 else
-  if [[ "${ADMIN_AUTOPILOT}" == "1" ]]; then
-    echo "[$(date '+%F %T')] 后台专项模式已启用，跳过公开站点前端跟进子代理" | tee -a "${RAW_LOG_FILE}"
-  fi
-  echo "FRONTEND_FOLLOWUP_EXIT_CODE=SKIPPED" >> "${META_FILE}"
+  FRONTEND_FOLLOWUP_EXIT_CODE="SKIPPED"
 fi
+echo "FRONTEND_FOLLOWUP_EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}" >> "${META_FILE}"
 
 {
   echo "END_AT=$(date '+%F %T %z')"
@@ -412,10 +402,12 @@ elif [[ "${SMOKE_EXIT_CODE:-SKIPPED}" != "SKIPPED" ]]; then
   SMOKE_STATUS_TEXT="失败"
 fi
 
-FRONTEND_FOLLOWUP_STATUS_TEXT="跳过"
-if [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-SKIPPED}" == "0" ]]; then
+FRONTEND_FOLLOWUP_STATUS_TEXT="禁用"
+if [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-DISABLED}" == "0" ]]; then
   FRONTEND_FOLLOWUP_STATUS_TEXT="通过"
-elif [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-SKIPPED}" != "SKIPPED" ]]; then
+elif [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-DISABLED}" == "SKIPPED" ]]; then
+  FRONTEND_FOLLOWUP_STATUS_TEXT="跳过"
+elif [[ "${FRONTEND_FOLLOWUP_EXIT_CODE:-DISABLED}" != "DISABLED" ]]; then
   FRONTEND_FOLLOWUP_STATUS_TEXT="失败"
 fi
 

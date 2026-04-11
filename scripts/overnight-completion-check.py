@@ -68,7 +68,9 @@ def main() -> int:
     check(
         has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_AUTH_EXIT_CODE")
         and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_SMOKE_EXIT_CODE")
-        and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_GATE_EXIT_CODE"),
+        and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_GATE_EXIT_CODE")
+        and has_text(scripts_dir / "overnight-hourly-run.sh", "已禁用公开站点前端跟进子代理")
+        and lacks_text(scripts_dir / "overnight-hourly-run.sh", "开始执行前端跟进子代理"),
         "单轮编排输出后台专项状态码",
         passed,
         pending,

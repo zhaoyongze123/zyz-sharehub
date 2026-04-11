@@ -127,8 +127,10 @@ grep -q 'SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "smoke exit code missing"
 grep -q 'ADMIN_AUTH_EXIT_CODE=0' "${LATEST_META}" || { echo "admin auth exit code missing"; exit 1; }
 grep -q 'ADMIN_SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin smoke exit code missing"; exit 1; }
 grep -q 'ADMIN_GATE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin gate exit code missing"; exit 1; }
+grep -q 'FRONTEND_FOLLOWUP_EXIT_CODE=DISABLED' "${LATEST_META}" || { echo "frontend followup disable flag missing"; exit 1; }
 grep -q 'PUSH_STATUS=SUCCESS' "${LATEST_META}" || { echo "push status missing"; exit 1; }
 grep -q 'Everything up-to-date' "${PUSH_LOG}" || { echo "push output missing"; exit 1; }
 grep -q 'CODEX_HOME=' "${LATEST_META}" || { echo "codex home missing"; exit 1; }
+grep -q '已禁用公开站点前端跟进子代理' "${TEST_ROOT}/hourly-run.log" || { echo "admin-only disable log missing"; exit 1; }
 
 echo "snapshot hourly run test passed"
