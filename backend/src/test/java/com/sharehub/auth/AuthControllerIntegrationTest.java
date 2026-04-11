@@ -92,6 +92,23 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldNotExposeAdminFlagForPlainOauthUser() throws Exception {
+        String oauthLogin = "plain-oauth-user";
+
+        mockMvc.perform(
+                get("/api/auth/me")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", oauthLogin);
+                        attributes.put("name", "Plain OAuth User");
+                    }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(oauthLogin))
+            .andExpect(jsonPath("$.data.name").value("Plain OAuth User"))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
+    }
+
+    @Test
     void shouldNotExposeAdminFlagForRevokedAdminAccount() throws Exception {
         String adminLogin = "revoked-auth-admin";
         revokeAdmin(adminLogin);
