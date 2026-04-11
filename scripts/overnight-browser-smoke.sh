@@ -126,8 +126,7 @@ validate_admin_scope() {
   done
 
   if rg -q "/admin/taxonomy|/resources|/roadmaps|/publish|/notes|/me|full-site-walkthrough\\.spec\\.ts" \
-    "${spec_file}" \
-    "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"; then
+    "${spec_file}"; then
     gate_check "后台 smoke 仍包含非专项页面或全站走查"
   fi
 }
