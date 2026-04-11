@@ -18,7 +18,7 @@ META_FILE="${SMOKE_DIR}/meta.env"
 BACKEND_MODE_FILE="${SMOKE_DIR}/backend-mode.txt"
 ADMIN_AUTOPILOT_MODE="${OVERNIGHT_ADMIN_AUTOPILOT:-1}"
 ADMIN_REQUIRE_POSTGRES="${OVERNIGHT_ADMIN_REQUIRE_POSTGRES:-1}"
-STANDARD_SMOKE_SPECS=(
+ADMIN_SMOKE_SPECS=(
   "tests/e2e/admin-smoke.spec.ts"
 )
 ADMIN_ALLOWED_ROUTES=(
@@ -193,6 +193,7 @@ trap cleanup EXIT
 MODULES="${PLAYWRIGHT_MODULES:-admin,backend}"
 log "本轮浏览器 smoke 模块：${MODULES}"
 log "后台专项目标页面：${ADMIN_ALLOWED_ROUTES[*]}"
+log "后台专项 smoke 用例：${ADMIN_SMOKE_SPECS[*]}"
 
 kill_port_process "${BACKEND_PORT}"
 kill_port_process "${FRONTEND_PORT}"
@@ -258,7 +259,7 @@ export VITE_API_PROXY_TARGET="${BACKEND_BASE_URL}"
 
 log "开始执行 Playwright smoke"
 set +e
-(cd "${FRONTEND_DIR}" && npx playwright test "${STANDARD_SMOKE_SPECS[@]}") | tee -a "${SMOKE_LOG}"
+(cd "${FRONTEND_DIR}" && npx playwright test "${ADMIN_SMOKE_SPECS[@]}") | tee -a "${SMOKE_LOG}"
 ADMIN_SMOKE_SCRIPT_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
