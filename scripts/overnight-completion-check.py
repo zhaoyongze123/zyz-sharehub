@@ -25,6 +25,10 @@ def env_value(path: Path, key: str) -> str:
     return ""
 
 
+def has_env_key(path: Path, key: str) -> bool:
+    return env_value(path, key) != ""
+
+
 def check(predicate: bool, name: str, passed: list[str], pending: list[str]) -> None:
     if predicate:
         passed.append(name)
@@ -173,31 +177,39 @@ def main() -> int:
         pending,
     )
     check(
-        env_value(latest_meta, "ADMIN_AUTH_EXIT_CODE") in {"0", "SKIPPED", ""},
+        latest_meta.exists()
+        and has_env_key(latest_meta, "RUN_ID")
+        and env_value(latest_meta, "ADMIN_AUTH_EXIT_CODE") in {"0", "SKIPPED"},
         "最近一轮后台鉴权线结果已产出",
         passed,
         pending,
     )
     check(
-        env_value(latest_meta, "ADMIN_SMOKE_EXIT_CODE") == "0",
+        latest_meta.exists()
+        and has_env_key(latest_meta, "RUN_ID")
+        and env_value(latest_meta, "ADMIN_SMOKE_EXIT_CODE") == "0",
         "最近一轮后台 smoke 通过",
         passed,
         pending,
     )
     check(
-        env_value(latest_meta, "ADMIN_GATE_EXIT_CODE") == "0",
+        latest_meta.exists()
+        and has_env_key(latest_meta, "RUN_ID")
+        and env_value(latest_meta, "ADMIN_GATE_EXIT_CODE") == "0",
         "最近一轮后台门禁验证通过",
         passed,
         pending,
     )
     check(
-        env_value(latest_smoke_meta, "ADMIN_AUTOPILOT_MODE") == "1",
+        latest_smoke_meta.exists()
+        and env_value(latest_smoke_meta, "ADMIN_AUTOPILOT_MODE") == "1",
         "最近一轮 smoke 已按后台专项模式执行",
         passed,
         pending,
     )
     check(
-        env_value(latest_smoke_meta, "MODULES") == "admin,backend",
+        latest_smoke_meta.exists()
+        and env_value(latest_smoke_meta, "MODULES") == "admin,backend",
         "最近一轮 smoke 仅执行后台模块",
         passed,
         pending,
