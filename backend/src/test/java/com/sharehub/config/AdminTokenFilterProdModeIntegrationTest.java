@@ -78,6 +78,19 @@ class AdminTokenFilterProdModeIntegrationTest {
             .andExpect(jsonPath("$.code").value("OK"));
     }
 
+    @Test
+    void shouldRejectNonWhitelistedOauthUserWhenDevTokenModeDisabled() throws Exception {
+        mockMvc.perform(
+                get("/api/admin/reports")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", "plain-oauth-user");
+                        attributes.put("name", "Plain OAuth User");
+                    }))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
     private void grantAdmin(String login) {
         jdbcTemplate.update(
             """

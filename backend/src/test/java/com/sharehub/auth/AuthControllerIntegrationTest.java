@@ -18,6 +18,7 @@ import com.sharehub.auth.UserProfileRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -63,6 +64,24 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, adminLogin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.login").value(adminLogin))
+            .andExpect(jsonPath("$.data.isAdmin").value(true));
+    }
+
+    @Test
+    void shouldExposeAdminFlagForWhitelistedOauthAdmin() throws Exception {
+        String adminLogin = "oauth-auth-admin";
+        grantAdmin(adminLogin);
+
+        mockMvc.perform(
+                get("/api/auth/me")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", adminLogin);
+                        attributes.put("name", "OAuth Auth Admin");
+                    }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(adminLogin))
+            .andExpect(jsonPath("$.data.name").value("OAuth Auth Admin"))
             .andExpect(jsonPath("$.data.isAdmin").value(true));
     }
 
