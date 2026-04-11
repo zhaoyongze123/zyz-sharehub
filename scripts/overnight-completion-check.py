@@ -192,6 +192,13 @@ def main() -> int:
         and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/reviews')")
         and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
         and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/users')")
+        and has_text(tests / "admin-smoke.spec.ts", "const dashboardReportsResponsePromise = waitForAdminApiGet(page, '/admin/reports')")
+        and has_text(tests / "admin-smoke.spec.ts", "const dashboardAuditResponsePromise = waitForAdminApiGet(page, '/admin/audit-logs')")
+        and has_text(tests / "admin-smoke.spec.ts", "const dashboardUsersResponsePromise = waitForAdminApiGet(page, '/admin/users')")
+        and has_text(tests / "admin-smoke.spec.ts", "const reviewsPageResponsePromise = waitForAdminApiGet(page, '/admin/reports')")
+        and has_text(tests / "admin-smoke.spec.ts", "const reportsPageResponsePromise = waitForAdminApiGet(page, '/admin/reports')")
+        and has_text(tests / "admin-smoke.spec.ts", "const auditPageResponsePromise = waitForAdminApiGet(page, '/admin/audit-logs')")
+        and has_text(tests / "admin-smoke.spec.ts", "const usersPageResponsePromise = waitForAdminApiGet(page, '/admin/users')")
         and has_text(tests / "admin-smoke.spec.ts", "browserFetch(page, '/api/admin/reports?page=1&pageSize=20'"),
         "后台页面真接口验收覆盖 admin/reports/reviews/users/audit-logs",
         passed,

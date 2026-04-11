@@ -74,11 +74,27 @@ EOF
 
 cat > "${TEST_PROJECT}/frontend/tests/e2e/admin-smoke.spec.ts" <<'EOF'
 test('后台专项 smoke', async ({ page }) => {
+  const dashboardReportsResponsePromise = waitForAdminApiGet(page, '/admin/reports')
+  const dashboardAuditResponsePromise = waitForAdminApiGet(page, '/admin/audit-logs')
+  const dashboardUsersResponsePromise = waitForAdminApiGet(page, '/admin/users')
   await page.goto('/admin')
-  await page.goto('/admin/reports')
+  await Promise.all([
+    dashboardReportsResponsePromise,
+    dashboardAuditResponsePromise,
+    dashboardUsersResponsePromise
+  ])
+  const reviewsPageResponsePromise = waitForAdminApiGet(page, '/admin/reports')
   await page.goto('/admin/reviews')
+  await reviewsPageResponsePromise
+  const reportsPageResponsePromise = waitForAdminApiGet(page, '/admin/reports')
+  await page.goto('/admin/reports')
+  await reportsPageResponsePromise
+  const auditPageResponsePromise = waitForAdminApiGet(page, '/admin/audit-logs')
   await page.goto('/admin/audit-logs')
+  await auditPageResponsePromise
+  const usersPageResponsePromise = waitForAdminApiGet(page, '/admin/users')
   await page.goto('/admin/users')
+  await usersPageResponsePromise
   await browserFetch(page, '/api/admin/reports?page=1&pageSize=20', {
     'X-User-Key': 'playwright-admin'
   })
