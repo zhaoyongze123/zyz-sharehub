@@ -70,6 +70,8 @@ def main() -> int:
         has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_AUTH_EXIT_CODE")
         and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_SMOKE_EXIT_CODE")
         and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_GATE_EXIT_CODE")
+        and has_text(scripts_dir / "overnight-hourly-run.sh", "ADMIN_SMOKE_SCRIPT_EXIT_CODE")
+        and lacks_text(scripts_dir / "overnight-hourly-run.sh", 'echo "SMOKE_EXIT_CODE=')
         and has_text(scripts_dir / "overnight-hourly-run.sh", "已禁用公开站点前端跟进子代理")
         and lacks_text(scripts_dir / "overnight-hourly-run.sh", "开始执行前端跟进子代理"),
         "单轮编排输出后台专项状态码",
@@ -80,6 +82,13 @@ def main() -> int:
         has_text(scripts_dir / "overnight-browser-smoke.sh", "OVERNIGHT_ADMIN_AUTOPILOT")
         and has_text(scripts_dir / "overnight-browser-smoke.sh", "PLAYWRIGHT_ADMIN_USER_KEY"),
         "后台 smoke 已切到后台专项模式",
+        passed,
+        pending,
+    )
+    check(
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "ADMIN_SMOKE_SCRIPT_EXIT_CODE")
+        and lacks_text(scripts_dir / "overnight-browser-smoke.sh", "STANDARD_SMOKE_EXIT_CODE"),
+        "后台 smoke 脚本状态码已收口为后台专项语义",
         passed,
         pending,
     )

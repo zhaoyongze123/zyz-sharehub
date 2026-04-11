@@ -40,6 +40,7 @@ cat > "${TEST_PROJECT}/scripts/overnight-hourly-run.sh" <<'EOF'
 echo "ADMIN_AUTH_EXIT_CODE"
 echo "ADMIN_SMOKE_EXIT_CODE"
 echo "ADMIN_GATE_EXIT_CODE"
+echo "ADMIN_SMOKE_SCRIPT_EXIT_CODE"
 echo "已禁用公开站点前端跟进子代理"
 EOF
 
@@ -48,6 +49,7 @@ cat > "${TEST_PROJECT}/scripts/overnight-browser-smoke.sh" <<'EOF'
 export OVERNIGHT_ADMIN_AUTOPILOT=1
 export PLAYWRIGHT_ADMIN_USER_KEY=playwright-admin
 export PLAYWRIGHT_MODULES="${PLAYWRIGHT_MODULES:-admin,backend}"
+echo "ADMIN_SMOKE_SCRIPT_EXIT_CODE"
 echo "/actuator/health/readiness"
 echo "/actuator/health/liveness"
 echo "application.yml 未将 dev token 默认设为关闭且仅允许显式开启"

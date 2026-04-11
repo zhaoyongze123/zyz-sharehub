@@ -123,10 +123,11 @@ PUSH_LOG="$(find "${TEST_PROJECT}/output/overnight" -name git-push.txt -print -q
 [[ -n "${PUSH_LOG}" ]] || { echo "push log missing"; exit 1; }
 
 grep -q 'fake codex ok' "${LATEST_MESSAGE}" || { echo "codex output missing"; exit 1; }
-grep -q 'SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "smoke exit code missing"; exit 1; }
 grep -q 'ADMIN_AUTH_EXIT_CODE=0' "${LATEST_META}" || { echo "admin auth exit code missing"; exit 1; }
 grep -q 'ADMIN_SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin smoke exit code missing"; exit 1; }
 grep -q 'ADMIN_GATE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin gate exit code missing"; exit 1; }
+grep -q 'ADMIN_SMOKE_SCRIPT_EXIT_CODE=0' "${LATEST_META}" || { echo "admin smoke script exit code missing"; exit 1; }
+! grep -q '^SMOKE_EXIT_CODE=' "${LATEST_META}" || { echo "legacy smoke exit code should be absent"; exit 1; }
 grep -q 'FRONTEND_FOLLOWUP_EXIT_CODE=DISABLED' "${LATEST_META}" || { echo "frontend followup disable flag missing"; exit 1; }
 grep -q 'PUSH_STATUS=SUCCESS' "${LATEST_META}" || { echo "push status missing"; exit 1; }
 grep -q 'Everything up-to-date' "${PUSH_LOG}" || { echo "push output missing"; exit 1; }

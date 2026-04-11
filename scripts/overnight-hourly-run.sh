@@ -41,6 +41,7 @@ GATE_LINE_PROMPT_FILE="${RUN_DIR}/gate-line-prompt.txt"
 ADMIN_AUTH_EXIT_CODE="SKIPPED"
 ADMIN_SMOKE_EXIT_CODE="SKIPPED"
 ADMIN_GATE_EXIT_CODE="SKIPPED"
+ADMIN_SMOKE_SCRIPT_EXIT_CODE="SKIPPED"
 FRONTEND_FOLLOWUP_EXIT_CODE="DISABLED"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
@@ -318,21 +319,21 @@ if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
     OVERNIGHT_ADMIN_AUTOPILOT="${ADMIN_AUTOPILOT}" \
     OVERNIGHT_ADMIN_REQUIRE_POSTGRES="${ADMIN_REQUIRE_POSTGRES}" \
     bash "${POST_RUN_SMOKE_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
-  SMOKE_EXIT_CODE=${PIPESTATUS[0]}
+  ADMIN_SMOKE_SCRIPT_EXIT_CODE=${PIPESTATUS[0]}
   set -e
-  echo "SMOKE_EXIT_CODE=${SMOKE_EXIT_CODE}" >> "${META_FILE}"
+  echo "ADMIN_SMOKE_SCRIPT_EXIT_CODE=${ADMIN_SMOKE_SCRIPT_EXIT_CODE}" >> "${META_FILE}"
   if [[ -f "${RUN_DIR}/browser-smoke/meta.env" ]]; then
-    ADMIN_SMOKE_EXIT_CODE="$(awk -F'=' '$1=="ADMIN_SMOKE_EXIT_CODE"{print $2; exit}' "${RUN_DIR}/browser-smoke/meta.env" 2>/dev/null || echo "${SMOKE_EXIT_CODE}")"
-    ADMIN_GATE_EXIT_CODE="$(awk -F'=' '$1=="ADMIN_GATE_EXIT_CODE"{print $2; exit}' "${RUN_DIR}/browser-smoke/meta.env" 2>/dev/null || echo "${SMOKE_EXIT_CODE}")"
+    ADMIN_SMOKE_EXIT_CODE="$(awk -F'=' '$1=="ADMIN_SMOKE_EXIT_CODE"{print $2; exit}' "${RUN_DIR}/browser-smoke/meta.env" 2>/dev/null || echo "${ADMIN_SMOKE_SCRIPT_EXIT_CODE}")"
+    ADMIN_GATE_EXIT_CODE="$(awk -F'=' '$1=="ADMIN_GATE_EXIT_CODE"{print $2; exit}' "${RUN_DIR}/browser-smoke/meta.env" 2>/dev/null || echo "${ADMIN_SMOKE_SCRIPT_EXIT_CODE}")"
   else
-    ADMIN_SMOKE_EXIT_CODE="${SMOKE_EXIT_CODE}"
-    ADMIN_GATE_EXIT_CODE="${SMOKE_EXIT_CODE}"
+    ADMIN_SMOKE_EXIT_CODE="${ADMIN_SMOKE_SCRIPT_EXIT_CODE}"
+    ADMIN_GATE_EXIT_CODE="${ADMIN_SMOKE_SCRIPT_EXIT_CODE}"
   fi
-  if [[ ${SMOKE_EXIT_CODE} -ne 0 ]]; then
-    EXIT_CODE=${SMOKE_EXIT_CODE}
+  if [[ ${ADMIN_SMOKE_SCRIPT_EXIT_CODE} -ne 0 ]]; then
+    EXIT_CODE=${ADMIN_SMOKE_SCRIPT_EXIT_CODE}
   fi
 else
-  echo "SMOKE_EXIT_CODE=SKIPPED" >> "${META_FILE}"
+  echo "ADMIN_SMOKE_SCRIPT_EXIT_CODE=SKIPPED" >> "${META_FILE}"
 fi
 
 echo "[$(date '+%F %T')] 后台专项状态码：ADMIN_AUTH_EXIT_CODE=${ADMIN_AUTH_EXIT_CODE} ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE} ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}" | tee -a "${RAW_LOG_FILE}"
@@ -396,9 +397,9 @@ if [[ "${RUN_SOURCE}" == "supervisor" ]]; then
 fi
 
 SMOKE_STATUS_TEXT="跳过"
-if [[ "${SMOKE_EXIT_CODE:-SKIPPED}" == "0" ]]; then
+if [[ "${ADMIN_SMOKE_EXIT_CODE:-SKIPPED}" == "0" ]]; then
   SMOKE_STATUS_TEXT="通过"
-elif [[ "${SMOKE_EXIT_CODE:-SKIPPED}" != "SKIPPED" ]]; then
+elif [[ "${ADMIN_SMOKE_EXIT_CODE:-SKIPPED}" != "SKIPPED" ]]; then
   SMOKE_STATUS_TEXT="失败"
 fi
 
