@@ -1,5 +1,7 @@
 package com.sharehub.config;
 
+import com.sharehub.admin.AdminAccountRepository;
+import com.sharehub.auth.RequestAccessService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -12,14 +14,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, Environment environment) throws Exception {
-        AdminTokenFilter adminTokenFilter = adminTokenFilter(environment);
+    public SecurityFilterChain filterChain(
+        HttpSecurity http,
+        Environment environment,
+        AdminTokenFilter adminTokenFilter
+    ) throws Exception {
         boolean oauthEnabled = environment.getProperty("sharehub.auth.github.enabled", Boolean.class, false);
 
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin", "/api/admin/**").hasRole("SUPER_ADMIN")
                 .requestMatchers(
                     "/actuator/health",
                     "/api/auth/**",
@@ -52,8 +57,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AdminTokenFilter adminTokenFilter(Environment environment) {
+    public AdminTokenFilter adminTokenFilter(
+        Environment environment,
+        AdminAccountRepository adminAccountRepository,
+        RequestAccessService requestAccessService
+    ) {
         String token = environment.getProperty("sharehub.admin.token", AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
-        return new AdminTokenFilter(token);
+        boolean devTokenEnabled = environment.getProperty("sharehub.admin.dev-token-enabled", Boolean.class, false);
+        return new AdminTokenFilter(token, devTokenEnabled, adminAccountRepository, requestAccessService);
     }
 }

@@ -55,6 +55,15 @@ class AdminTokenFilterProdModeIntegrationTest {
     }
 
     @Test
+    void shouldRejectAdminRootSpoofedViaUserHeaderWhenDevTokenModeDisabled() throws Exception {
+        grantAdmin(ADMIN_LOGIN);
+
+        mockMvc.perform(get("/api/admin").header(RequestAccessService.USER_KEY_HEADER, ADMIN_LOGIN))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    @Test
     void shouldAllowWhitelistedOauthAdminWhenDevTokenModeDisabled() throws Exception {
         grantAdmin(ADMIN_LOGIN);
 

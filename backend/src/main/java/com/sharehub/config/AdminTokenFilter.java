@@ -112,7 +112,7 @@ public class AdminTokenFilter extends OncePerRequestFilter {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
             principal,
             null,
-            List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+            List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
         );
         SecurityContextHolder.getContext().setAuthentication(authentication);
         try {
