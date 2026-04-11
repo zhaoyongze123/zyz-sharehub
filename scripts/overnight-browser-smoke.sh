@@ -2,6 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "${PROJECT_ROOT}/scripts/load-env.sh"
+load_env_stack "${PROJECT_ROOT}/scripts" ".env.overnight" ".env.overnight.local"
 RUN_DIR="${1:?请传入 run 目录}"
 START_HEAD="${2:-}"
 END_HEAD="${3:-}"
@@ -17,8 +19,7 @@ BACKEND_MODE_FILE="${SMOKE_DIR}/backend-mode.txt"
 ADMIN_AUTOPILOT_MODE="${OVERNIGHT_ADMIN_AUTOPILOT:-1}"
 ADMIN_REQUIRE_POSTGRES="${OVERNIGHT_ADMIN_REQUIRE_POSTGRES:-1}"
 STANDARD_SMOKE_SPECS=(
-  "tests/e2e/module-smoke.spec.ts"
-  "tests/e2e/sharehub-real-api.spec.ts"
+  "tests/e2e/admin-smoke.spec.ts"
 )
 ADMIN_ALLOWED_ROUTES=(
   "/admin"
@@ -27,6 +28,7 @@ ADMIN_ALLOWED_ROUTES=(
   "/admin/users"
   "/admin/audit-logs"
 )
+OVERNIGHT_BACKEND_MODE="${OVERNIGHT_BACKEND_MODE:-test-profile}"
 
 BACKEND_PORT="${OVERNIGHT_BACKEND_PORT:-18080}"
 FRONTEND_PORT="${OVERNIGHT_FRONTEND_PORT:-14173}"
@@ -85,6 +87,10 @@ has_line() {
 }
 
 can_use_cloud_dev() {
+  if [[ "${OVERNIGHT_BACKEND_MODE}" != "cloud-dev" ]]; then
+    return 1
+  fi
+
   if [[ -f "${PROJECT_ROOT}/backend/.env.cloud-dev.local" ]]; then
     # shellcheck disable=SC1091
     source "${PROJECT_ROOT}/backend/.env.cloud-dev.local"
@@ -197,7 +203,7 @@ if can_use_cloud_dev; then
   nohup bash "${PROJECT_ROOT}/scripts/run-backend-cloud-dev.sh" > "${BACKEND_LOG}" 2>&1 &
 else
   BACKEND_MODE="test-profile"
-  log "未检测到 cloud-dev 密码配置，回落到本机自包含 smoke profile"
+  log "按环境隔离规则使用 test-profile smoke 环境"
   nohup bash "${PROJECT_ROOT}/scripts/run-backend-smoke.sh" > "${BACKEND_LOG}" 2>&1 &
 fi
 BACKEND_PID=$!
@@ -310,13 +316,12 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
     gate_check "liveness probe 不可用"
   fi
 
-  if rg -q "PLAYWRIGHT_ADMIN_TOKEN" "${FRONTEND_DIR}/tests/e2e/module-smoke.spec.ts" "${FRONTEND_DIR}/tests/e2e/sharehub-real-api.spec.ts"; then
+  if rg -q "PLAYWRIGHT_ADMIN_TOKEN" "${FRONTEND_DIR}/tests/e2e/admin-smoke.spec.ts"; then
     gate_check "后台 Playwright 仍依赖 PLAYWRIGHT_ADMIN_TOKEN"
   fi
 
-  if rg -q "/admin/taxonomy|full-site-walkthrough\\.spec\\.ts" \
-    "${FRONTEND_DIR}/tests/e2e/module-smoke.spec.ts" \
-    "${FRONTEND_DIR}/tests/e2e/sharehub-real-api.spec.ts" \
+  if rg -q "/admin/taxonomy|/resources|/roadmaps|/publish|full-site-walkthrough\\.spec\\.ts" \
+    "${FRONTEND_DIR}/tests/e2e/admin-smoke.spec.ts" \
     "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"; then
     gate_check "后台 smoke 仍包含非专项页面或全站走查"
   fi

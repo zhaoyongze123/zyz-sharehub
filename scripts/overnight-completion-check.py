@@ -89,25 +89,22 @@ def main() -> int:
         pending,
     )
     check(
-        lacks_text(tests / "module-smoke.spec.ts", "PLAYWRIGHT_ADMIN_TOKEN")
-        and has_text(tests / "module-smoke.spec.ts", "PLAYWRIGHT_ADMIN_USER_KEY"),
+        (tests / "admin-smoke.spec.ts").exists()
+        and lacks_text(tests / "admin-smoke.spec.ts", "PLAYWRIGHT_ADMIN_TOKEN")
+        and has_text(tests / "admin-smoke.spec.ts", "PLAYWRIGHT_ADMIN_USER_KEY"),
         "后台 smoke 不再依赖管理员 token",
         passed,
         pending,
     )
     check(
-        lacks_text(tests / "sharehub-real-api.spec.ts", "PLAYWRIGHT_ADMIN_TOKEN")
-        and has_text(tests / "sharehub-real-api.spec.ts", "PLAYWRIGHT_ADMIN_USER_KEY"),
-        "后台真接口验收不再依赖管理员 token",
-        passed,
-        pending,
-    )
-    check(
-        lacks_text(tests / "module-smoke.spec.ts", "/admin/taxonomy")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reviews')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reports')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/users')"),
+        lacks_text(tests / "admin-smoke.spec.ts", "/admin/taxonomy")
+        and lacks_text(tests / "admin-smoke.spec.ts", "/resources")
+        and lacks_text(tests / "admin-smoke.spec.ts", "/roadmaps")
+        and lacks_text(tests / "admin-smoke.spec.ts", "/publish")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/reviews')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/reports')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/users')"),
         "后台 module smoke 只覆盖 admin/reports/reviews/users/audit-logs",
         passed,
         pending,
@@ -136,12 +133,12 @@ def main() -> int:
         pending,
     )
     check(
-        has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reports')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reviews')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
-        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/users')")
-        and has_text(tests / "sharehub-real-api.spec.ts", "await page.goto('/admin/reviews')"),
+        has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/reports')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/reviews')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
+        and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/users')")
+        and has_text(tests / "admin-smoke.spec.ts", "browserFetch(page, '/api/admin/reports?page=1&pageSize=20'"),
         "后台页面真接口验收覆盖 admin/reports/reviews/users/audit-logs",
         passed,
         pending,
@@ -211,6 +208,14 @@ def main() -> int:
         latest_smoke_meta.exists()
         and env_value(latest_smoke_meta, "MODULES") == "admin,backend",
         "最近一轮 smoke 仅执行后台模块",
+        passed,
+        pending,
+    )
+    check(
+        lacks_text(scripts_dir / "overnight-browser-smoke.sh", "module-smoke.spec.ts")
+        and lacks_text(scripts_dir / "overnight-browser-smoke.sh", "sharehub-real-api.spec.ts")
+        ,
+        "后台专项机器判定已脱离通用 E2E 用例",
         passed,
         pending,
     )
