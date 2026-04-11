@@ -50,4 +50,24 @@ class SecurityConfigTest {
 
         assertThat(SecurityConfig.isAdminDevTokenEnabled(environment)).isFalse();
     }
+
+    @Test
+    void shouldDisableAdminDevTokenWhenProductionProfileIsActiveWithoutAppEnvOverride() {
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("spring.profiles.active", "production")
+            .withProperty("sharehub.admin.dev-token-enabled", "true");
+        environment.setActiveProfiles("production");
+
+        assertThat(SecurityConfig.isAdminDevTokenEnabled(environment)).isFalse();
+    }
+
+    @Test
+    void shouldDisableAdminDevTokenWhenStagingProfileIsActiveWithoutAppEnvOverride() {
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("spring.profiles.active", "staging")
+            .withProperty("sharehub.admin.dev-token-enabled", "true");
+        environment.setActiveProfiles("staging");
+
+        assertThat(SecurityConfig.isAdminDevTokenEnabled(environment)).isFalse();
+    }
 }

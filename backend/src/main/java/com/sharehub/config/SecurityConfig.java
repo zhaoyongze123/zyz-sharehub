@@ -4,6 +4,7 @@ import com.sharehub.admin.AdminAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -68,6 +69,10 @@ public class SecurityConfig {
     static boolean isAdminDevTokenEnabled(Environment environment) {
         boolean configured = environment.getProperty("sharehub.admin.dev-token-enabled", Boolean.class, false);
         if (!configured) {
+            return false;
+        }
+
+        if (environment.acceptsProfiles(Profiles.of("production", "staging"))) {
             return false;
         }
 

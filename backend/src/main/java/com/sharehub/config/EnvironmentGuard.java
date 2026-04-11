@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,7 +26,10 @@ public class EnvironmentGuard implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if ("production".equalsIgnoreCase(appEnv)) {
+        boolean productionLikeProfile = isProductionLikeProfile();
+        boolean testProfile = environment.acceptsProfiles(Profiles.of("test"));
+
+        if (productionLikeProfile) {
             if (adminDevTokenEnabled) {
                 throw new IllegalStateException("production 环境禁止开启 SHAREHUB_ADMIN_DEV_TOKEN_ENABLED");
             }
@@ -34,7 +38,10 @@ public class EnvironmentGuard implements ApplicationRunner {
             }
         }
 
-        if ("test".equalsIgnoreCase(appEnv) && datasourceUrl.contains("sharehub_prod")) {
+        if (testProfile || "test".equalsIgnoreCase(appEnv)) {
+            if (!datasourceUrl.contains("sharehub_prod")) {
+                return;
+            }
             throw new IllegalStateException("test 环境禁止连接生产数据库");
         }
 
@@ -44,5 +51,9 @@ public class EnvironmentGuard implements ApplicationRunner {
                 throw new IllegalStateException("cloud-dev 环境缺少 POSTGRES_PASSWORD");
             }
         }
+    }
+
+    private boolean isProductionLikeProfile() {
+        return "production".equalsIgnoreCase(appEnv) || environment.acceptsProfiles(Profiles.of("production"));
     }
 }
