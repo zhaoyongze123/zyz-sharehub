@@ -97,6 +97,18 @@ check_health_status_up() {
   fi
 }
 
+probe_status_summary() {
+  local url="$1"
+  local response_file
+  local http_code
+  response_file="$(mktemp)"
+  http_code="$(curl -sS -o "${response_file}" -w '%{http_code}' "${url}" 2>/dev/null || echo "curl_error")"
+  local response_body
+  response_body="$(tr '\n' ' ' < "${response_file}" | cut -c1-200)"
+  rm -f "${response_file}"
+  printf 'HTTP %s body=%s' "${http_code}" "${response_body:-<empty>}"
+}
+
 validate_admin_modules() {
   local raw_modules="$1"
   local parsed_modules=()
@@ -274,7 +286,7 @@ fi
 
 LAST_HEALTH_STAGE="readiness"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/readiness" "${BACKEND_PID}" "后端 readiness" 60 2; then
-  record_failure "后端 readiness 检查失败，请查看 ${BACKEND_LOG}"
+  record_failure "后端 readiness 检查失败，请查看 ${BACKEND_LOG}；$(probe_status_summary "${BACKEND_BASE_URL}/actuator/health/readiness")"
   exit 1
 fi
 
@@ -284,7 +296,7 @@ fi
 
 LAST_HEALTH_STAGE="liveness"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/liveness" "${BACKEND_PID}" "后端 liveness" 60 2; then
-  record_failure "后端 liveness 检查失败，请查看 ${BACKEND_LOG}"
+  record_failure "后端 liveness 检查失败，请查看 ${BACKEND_LOG}；$(probe_status_summary "${BACKEND_BASE_URL}/actuator/health/liveness")"
   exit 1
 fi
 
