@@ -14,6 +14,7 @@
 - readiness / liveness 已开启
 - `application.yml`、`application-test.yml`、`application-cloud-dev.yml` 默认禁用 dev token，只有显式设置 `SHAREHUB_ADMIN_DEV_TOKEN_ENABLED=true` 才允许本地、测试、cloud-dev 联调
 - 生产链路拒绝仅凭 `X-Admin-Token` 访问后台接口
+- 已保留“生产禁 token”与“显式开启 dev token”两类后台集成测试
 - 小时调度日志已输出 `ADMIN_AUTH_EXIT_CODE`、`ADMIN_SMOKE_EXIT_CODE`、`ADMIN_GATE_EXIT_CODE`
 
 ## 阻断项

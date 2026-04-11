@@ -126,6 +126,15 @@ def main() -> int:
         pending,
     )
     check(
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "缺少生产禁用 dev token 集成测试配置")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "缺少生产禁用 dev token 集成测试断言")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "缺少本地显式开启 dev token 集成测试配置")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "缺少本地显式开启 dev token 集成测试断言"),
+        "后台门禁已要求显式区分 dev token 启停两类集成测试",
+        passed,
+        pending,
+    )
+    check(
         has_text(scripts_dir / "overnight-browser-smoke.sh", "生产部署仍然包含 MySQL 配置")
         and has_text(scripts_dir / "overnight-browser-smoke.sh", "生产部署未显式使用 PostgreSQL JDBC，未满足 PostgreSQL-only"),
         "后台门禁会阻断非 PostgreSQL-only 生产配置",

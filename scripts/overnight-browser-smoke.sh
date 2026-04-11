@@ -308,6 +308,22 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
     gate_check "生产环境错误接受了 X-Admin-Token"
   fi
 
+  if ! has_line "${PROJECT_ROOT}/backend/src/test/java/com/sharehub/config/AdminTokenFilterProdModeIntegrationTest.java" 'sharehub\.admin\.dev-token-enabled=false'; then
+    gate_check "缺少生产禁用 dev token 集成测试配置"
+  fi
+
+  if ! has_line "${PROJECT_ROOT}/backend/src/test/java/com/sharehub/config/AdminTokenFilterProdModeIntegrationTest.java" 'shouldRejectAdminTokenWhenDevTokenModeDisabled'; then
+    gate_check "缺少生产禁用 dev token 集成测试断言"
+  fi
+
+  if ! has_line "${PROJECT_ROOT}/backend/src/test/java/com/sharehub/config/AdminTokenFilterDevModeIntegrationTest.java" 'sharehub\.admin\.dev-token-enabled=true'; then
+    gate_check "缺少本地显式开启 dev token 集成测试配置"
+  fi
+
+  if ! has_line "${PROJECT_ROOT}/backend/src/test/java/com/sharehub/config/AdminTokenFilterDevModeIntegrationTest.java" 'shouldAllowAdminEndpointsViaDevTokenWhenExplicitlyEnabled'; then
+    gate_check "缺少本地显式开启 dev token 集成测试断言"
+  fi
+
   if ! curl -fsS "${BACKEND_BASE_URL}/actuator/health/readiness" >/dev/null 2>&1; then
     gate_check "readiness probe 不可用"
   fi

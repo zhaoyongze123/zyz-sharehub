@@ -49,4 +49,5 @@ cd /Users/mac/Documents/New\ project
 - 脚本检查生产配置是否仍包含 MySQL，并以 PostgreSQL-only 为门禁
 - 脚本检查 `application.yml`、`application-test.yml`、`application-cloud-dev.yml` 都默认关闭 dev token，只有显式设置 `SHAREHUB_ADMIN_DEV_TOKEN_ENABLED=true` 才允许本地、测试、cloud-dev 联调
 - 脚本检查生产链路拒绝单独携带 `X-Admin-Token` 的后台请求
+- 脚本检查 `AdminTokenFilterProdModeIntegrationTest` 与 `AdminTokenFilterDevModeIntegrationTest` 同时存在，分别覆盖“生产禁 token”和“显式开启 dev token”
 - 小时调度日志必须显式输出 `ADMIN_AUTH_EXIT_CODE`、`ADMIN_SMOKE_EXIT_CODE`、`ADMIN_GATE_EXIT_CODE`
