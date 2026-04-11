@@ -81,7 +81,7 @@ public class AdminTokenFilter extends OncePerRequestFilter {
 
     private boolean isAdminPath(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path != null && path.startsWith("/api/admin/");
+        return path != null && ("/api/admin".equals(path) || path.startsWith("/api/admin/"));
     }
 
     private boolean isWhitelistedAdmin(HttpServletRequest request) {

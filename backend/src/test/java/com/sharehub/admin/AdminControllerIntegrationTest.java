@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "sharehub.admin.dev-token-enabled=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class AdminControllerIntegrationTest {
@@ -97,6 +97,10 @@ public class AdminControllerIntegrationTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
 
+        mvc.perform(get("/api/admin"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+
         mvc.perform(get("/api/admin/audit-logs"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
@@ -113,6 +117,12 @@ public class AdminControllerIntegrationTest {
         mvc.perform(get("/api/admin/reports").header(RequestAccessService.USER_KEY_HEADER, "plain-user"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
+    @Test
+    void adminRootPathUsesWhitelistAuthentication() throws Exception {
+        mvc.perform(adminGet("/api/admin"))
+            .andExpect(status().isNotFound());
     }
 
     @Test
