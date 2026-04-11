@@ -120,6 +120,24 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldNotExposeAdminFlagForRevokedOauthAdminAccount() throws Exception {
+        String adminLogin = "revoked-oauth-auth-admin";
+        revokeAdmin(adminLogin);
+
+        mockMvc.perform(
+                get("/api/auth/me")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", adminLogin);
+                        attributes.put("name", "Revoked OAuth Auth Admin");
+                    }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(adminLogin))
+            .andExpect(jsonPath("$.data.name").value("Revoked OAuth Auth Admin"))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
+    }
+
+    @Test
     void shouldPersistAvatarIntoUserProfile() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",
