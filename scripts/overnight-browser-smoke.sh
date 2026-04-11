@@ -77,11 +77,11 @@ FAILURE_REASON=${FAILURE_REASON}
 EOF
 }
 
-has_enabled_property() {
+has_line() {
   local path="$1"
-  local key="$2"
+  local pattern="$2"
   [[ -f "${path}" ]] || return 1
-  rg -q "^[[:space:]]*${key}:[[:space:]]*true[[:space:]]*$" "${path}"
+  rg -q "${pattern}" "${path}"
 }
 
 can_use_cloud_dev() {
@@ -260,12 +260,16 @@ ADMIN_SMOKE_EXIT_CODE=${STANDARD_SMOKE_EXIT_CODE}
 ADMIN_GATE_EXIT_CODE=0
 
 if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
-  if ! has_enabled_property "${PROJECT_ROOT}/backend/src/main/resources/application-cloud-dev.yml" "dev-token-enabled"; then
-    gate_check "application-cloud-dev.yml 未显式开启 dev token"
+  if ! has_line "${PROJECT_ROOT}/backend/src/main/resources/application.yml" 'dev-token-enabled:[[:space:]]+\$\{SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false\}'; then
+    gate_check "application.yml 未将 dev token 默认设为关闭且仅允许显式开启"
   fi
 
-  if has_enabled_property "${PROJECT_ROOT}/backend/src/main/resources/application.yml" "dev-token-enabled"; then
-    gate_check "application.yml 仍默认开启 dev token"
+  if ! has_line "${PROJECT_ROOT}/backend/src/main/resources/application-cloud-dev.yml" 'dev-token-enabled:[[:space:]]+\$\{SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false\}'; then
+    gate_check "application-cloud-dev.yml 未改为显式开启 dev token"
+  fi
+
+  if ! has_line "${PROJECT_ROOT}/backend/src/main/resources/application-test.yml" 'dev-token-enabled:[[:space:]]+false[[:space:]]*$|dev-token-enabled:[[:space:]]+\$\{SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false\}'; then
+    gate_check "application-test.yml 未改为显式开启 dev token"
   fi
 
   if ! rg -q "jdbc:postgresql" "${PROJECT_ROOT}/backend/src/main/resources/application.yml"; then
@@ -275,6 +279,9 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
   if [[ "${ADMIN_REQUIRE_POSTGRES}" == "1" ]]; then
     if rg -q "jdbc:mysql|mysql:" "${PROJECT_ROOT}/deploy/docker-compose.prod.yml"; then
       gate_check "生产部署仍然包含 MySQL 配置，未满足 PostgreSQL-only"
+    fi
+    if ! rg -q "SPRING_DATASOURCE_URL:[[:space:]]+jdbc:postgresql://" "${PROJECT_ROOT}/deploy/docker-compose.prod.yml"; then
+      gate_check "生产部署未显式使用 PostgreSQL JDBC，未满足 PostgreSQL-only"
     fi
   fi
 

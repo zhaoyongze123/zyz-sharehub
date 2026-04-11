@@ -99,6 +99,16 @@ def main() -> int:
         pending,
     )
     check(
+        lacks_text(tests / "module-smoke.spec.ts", "/admin/taxonomy")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reviews')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reports')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/users')"),
+        "后台 module smoke 只覆盖 admin/reports/reviews/users/audit-logs",
+        passed,
+        pending,
+    )
+    check(
         has_text(scripts_dir / "overnight-browser-smoke.sh", "/actuator/health/readiness")
         and has_text(scripts_dir / "overnight-browser-smoke.sh", "/actuator/health/liveness"),
         "后台 smoke 已纳入 readiness/liveness probes",
@@ -106,8 +116,17 @@ def main() -> int:
         pending,
     )
     check(
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "application.yml 未将 dev token 默认设为关闭且仅允许显式开启")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "application-cloud-dev.yml 未改为显式开启 dev token")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "application-test.yml 未改为显式开启 dev token")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "生产环境错误接受了 X-Admin-Token"),
+        "后台门禁已区分生产禁 token 与本地显式开启 dev token",
+        passed,
+        pending,
+    )
+    check(
         has_text(scripts_dir / "overnight-browser-smoke.sh", "生产部署仍然包含 MySQL 配置")
-        and has_text(scripts_dir / "overnight-browser-smoke.sh", "未满足 PostgreSQL-only"),
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "生产部署未显式使用 PostgreSQL JDBC，未满足 PostgreSQL-only"),
         "后台门禁会阻断非 PostgreSQL-only 生产配置",
         passed,
         pending,
@@ -115,6 +134,7 @@ def main() -> int:
     check(
         has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin')")
         and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reports')")
+        and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/reviews')")
         and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/audit-logs')")
         and has_text(tests / "module-smoke.spec.ts", "await page.goto('/admin/users')")
         and has_text(tests / "sharehub-real-api.spec.ts", "await page.goto('/admin/reviews')"),

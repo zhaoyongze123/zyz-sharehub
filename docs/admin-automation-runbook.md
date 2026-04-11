@@ -43,5 +43,8 @@ cd /Users/mac/Documents/New\ project
 执行时必须满足：
 
 - Playwright 使用 `PLAYWRIGHT_ADMIN_USER_KEY`，不再依赖 `PLAYWRIGHT_ADMIN_TOKEN`
+- 仅验 `/admin`、`/admin/reports`、`/admin/reviews`、`/admin/users`、`/admin/audit-logs`
 - 脚本检查 `/actuator/health`、`/actuator/health/readiness`、`/actuator/health/liveness`
 - 脚本检查生产配置是否仍包含 MySQL，并以 PostgreSQL-only 为门禁
+- 脚本检查 `application.yml`、`application-test.yml`、`application-cloud-dev.yml` 都默认关闭 dev token，只有显式设置 `SHAREHUB_ADMIN_DEV_TOKEN_ENABLED=true` 才允许联调
+- 脚本检查生产链路拒绝单独携带 `X-Admin-Token` 的后台请求
