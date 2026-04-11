@@ -11,3 +11,6 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:56379}
       password: ${REDIS_PASSWORD}
+sharehub:
+  admin:
+    dev-token-enabled: ${SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false}

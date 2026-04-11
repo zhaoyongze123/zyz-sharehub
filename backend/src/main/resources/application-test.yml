@@ -1,9 +1,12 @@
 spring:
+  config:
+    activate:
+      on-profile: test
   datasource:
-    url: jdbc:h2:mem:sharehub;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://${POSTGRES_TEST_HOST:${POSTGRES_HOST:127.0.0.1}}:${POSTGRES_TEST_PORT:${POSTGRES_PORT:55432}}/${POSTGRES_TEST_DB:sharehub_test}
+    driver-class-name: org.postgresql.Driver
+    username: ${POSTGRES_TEST_USER:${POSTGRES_USER:sharehub_dev}}
+    password: ${POSTGRES_TEST_PASSWORD:${POSTGRES_PASSWORD:}}
   jpa:
     hibernate:
       ddl-auto: none
@@ -15,10 +18,15 @@ spring:
       schema-locations: classpath:schema-test.sql
   data:
     redis:
+      host: ${REDIS_TEST_HOST:${REDIS_HOST:127.0.0.1}}
+      port: ${REDIS_TEST_PORT:${REDIS_PORT:56379}}
+      password: ${REDIS_TEST_PASSWORD:${REDIS_PASSWORD:}}
       repositories:
         enabled: false
 
 sharehub:
+  admin:
+    dev-token-enabled: ${SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false}
   auth:
     github:
       enabled: false

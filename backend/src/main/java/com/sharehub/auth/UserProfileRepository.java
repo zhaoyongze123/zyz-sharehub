@@ -2,11 +2,15 @@ package com.sharehub.auth;
 
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
+import com.sharehub.admin.AdminAccountRepository;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
@@ -20,22 +24,25 @@ import org.springframework.web.server.ResponseStatusException;
 public class UserProfileRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AdminAccountRepository adminAccountRepository;
 
-    public UserProfileRepository(JdbcTemplate jdbcTemplate) {
+    public UserProfileRepository(JdbcTemplate jdbcTemplate, AdminAccountRepository adminAccountRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.adminAccountRepository = adminAccountRepository;
     }
 
     public UserProfileDto upsert(String login, String name, UUID avatarFileId) {
         Optional<UserProfileDto> existing = findOptional(login);
         if (existing.isPresent()) {
             UUID effectiveAvatarFileId = avatarFileId != null ? avatarFileId : existing.get().avatarFileId();
+            String effectiveName = resolveUpsertName(existing.get(), login, name);
             jdbcTemplate.update(
                 """
                     UPDATE users
                     SET name = ?, avatar_file_id = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE login = ?
                     """,
-                nullable(name),
+                effectiveName,
                 effectiveAvatarFileId,
                 login
             );
@@ -66,8 +73,27 @@ public class UserProfileRepository {
             nullable(name),
             avatarFileId,
             avatarFileId == null ? null : "/api/files/" + avatarFileId,
-            "ACTIVE"
+            "ACTIVE",
+            adminAccountRepository.isActiveAdmin(login)
         );
+    }
+
+    public UserProfileDto ensureActiveProfile(String login) {
+        UserProfileDto profile = findOptional(login).orElseGet(() -> upsert(login, login, null));
+        if ("BANNED".equalsIgnoreCase(profile.status())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "USER_BANNED");
+        }
+        return profile;
+    }
+
+    public UserProfileDto updateProfile(String login, String name) {
+        ensureExists(login);
+        jdbcTemplate.update(
+            "UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE login = ?",
+            nullable(name),
+            login
+        );
+        return findByLogin(login);
     }
 
     public UserProfileDto updateAvatar(String login, UUID avatarFileId) {
@@ -86,6 +112,35 @@ public class UserProfileRepository {
 
     public Optional<UserProfileDto> findOptionalByLogin(String login) {
         return findOptional(login);
+    }
+
+    public boolean isActiveAdmin(String login) {
+        return adminAccountRepository.isActiveAdmin(login);
+    }
+
+    public Map<String, UserProfileDto> findByLogins(Set<String> logins) {
+        if (logins == null || logins.isEmpty()) {
+            return Map.of();
+        }
+
+        String placeholders = String.join(",", logins.stream().map(item -> "?").toList());
+        String sql = """
+            SELECT id, login, name, avatar_file_id, status
+            FROM users
+            WHERE login IN (%s)
+            """.formatted(placeholders);
+
+        List<UserProfileDto> rows = jdbcTemplate.query(
+            sql,
+            (resultSet, rowNum) -> mapUser(resultSet),
+            logins.toArray()
+        );
+
+        Map<String, UserProfileDto> result = new HashMap<>();
+        for (UserProfileDto row : rows) {
+            result.put(row.login(), row);
+        }
+        return result;
     }
 
     public UserProfileDto findById(Long id) {
@@ -120,10 +175,7 @@ public class UserProfileRepository {
     }
 
     public void ensureActive(String login) {
-        UserProfileDto profile = findByLogin(login);
-        if ("BANNED".equalsIgnoreCase(profile.status())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "USER_BANNED");
-        }
+        ensureActiveProfile(login);
     }
 
     private Optional<UserProfileDto> findOptional(String login) {
@@ -154,12 +206,24 @@ public class UserProfileRepository {
             resultSet.getString("name"),
             avatarFileId,
             avatarFileId == null ? null : "/api/files/" + avatarFileId,
-            resultSet.getString("status")
+            resultSet.getString("status"),
+            adminAccountRepository.isActiveAdmin(resultSet.getString("login"))
         );
     }
 
     private String nullable(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private String resolveUpsertName(UserProfileDto existing, String login, String requestedName) {
+        String normalizedRequestedName = nullable(requestedName);
+        if (normalizedRequestedName == null) {
+            return existing.name();
+        }
+        if (normalizedRequestedName.equals(login) && existing.name() != null && !existing.name().isBlank()) {
+            return existing.name();
+        }
+        return normalizedRequestedName;
     }
 
     private Optional<UserProfileDto> findOptionalById(Long id) {

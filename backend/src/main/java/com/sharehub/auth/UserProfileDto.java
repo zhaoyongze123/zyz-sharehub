@@ -8,6 +8,7 @@ public record UserProfileDto(
     String name,
     UUID avatarFileId,
     String avatarUrl,
-    String status
+    String status,
+    boolean isAdmin
 ) {
 }
