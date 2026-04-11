@@ -271,11 +271,11 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
   fi
 
   if ! has_line "${PROJECT_ROOT}/backend/src/main/resources/application-cloud-dev.yml" 'dev-token-enabled:[[:space:]]+\$\{SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false\}'; then
-    gate_check "application-cloud-dev.yml 未改为显式开启 dev token"
+    gate_check "application-cloud-dev.yml 未将 dev token 默认设为关闭且仅允许显式开启"
   fi
 
   if ! has_line "${PROJECT_ROOT}/backend/src/main/resources/application-test.yml" 'dev-token-enabled:[[:space:]]+false[[:space:]]*$|dev-token-enabled:[[:space:]]+\$\{SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:false\}'; then
-    gate_check "application-test.yml 未改为显式开启 dev token"
+    gate_check "application-test.yml 未将 dev token 默认设为关闭且仅允许显式开启"
   fi
 
   if ! rg -q "jdbc:postgresql" "${PROJECT_ROOT}/backend/src/main/resources/application.yml"; then

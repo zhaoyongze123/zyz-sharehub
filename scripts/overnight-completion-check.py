@@ -118,8 +118,8 @@ def main() -> int:
     )
     check(
         has_text(scripts_dir / "overnight-browser-smoke.sh", "application.yml 未将 dev token 默认设为关闭且仅允许显式开启")
-        and has_text(scripts_dir / "overnight-browser-smoke.sh", "application-cloud-dev.yml 未改为显式开启 dev token")
-        and has_text(scripts_dir / "overnight-browser-smoke.sh", "application-test.yml 未改为显式开启 dev token")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "application-cloud-dev.yml 未将 dev token 默认设为关闭且仅允许显式开启")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "application-test.yml 未将 dev token 默认设为关闭且仅允许显式开启")
         and has_text(scripts_dir / "overnight-browser-smoke.sh", "生产环境错误接受了 X-Admin-Token"),
         "后台门禁已区分生产禁 token 与本地显式开启 dev token",
         passed,

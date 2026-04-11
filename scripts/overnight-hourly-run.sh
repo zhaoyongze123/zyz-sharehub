@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="${OVERNIGHT_PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+source "${PROJECT_ROOT}/scripts/load-env.sh"
+load_env_stack "${PROJECT_ROOT}/scripts" ".env.overnight" ".env.overnight.local"
 OUTPUT_DIR="${PROJECT_ROOT}/output/overnight"
 STATE_DIR="${OUTPUT_DIR}/state"
 RUN_LOCK_DIR="${STATE_DIR}/hourly-run.lock"
@@ -17,6 +19,9 @@ PRIMARY_MODEL="${OVERNIGHT_PRIMARY_MODEL:-gpt-5.4}"
 FALLBACK_MODELS="${OVERNIGHT_FALLBACK_MODELS:-gpt-5.1-codex-max,gpt-5.1-codex-mini}"
 CODEX_BIN="${OVERNIGHT_CODEX_BIN:-codex}"
 ENABLE_MULTI_AGENT="${OVERNIGHT_ENABLE_MULTI_AGENT:-1}"
+ADMIN_AUTOPILOT="${OVERNIGHT_ADMIN_AUTOPILOT:-1}"
+ADMIN_PARALLEL_MODE="${OVERNIGHT_ADMIN_PARALLEL_MODE:-2way}"
+ADMIN_REQUIRE_POSTGRES="${OVERNIGHT_ADMIN_REQUIRE_POSTGRES:-1}"
 POST_RUN_SMOKE_SCRIPT="${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"
 POST_FRONTEND_FOLLOWUP_SCRIPT="${PROJECT_ROOT}/scripts/overnight-frontend-followup.sh"
 LAST_MESSAGE_FILE="${RUN_DIR}/last-message.md"
@@ -28,6 +33,15 @@ AUTOPILOT_CODEX_HOME="${OUTPUT_DIR}/codex-home"
 START_HEAD="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
 RUN_SOURCE="${OVERNIGHT_RUN_SOURCE:-manual}"
 START_EPOCH="$(date '+%s')"
+AUTH_LINE_MESSAGE_FILE="${RUN_DIR}/auth-line-message.md"
+GATE_LINE_MESSAGE_FILE="${RUN_DIR}/gate-line-message.md"
+AUTH_LINE_LOG_FILE="${RUN_DIR}/auth-line.log"
+GATE_LINE_LOG_FILE="${RUN_DIR}/gate-line.log"
+AUTH_LINE_PROMPT_FILE="${RUN_DIR}/auth-line-prompt.txt"
+GATE_LINE_PROMPT_FILE="${RUN_DIR}/gate-line-prompt.txt"
+ADMIN_AUTH_EXIT_CODE="SKIPPED"
+ADMIN_SMOKE_EXIT_CODE="SKIPPED"
+ADMIN_GATE_EXIT_CODE="SKIPPED"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -149,6 +163,9 @@ model_for_attempt() {
   echo "PRIMARY_MODEL=${PRIMARY_MODEL}"
   echo "FALLBACK_MODELS=${FALLBACK_MODELS}"
   echo "CODEX_HOME=${CODEX_HOME}"
+  echo "ADMIN_AUTOPILOT=${ADMIN_AUTOPILOT}"
+  echo "ADMIN_PARALLEL_MODE=${ADMIN_PARALLEL_MODE}"
+  echo "ADMIN_REQUIRE_POSTGRES=${ADMIN_REQUIRE_POSTGRES}"
 } > "${META_FILE}"
 
 {
@@ -168,41 +185,119 @@ model_for_attempt() {
   cat "${PROMPT_FILE}"
 } > "${RUN_DIR}/prompt.txt"
 
+cat "${RUN_DIR}/prompt.txt" > "${AUTH_LINE_PROMPT_FILE}"
+cat >> "${AUTH_LINE_PROMPT_FILE}" <<'EOF'
+
+## 本轮固定 ownership
+- 当前工作线：线 A（后台鉴权与安全收口）
+- 仅允许修改：后台鉴权、安全配置、管理员白名单、`/api/auth/me`、后台权限相关测试
+- 禁止修改：后台页面、运行文档、完成判定脚本、browser smoke 脚本
+EOF
+
+cat "${RUN_DIR}/prompt.txt" > "${GATE_LINE_PROMPT_FILE}"
+cat >> "${GATE_LINE_PROMPT_FILE}" <<'EOF'
+
+## 本轮固定 ownership
+- 当前工作线：线 B（后台功能与可用性门禁）
+- 仅允许修改：后台页面、后台 smoke / E2E、完成判定脚本、运行文档、门禁脚本
+- 禁止修改：核心后台鉴权过滤器、管理员白名单表结构
+EOF
+
 echo "[$(date '+%F %T')] 开始执行第 ${RUN_ID} 轮，日志目录: ${RUN_DIR}" | tee -a "${RAW_LOG_FILE}"
 
 TRANSIENT_ERROR_HINT=""
 ATTEMPT=1
 EXIT_CODE=1
 
-while (( ATTEMPT <= MAX_RETRIES )); do
-  CURRENT_MODEL="$(model_for_attempt "${ATTEMPT}")"
-  CODEX_CMD=(
+run_codex_attempt() {
+  local prompt_file="$1"
+  local output_file="$2"
+  local log_file="$3"
+  local model="$4"
+
+  local cmd=(
     "${CODEX_BIN}"
     exec
     --ephemeral
     -c 'model_reasoning_effort="low"'
-    -m "${CURRENT_MODEL}"
+    -m "${model}"
     --dangerously-bypass-approvals-and-sandbox
     -C "${PROJECT_ROOT}"
-    -o "${LAST_MESSAGE_FILE}"
+    -o "${output_file}"
   )
   if [[ "${ENABLE_MULTI_AGENT}" != "1" ]]; then
-    CODEX_CMD+=(--disable multi_agent)
+    cmd+=(--disable multi_agent)
   fi
+
+  python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${cmd[@]}" - < "${prompt_file}" > "${log_file}" 2>&1
+}
+
+while (( ATTEMPT <= MAX_RETRIES )); do
+  CURRENT_MODEL="$(model_for_attempt "${ATTEMPT}")"
   rm -f "${LAST_MESSAGE_FILE}"
   echo "[$(date '+%F %T')] 执行尝试 ${ATTEMPT}/${MAX_RETRIES}，模型=${CURRENT_MODEL}" | tee -a "${RAW_LOG_FILE}"
 
-  set +e
-  python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${CODEX_CMD[@]}" - \
-    < "${RUN_DIR}/prompt.txt" 2>&1 | tee -a "${RAW_LOG_FILE}"
-  EXIT_CODE=${PIPESTATUS[0]}
-  set -e
+  if [[ "${ADMIN_AUTOPILOT}" == "1" && "${ADMIN_PARALLEL_MODE}" == "2way" ]]; then
+    echo "[$(date '+%F %T')] 后台专项模式：启动两条工作线并行执行" | tee -a "${RAW_LOG_FILE}"
+    rm -f "${AUTH_LINE_MESSAGE_FILE}" "${GATE_LINE_MESSAGE_FILE}" "${AUTH_LINE_LOG_FILE}" "${GATE_LINE_LOG_FILE}"
 
-  if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
-    break
+    set +e
+    run_codex_attempt "${AUTH_LINE_PROMPT_FILE}" "${AUTH_LINE_MESSAGE_FILE}" "${AUTH_LINE_LOG_FILE}" "${CURRENT_MODEL}" &
+    AUTH_PID=$!
+    run_codex_attempt "${GATE_LINE_PROMPT_FILE}" "${GATE_LINE_MESSAGE_FILE}" "${GATE_LINE_LOG_FILE}" "${CURRENT_MODEL}" &
+    GATE_PID=$!
+    wait "${AUTH_PID}"
+    AUTH_LINE_EXIT_CODE=$?
+    wait "${GATE_PID}"
+    GATE_LINE_EXIT_CODE=$?
+    set -e
+
+    cat "${AUTH_LINE_LOG_FILE}" >> "${RAW_LOG_FILE}" 2>/dev/null || true
+    cat "${GATE_LINE_LOG_FILE}" >> "${RAW_LOG_FILE}" 2>/dev/null || true
+
+    ADMIN_AUTH_EXIT_CODE="${AUTH_LINE_EXIT_CODE}"
+    if [[ ${AUTH_LINE_EXIT_CODE} -eq 0 && ${GATE_LINE_EXIT_CODE} -eq 0 && -s "${AUTH_LINE_MESSAGE_FILE}" && -s "${GATE_LINE_MESSAGE_FILE}" ]]; then
+      {
+        echo "# 线 A 结果"
+        cat "${AUTH_LINE_MESSAGE_FILE}"
+        echo
+        echo "# 线 B 结果"
+        cat "${GATE_LINE_MESSAGE_FILE}"
+      } > "${LAST_MESSAGE_FILE}"
+      EXIT_CODE=0
+      break
+    fi
+
+    EXIT_CODE=1
+    TRANSIENT_ERROR_HINT="$(rg -m 1 'high demand|stream disconnected|Reconnecting|temporary errors|no last agent message' "${RAW_LOG_FILE}" 2>/dev/null || true)"
+  else
+    CODEX_CMD=(
+      "${CODEX_BIN}"
+      exec
+      --ephemeral
+      -c 'model_reasoning_effort="low"'
+      -m "${CURRENT_MODEL}"
+      --dangerously-bypass-approvals-and-sandbox
+      -C "${PROJECT_ROOT}"
+      -o "${LAST_MESSAGE_FILE}"
+    )
+    if [[ "${ENABLE_MULTI_AGENT}" != "1" ]]; then
+      CODEX_CMD+=(--disable multi_agent)
+    fi
+
+    set +e
+    python3 "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TIMEOUT_SECONDS}" "${CODEX_CMD[@]}" - \
+      < "${RUN_DIR}/prompt.txt" 2>&1 | tee -a "${RAW_LOG_FILE}"
+    EXIT_CODE=${PIPESTATUS[0]}
+    set -e
+
+    if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
+      break
+    fi
+
+    TRANSIENT_ERROR_HINT="$(rg -m 1 'high demand|stream disconnected|Reconnecting|temporary errors|no last agent message' "${RAW_LOG_FILE}" 2>/dev/null || true)"
   fi
 
-  TRANSIENT_ERROR_HINT="$(rg -m 1 'high demand|stream disconnected|Reconnecting|temporary errors|no last agent message' "${RAW_LOG_FILE}" 2>/dev/null || true)"
   if [[ -n "${TRANSIENT_ERROR_HINT}" && ${ATTEMPT} -lt ${MAX_RETRIES} ]]; then
     BACKOFF_SECONDS=$(( ATTEMPT * 5 ))
     echo "[$(date '+%F %T')] 检测到瞬时错误，${BACKOFF_SECONDS}s 后重试: ${TRANSIENT_ERROR_HINT}" | tee -a "${RAW_LOG_FILE}"
@@ -219,10 +314,20 @@ END_HEAD="$(git -C "${PROJECT_ROOT}" rev-parse HEAD)"
 if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
   echo "[$(date '+%F %T')] 开始执行前后端浏览器联调 smoke" | tee -a "${RAW_LOG_FILE}"
   set +e
-  bash "${POST_RUN_SMOKE_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
+  env \
+    OVERNIGHT_ADMIN_AUTOPILOT="${ADMIN_AUTOPILOT}" \
+    OVERNIGHT_ADMIN_REQUIRE_POSTGRES="${ADMIN_REQUIRE_POSTGRES}" \
+    bash "${POST_RUN_SMOKE_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
   SMOKE_EXIT_CODE=${PIPESTATUS[0]}
   set -e
   echo "SMOKE_EXIT_CODE=${SMOKE_EXIT_CODE}" >> "${META_FILE}"
+  if [[ -f "${RUN_DIR}/browser-smoke/meta.env" ]]; then
+    ADMIN_SMOKE_EXIT_CODE="$(awk -F'=' '$1=="ADMIN_SMOKE_EXIT_CODE"{print $2; exit}' "${RUN_DIR}/browser-smoke/meta.env" 2>/dev/null || echo "${SMOKE_EXIT_CODE}")"
+    ADMIN_GATE_EXIT_CODE="$(awk -F'=' '$1=="ADMIN_GATE_EXIT_CODE"{print $2; exit}' "${RUN_DIR}/browser-smoke/meta.env" 2>/dev/null || echo "${SMOKE_EXIT_CODE}")"
+  else
+    ADMIN_SMOKE_EXIT_CODE="${SMOKE_EXIT_CODE}"
+    ADMIN_GATE_EXIT_CODE="${SMOKE_EXIT_CODE}"
+  fi
   if [[ ${SMOKE_EXIT_CODE} -ne 0 ]]; then
     EXIT_CODE=${SMOKE_EXIT_CODE}
   fi
@@ -230,7 +335,9 @@ else
   echo "SMOKE_EXIT_CODE=SKIPPED" >> "${META_FILE}"
 fi
 
-if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
+echo "[$(date '+%F %T')] 后台专项状态码：ADMIN_AUTH_EXIT_CODE=${ADMIN_AUTH_EXIT_CODE} ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE} ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}" | tee -a "${RAW_LOG_FILE}"
+
+if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" && "${ADMIN_AUTOPILOT}" != "1" ]]; then
   echo "[$(date '+%F %T')] 开始执行前端跟进子代理" | tee -a "${RAW_LOG_FILE}"
   set +e
   bash "${POST_FRONTEND_FOLLOWUP_SCRIPT}" "${RUN_DIR}" "${START_HEAD}" "${END_HEAD}" 2>&1 | tee -a "${RAW_LOG_FILE}"
@@ -241,6 +348,9 @@ if [[ ${EXIT_CODE} -eq 0 && -s "${LAST_MESSAGE_FILE}" ]]; then
     EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}
   fi
 else
+  if [[ "${ADMIN_AUTOPILOT}" == "1" ]]; then
+    echo "[$(date '+%F %T')] 后台专项模式已启用，跳过公开站点前端跟进子代理" | tee -a "${RAW_LOG_FILE}"
+  fi
   echo "FRONTEND_FOLLOWUP_EXIT_CODE=SKIPPED" >> "${META_FILE}"
 fi
 
@@ -249,6 +359,9 @@ fi
   echo "EXIT_CODE=${EXIT_CODE}"
   echo "ATTEMPTS=${ATTEMPT}"
   echo "LAST_MODEL=$(model_for_attempt "${ATTEMPT}")"
+  echo "ADMIN_AUTH_EXIT_CODE=${ADMIN_AUTH_EXIT_CODE}"
+  echo "ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE}"
+  echo "ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}"
 } >> "${META_FILE}"
 
 git -C "${PROJECT_ROOT}" status --short --branch > "${RUN_DIR}/git-status.txt" || true

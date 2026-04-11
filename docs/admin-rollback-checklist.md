@@ -20,7 +20,9 @@ git checkout <上一稳定提交>
 - `output/overnight/supervisor.log`
 - `output/overnight/latest-meta.env`
 - `ADMIN_AUTH_EXIT_CODE` / `ADMIN_SMOKE_EXIT_CODE` / `ADMIN_GATE_EXIT_CODE`
+- `frontend/tests/e2e/admin-smoke.spec.ts` 是否仍为后台专项唯一 smoke 入口
 - `backend / frontend` 启动状态
 - 后台接口访问控制
-- `application.yml` / `application-test.yml` / `application-cloud-dev.yml` 是否恢复为默认禁用 dev token，且仅允许通过 `SHAREHUB_ADMIN_DEV_TOKEN_ENABLED=true` 显式开启
+- `application.yml` / `application-test.yml` / `application-cloud-dev.yml` 是否恢复为默认禁用 dev token，且仅允许通过 `SHAREHUB_ADMIN_DEV_TOKEN_ENABLED=true` 在本地、测试、cloud-dev 显式开启
 - smoke 是否仍只覆盖 `/admin`、`/admin/reports`、`/admin/reviews`、`/admin/users`、`/admin/audit-logs`
+- 小时调度日志是否仍输出 `ADMIN_AUTH_EXIT_CODE` / `ADMIN_SMOKE_EXIT_CODE` / `ADMIN_GATE_EXIT_CODE`
