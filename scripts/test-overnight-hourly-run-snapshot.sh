@@ -19,6 +19,7 @@ TEST_REMOTE="${TEST_ROOT}/remote.git"
 mkdir -p "${TEST_PROJECT}/scripts" "${TEST_PROJECT}/output/overnight/state" "${TEST_ROOT}/bin"
 
 cp "${PROJECT_ROOT}/scripts/overnight-hourly-run.sh" "${TEST_PROJECT}/scripts/overnight-hourly-run.sh"
+cp "${PROJECT_ROOT}/scripts/load-env.sh" "${TEST_PROJECT}/scripts/load-env.sh"
 cp "${PROJECT_ROOT}/scripts/run_with_timeout.py" "${TEST_PROJECT}/scripts/run_with_timeout.py"
 
 cat > "${TEST_PROJECT}/scripts/overnight-manager-prompt.md" <<'EOF'
@@ -28,7 +29,14 @@ EOF
 cat > "${TEST_PROJECT}/scripts/overnight-browser-smoke.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-echo "smoke-ok" >> "$1/smoke-ran.log"
+RUN_DIR="${1:?run dir required}"
+SMOKE_DIR="${RUN_DIR}/browser-smoke"
+mkdir -p "${SMOKE_DIR}"
+cat > "${SMOKE_DIR}/meta.env" <<'META'
+ADMIN_SMOKE_EXIT_CODE=0
+ADMIN_GATE_EXIT_CODE=0
+META
+echo "smoke-ok" >> "${RUN_DIR}/smoke-ran.log"
 EOF
 
 cat > "${TEST_ROOT}/bin/fake-codex" <<'EOF'
@@ -55,6 +63,7 @@ EOF
 
 chmod +x \
   "${TEST_PROJECT}/scripts/overnight-hourly-run.sh" \
+  "${TEST_PROJECT}/scripts/load-env.sh" \
   "${TEST_PROJECT}/scripts/overnight-browser-smoke.sh" \
   "${TEST_PROJECT}/scripts/run_with_timeout.py" \
   "${TEST_ROOT}/bin/fake-codex"
@@ -115,6 +124,9 @@ PUSH_LOG="$(find "${TEST_PROJECT}/output/overnight" -name git-push.txt -print -q
 
 grep -q 'fake codex ok' "${LATEST_MESSAGE}" || { echo "codex output missing"; exit 1; }
 grep -q 'SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "smoke exit code missing"; exit 1; }
+grep -q 'ADMIN_AUTH_EXIT_CODE=0' "${LATEST_META}" || { echo "admin auth exit code missing"; exit 1; }
+grep -q 'ADMIN_SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin smoke exit code missing"; exit 1; }
+grep -q 'ADMIN_GATE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin gate exit code missing"; exit 1; }
 grep -q 'PUSH_STATUS=SUCCESS' "${LATEST_META}" || { echo "push status missing"; exit 1; }
 grep -q 'Everything up-to-date' "${PUSH_LOG}" || { echo "push output missing"; exit 1; }
 grep -q 'CODEX_HOME=' "${LATEST_META}" || { echo "codex home missing"; exit 1; }
