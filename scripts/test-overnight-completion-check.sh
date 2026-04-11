@@ -28,6 +28,11 @@ mkdir -p \
 cp "${PROJECT_ROOT}/scripts/overnight-completion-check.py" "${TEST_PROJECT}/scripts/overnight-completion-check.py"
 chmod +x "${TEST_PROJECT}/scripts/overnight-completion-check.py"
 
+cat > "${TEST_PROJECT}/scripts/start-overnight-autopilot.sh" <<'EOF'
+#!/usr/bin/env bash
+chmod +x ./scripts/overnight-hourly-run.sh ./scripts/overnight-browser-smoke.sh
+EOF
+
 cat > "${TEST_PROJECT}/scripts/overnight-manager-prompt.md" <<'EOF'
 你是 ShareHub 项目的夜间值守经理 agent。
 
@@ -116,6 +121,10 @@ EOF
 cat > "${TEST_PROJECT}/docs/admin-rollback-checklist.md" <<'EOF'
 git checkout <上一稳定提交>
 ADMIN_GATE_EXIT_CODE
+EOF
+
+cat > "${TEST_PROJECT}/docs/overnight-autopilot.md" <<'EOF'
+后台专项模式下已禁用公开站点前端跟进子代理
 EOF
 
 cat > "${TEST_PROJECT}/backend/src/main/resources/application.yml" <<'EOF'

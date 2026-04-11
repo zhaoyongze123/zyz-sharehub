@@ -101,6 +101,13 @@ def main() -> int:
         pending,
     )
     check(
+        lacks_text(scripts_dir / "start-overnight-autopilot.sh", "overnight-frontend-followup.sh")
+        and has_text(docs_dir / "overnight-autopilot.md", "后台专项模式下已禁用公开站点前端跟进子代理"),
+        "启动入口已脱离公开站点前端跟进依赖",
+        passed,
+        pending,
+    )
+    check(
         has_text(scripts_dir / "overnight-browser-smoke.sh", "OVERNIGHT_ADMIN_AUTOPILOT")
         and has_text(scripts_dir / "overnight-browser-smoke.sh", "PLAYWRIGHT_ADMIN_USER_KEY"),
         "后台 smoke 已切到后台专项模式",

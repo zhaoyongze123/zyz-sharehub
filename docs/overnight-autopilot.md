@@ -93,6 +93,7 @@ cd /Users/mac/Documents/New\ project
 - 浏览器 smoke 会阻断非 PostgreSQL-only 生产配置
 - 浏览器 smoke 会阻断生产环境接受独立 `X-Admin-Token`
 - 后台专项模式下已禁用公开站点前端跟进子代理
+- 启动脚本不再预热或依赖 `scripts/overnight-frontend-followup.sh`
 - 每轮结束会自动 push 当前功能分支并发飞书总结
 - 如果自动化或业务阻塞导致无法继续推进，会发飞书异常通知
 
