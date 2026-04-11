@@ -1,8 +1,8 @@
-# ShareHub 部署运行手册
+# ShareHub 后台专项部署运行手册
 
 ## 目标
 
-用于把当前仓库按真实链路启动起来，并在部署或联调时快速定位问题。
+用于按后台管理生产级改造专项启动真实链路，并在部署或联调时快速定位问题。
 
 ## 启动前检查
 
@@ -39,41 +39,34 @@ npm run dev -- --host 127.0.0.1 --port 14173 --strictPort
 - 前端：`http://127.0.0.1:14173`
 - 后端：`http://127.0.0.1:18080`
 
-## 浏览器联调
+## 后台专项浏览器联调
 
-最小 smoke：
-
-```bash
-cd /Users/mac/Documents/New\ project/frontend
-PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
-PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
-npx playwright test tests/e2e/module-smoke.spec.ts
-```
-
-全站走查：
+后台专项 smoke：
 
 ```bash
 cd /Users/mac/Documents/New\ project/frontend
 PLAYWRIGHT_BASE_URL='http://127.0.0.1:14173' \
 PLAYWRIGHT_API_BASE_URL='http://127.0.0.1:18080' \
-PLAYWRIGHT_USER_KEY='playwright-user' \
-PLAYWRIGHT_ADMIN_TOKEN='dev-admin-token' \
-npx playwright test tests/e2e/full-site-walkthrough.spec.ts
+PLAYWRIGHT_ADMIN_USER_KEY='playwright-admin' \
+npx playwright test tests/e2e/admin-smoke.spec.ts
 ```
 
 说明：
 
-- `full-site-walkthrough.spec.ts` 会通过真实接口创建 1 条笔记、1 条资料、1 条路线并追加真实节点，用于页面闭环验证
-- 后台治理页依赖管理员透传头；默认联调值为 `dev-admin-token`
-- 若目标环境改了测试账号或管理员 token，需同步覆盖 `PLAYWRIGHT_USER_KEY`、`PLAYWRIGHT_ADMIN_TOKEN`
+- `admin-smoke.spec.ts` 会通过真实后台接口校验 `/admin`、`/admin/reports`、`/admin/reviews`、`/admin/users`、`/admin/audit-logs`
+- 管理员联调身份使用 `PLAYWRIGHT_ADMIN_USER_KEY`，不再依赖 `PLAYWRIGHT_ADMIN_TOKEN`
+- 若目标环境改了联调管理员账号，需同步覆盖 `PLAYWRIGHT_ADMIN_USER_KEY`
+- 生产链路必须拒绝仅携带 `X-Admin-Token` 的后台请求
+- 生产配置必须满足 PostgreSQL-only
+- 发布前需确认 `/actuator/health`、`/actuator/health/readiness`、`/actuator/health/liveness` 全部可访问
 - 若本机已存在前端开发服务，例如 `http://127.0.0.1:5173`，可直接覆盖 `PLAYWRIGHT_BASE_URL` 复用该服务执行走查
 
 最近一次本地复核：
 
-- 复核时间：2026-04-10 08:45 +0800
+- 复核时间：2026-04-12 02:26:46 +0800
 - 复核环境：前端 `http://127.0.0.1:14173`，后端 `http://127.0.0.1:18080`
-- 复核命令：`npx playwright test tests/e2e/full-site-walkthrough.spec.ts`
-- 复核结果：`tests/e2e/full-site-walkthrough.spec.ts` 7/7 通过（13.1s，本轮夜间复核）
+- 复核命令：`npx playwright test tests/e2e/admin-smoke.spec.ts`
+- 复核结果：以当前后台专项 smoke 与夜间门禁结果为准
 
 ## 夜间自动化
 
@@ -117,4 +110,4 @@ cd /Users/mac/Documents/New\ project
 
 - 先看 `output/overnight/*/browser-smoke/smoke.log`
 - 再看 `playwright-report`
-- 区分是页面断言失败、接口 4xx/5xx，还是服务未启动
+- 区分是后台页面断言失败、后台接口 4xx/5xx、PostgreSQL-only 门禁失败，还是服务未启动

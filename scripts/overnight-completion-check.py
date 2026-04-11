@@ -59,8 +59,9 @@ def main() -> int:
     pending: list[str] = []
 
     check(
-        lacks_text(scripts_dir / "overnight-manager-prompt.md", "批次 1：资源 + 路线公开读取链路")
-        and has_text(scripts_dir / "overnight-manager-prompt.md", "后台管理生产级改造专项"),
+        has_text(scripts_dir / "overnight-manager-prompt.md", "后台管理生产级改造专项")
+        and has_text(scripts_dir / "overnight-manager-prompt.md", "只推进后台管理生产级改造专项")
+        and lacks_text(scripts_dir / "overnight-manager-prompt.md", "批次 1：资源 + 路线公开读取链路"),
         "自动化 prompt 已切到后台专项",
         passed,
         pending,
