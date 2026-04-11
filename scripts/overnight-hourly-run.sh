@@ -43,6 +43,7 @@ ADMIN_SMOKE_EXIT_CODE="SKIPPED"
 ADMIN_GATE_EXIT_CODE="SKIPPED"
 ADMIN_SMOKE_SCRIPT_EXIT_CODE="SKIPPED"
 FRONTEND_FOLLOWUP_EXIT_CODE="DISABLED"
+PARALLEL_DEGRADED_REASON="none"
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
@@ -167,6 +168,7 @@ model_for_attempt() {
   echo "ADMIN_AUTOPILOT=${ADMIN_AUTOPILOT}"
   echo "ADMIN_PARALLEL_MODE=${ADMIN_PARALLEL_MODE}"
   echo "ADMIN_REQUIRE_POSTGRES=${ADMIN_REQUIRE_POSTGRES}"
+  echo "PARALLEL_DEGRADED_REASON=${PARALLEL_DEGRADED_REASON}"
 } > "${META_FILE}"
 
 {
@@ -272,6 +274,14 @@ while (( ATTEMPT <= MAX_RETRIES )); do
     EXIT_CODE=1
     TRANSIENT_ERROR_HINT="$(rg -m 1 'high demand|stream disconnected|Reconnecting|temporary errors|no last agent message' "${RAW_LOG_FILE}" 2>/dev/null || true)"
   else
+    if [[ "${ADMIN_AUTOPILOT}" != "1" ]]; then
+      PARALLEL_DEGRADED_REASON="后台专项模式未启用，退化为单线执行"
+    elif [[ "${ADMIN_PARALLEL_MODE}" != "2way" ]]; then
+      PARALLEL_DEGRADED_REASON="OVERNIGHT_ADMIN_PARALLEL_MODE=${ADMIN_PARALLEL_MODE}，未按两条工作线并行执行"
+    else
+      PARALLEL_DEGRADED_REASON="未知原因退化为单线执行"
+    fi
+    echo "[$(date '+%F %T')] 并行执行已退化：${PARALLEL_DEGRADED_REASON}" | tee -a "${RAW_LOG_FILE}"
     CODEX_CMD=(
       "${CODEX_BIN}"
       exec
@@ -353,6 +363,7 @@ echo "FRONTEND_FOLLOWUP_EXIT_CODE=${FRONTEND_FOLLOWUP_EXIT_CODE}" >> "${META_FIL
   echo "ADMIN_AUTH_EXIT_CODE=${ADMIN_AUTH_EXIT_CODE}"
   echo "ADMIN_SMOKE_EXIT_CODE=${ADMIN_SMOKE_EXIT_CODE}"
   echo "ADMIN_GATE_EXIT_CODE=${ADMIN_GATE_EXIT_CODE}"
+  echo "PARALLEL_DEGRADED_REASON=${PARALLEL_DEGRADED_REASON}"
 } >> "${META_FILE}"
 
 git -C "${PROJECT_ROOT}" status --short --branch > "${RUN_DIR}/git-status.txt" || true

@@ -127,6 +127,7 @@ grep -q 'ADMIN_AUTH_EXIT_CODE=0' "${LATEST_META}" || { echo "admin auth exit cod
 grep -q 'ADMIN_SMOKE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin smoke exit code missing"; exit 1; }
 grep -q 'ADMIN_GATE_EXIT_CODE=0' "${LATEST_META}" || { echo "admin gate exit code missing"; exit 1; }
 grep -q 'ADMIN_SMOKE_SCRIPT_EXIT_CODE=0' "${LATEST_META}" || { echo "admin smoke script exit code missing"; exit 1; }
+grep -q 'PARALLEL_DEGRADED_REASON=none' "${LATEST_META}" || { echo "parallel degraded reason missing"; exit 1; }
 ! grep -q '^SMOKE_EXIT_CODE=' "${LATEST_META}" || { echo "legacy smoke exit code should be absent"; exit 1; }
 grep -q 'FRONTEND_FOLLOWUP_EXIT_CODE=DISABLED' "${LATEST_META}" || { echo "frontend followup disable flag missing"; exit 1; }
 grep -q 'PUSH_STATUS=SUCCESS' "${LATEST_META}" || { echo "push status missing"; exit 1; }
