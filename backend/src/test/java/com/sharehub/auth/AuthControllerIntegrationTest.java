@@ -86,6 +86,17 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void shouldNotExposeAdminFlagForRevokedAdminAccount() throws Exception {
+        String adminLogin = "revoked-auth-admin";
+        revokeAdmin(adminLogin);
+
+        mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, adminLogin))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(adminLogin))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
+    }
+
+    @Test
     void shouldPersistAvatarIntoUserProfile() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",
@@ -265,6 +276,20 @@ class AuthControllerIntegrationTest {
             login,
             "auth-test",
             "auth integration test"
+        );
+    }
+
+    private void revokeAdmin(String login) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO admin_accounts (
+                    user_login, status, granted_by, granted_at, revoked_by, revoked_at, remark, created_at, updated_at
+                ) VALUES (?, 'REVOKED', ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            login,
+            "auth-test",
+            "security-audit",
+            "revoked auth integration test"
         );
     }
 }

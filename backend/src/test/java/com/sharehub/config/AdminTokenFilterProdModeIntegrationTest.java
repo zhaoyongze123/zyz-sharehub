@@ -91,6 +91,21 @@ class AdminTokenFilterProdModeIntegrationTest {
             .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
     }
 
+    @Test
+    void shouldRejectRevokedOauthAdminWhenDevTokenModeDisabled() throws Exception {
+        revokeAdmin(ADMIN_LOGIN);
+
+        mockMvc.perform(
+                get("/api/admin/reports")
+                    .with(oauth2Login().attributes(attributes -> {
+                        attributes.put("login", ADMIN_LOGIN);
+                        attributes.put("name", "Revoked OAuth Admin");
+                    }))
+            )
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(AdminTokenFilter.ADMIN_TOKEN_REQUIRED));
+    }
+
     private void grantAdmin(String login) {
         jdbcTemplate.update(
             """
@@ -101,6 +116,28 @@ class AdminTokenFilterProdModeIntegrationTest {
             login,
             "prod-mode-test",
             "prod mode admin"
+        );
+    }
+
+    private void revokeAdmin(String login) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO admin_accounts (
+                    user_login, status, granted_by, granted_at, revoked_by, revoked_at, remark, created_at, updated_at
+                ) VALUES (?, 'REVOKED', ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_login) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    granted_by = EXCLUDED.granted_by,
+                    granted_at = EXCLUDED.granted_at,
+                    revoked_by = EXCLUDED.revoked_by,
+                    revoked_at = EXCLUDED.revoked_at,
+                    remark = EXCLUDED.remark,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+            login,
+            "prod-mode-test",
+            "security-audit",
+            "revoked prod mode admin"
         );
     }
 }
