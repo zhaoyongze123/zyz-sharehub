@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -134,6 +135,43 @@ class AuthControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.login").value(adminLogin))
             .andExpect(jsonPath("$.data.name").value("Revoked OAuth Auth Admin"))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
+    }
+
+    @Test
+    void shouldNotExposeAdminFlagForElevatedOauthUserOutsideWhitelist() throws Exception {
+        String elevatedLogin = "elevated-but-not-whitelisted";
+
+        mockMvc.perform(
+                get("/api/auth/me")
+                    .with(oauth2Login()
+                        .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
+                        .attributes(attributes -> {
+                            attributes.put("login", elevatedLogin);
+                            attributes.put("name", "Elevated Plain OAuth User");
+                        }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(elevatedLogin))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
+    }
+
+    @Test
+    void shouldNotExposeAdminFlagForElevatedRevokedOauthAdmin() throws Exception {
+        String adminLogin = "elevated-revoked-oauth-admin";
+        revokeAdmin(adminLogin);
+
+        mockMvc.perform(
+                get("/api/auth/me")
+                    .with(oauth2Login()
+                        .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
+                        .attributes(attributes -> {
+                            attributes.put("login", adminLogin);
+                            attributes.put("name", "Elevated Revoked OAuth Admin");
+                        }))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(adminLogin))
             .andExpect(jsonPath("$.data.isAdmin").value(false));
     }
 

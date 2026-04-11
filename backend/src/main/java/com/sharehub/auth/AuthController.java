@@ -10,7 +10,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -118,13 +117,6 @@ public class AuthController {
     private boolean isAdminSession(Authentication authentication, String login) {
         if (authentication == null) {
             return false;
-        }
-
-        boolean alreadyElevated = authentication.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .anyMatch("ROLE_SUPER_ADMIN"::equals);
-        if (alreadyElevated) {
-            return true;
         }
 
         if (authentication.getPrincipal() instanceof OAuth2User) {
