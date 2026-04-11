@@ -94,6 +94,8 @@ def main() -> int:
     )
     check(
         has_text(scripts_dir / "overnight-browser-smoke.sh", 'PLAYWRIGHT_MODULES:-admin,backend')
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "后台专项 smoke 仅允许 admin/backend 模块")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "validate_admin_modules")
         and lacks_text(scripts_dir / "overnight-browser-smoke.sh", "FULL_WALKTHROUGH_ENABLED")
         and lacks_text(scripts_dir / "overnight-browser-smoke.sh", "full-site-walkthrough.spec.ts"),
         "后台 smoke 只聚焦后台模块，不再触发全站走查",
@@ -125,6 +127,15 @@ def main() -> int:
         has_text(scripts_dir / "overnight-browser-smoke.sh", "/actuator/health/readiness")
         and has_text(scripts_dir / "overnight-browser-smoke.sh", "/actuator/health/liveness"),
         "后台 smoke 已纳入 readiness/liveness probes",
+        passed,
+        pending,
+    )
+    check(
+        has_text(scripts_dir / "overnight-browser-smoke.sh", 'record_failure "${label} 未返回 status=UP"')
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", 'check_health_status_up "${BACKEND_BASE_URL}/actuator/health"')
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", 'check_health_status_up "${BACKEND_BASE_URL}/actuator/health/readiness"')
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", 'check_health_status_up "${BACKEND_BASE_URL}/actuator/health/liveness"'),
+        "后台 smoke 会校验 health/readiness/liveness 返回 UP",
         passed,
         pending,
     )
@@ -161,6 +172,13 @@ def main() -> int:
         and has_text(tests / "admin-smoke.spec.ts", "await page.goto('/admin/users')")
         and has_text(tests / "admin-smoke.spec.ts", "browserFetch(page, '/api/admin/reports?page=1&pageSize=20'"),
         "后台页面真接口验收覆盖 admin/reports/reviews/users/audit-logs",
+        passed,
+        pending,
+    )
+    check(
+        has_text(scripts_dir / "overnight-browser-smoke.sh", "后台 smoke 缺少后台页面验收路由")
+        and has_text(scripts_dir / "overnight-browser-smoke.sh", "validate_admin_scope"),
+        "后台门禁会阻断缺失的后台页面验收路由",
         passed,
         pending,
     )

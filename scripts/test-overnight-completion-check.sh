@@ -49,9 +49,17 @@ cat > "${TEST_PROJECT}/scripts/overnight-browser-smoke.sh" <<'EOF'
 export OVERNIGHT_ADMIN_AUTOPILOT=1
 export PLAYWRIGHT_ADMIN_USER_KEY=playwright-admin
 export PLAYWRIGHT_MODULES="${PLAYWRIGHT_MODULES:-admin,backend}"
+echo "validate_admin_modules"
+echo "后台专项 smoke 仅允许 admin/backend 模块"
+echo "validate_admin_scope"
+echo "后台 smoke 缺少后台页面验收路由"
 echo "ADMIN_SMOKE_SCRIPT_EXIT_CODE"
 echo "/actuator/health/readiness"
 echo "/actuator/health/liveness"
+echo 'record_failure "${label} 未返回 status=UP"'
+echo 'check_health_status_up "${BACKEND_BASE_URL}/actuator/health"'
+echo 'check_health_status_up "${BACKEND_BASE_URL}/actuator/health/readiness"'
+echo 'check_health_status_up "${BACKEND_BASE_URL}/actuator/health/liveness"'
 echo "application.yml 未将 dev token 默认设为关闭且仅允许显式开启"
 echo "application-cloud-dev.yml 未将 dev token 默认设为关闭且仅允许显式开启"
 echo "application-test.yml 未将 dev token 默认设为关闭且仅允许显式开启"

@@ -86,6 +86,52 @@ has_line() {
   rg -q "${pattern}" "${path}"
 }
 
+check_health_status_up() {
+  local url="$1"
+  local label="$2"
+  local body
+  body="$(curl -fsS "${url}" 2>/dev/null || true)"
+  if [[ "${body}" != *'"status":"UP"'* ]]; then
+    record_failure "${label} 未返回 status=UP"
+    return 1
+  fi
+}
+
+validate_admin_modules() {
+  local raw_modules="$1"
+  local parsed_modules=()
+  IFS=',' read -r -a parsed_modules <<< "${raw_modules}"
+  for module in "${parsed_modules[@]}"; do
+    local normalized
+    normalized="${module//[[:space:]]/}"
+    [[ -z "${normalized}" ]] && continue
+    case "${normalized}" in
+      admin|backend)
+        ;;
+      *)
+        gate_check "后台专项 smoke 仅允许 admin/backend 模块，检测到非法模块：${normalized}"
+        ;;
+    esac
+  done
+}
+
+validate_admin_scope() {
+  local spec_file="${FRONTEND_DIR}/tests/e2e/admin-smoke.spec.ts"
+  local route
+
+  for route in "${ADMIN_ALLOWED_ROUTES[@]}"; do
+    if ! has_line "${spec_file}" "await page\\.goto\\('${route//\//\\/}'\\)"; then
+      gate_check "后台 smoke 缺少后台页面验收路由：${route}"
+    fi
+  done
+
+  if rg -q "/admin/taxonomy|/resources|/roadmaps|/publish|/notes|/me|full-site-walkthrough\\.spec\\.ts" \
+    "${spec_file}" \
+    "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"; then
+    gate_check "后台 smoke 仍包含非专项页面或全站走查"
+  fi
+}
+
 can_use_cloud_dev() {
   if [[ "${OVERNIGHT_BACKEND_MODE}" != "cloud-dev" ]]; then
     return 1
@@ -194,6 +240,7 @@ MODULES="${PLAYWRIGHT_MODULES:-admin,backend}"
 log "本轮浏览器 smoke 模块：${MODULES}"
 log "后台专项目标页面：${ADMIN_ALLOWED_ROUTES[*]}"
 log "后台专项 smoke 用例：${ADMIN_SMOKE_SPECS[*]}"
+validate_admin_modules "${MODULES}"
 
 kill_port_process "${BACKEND_PORT}"
 kill_port_process "${FRONTEND_PORT}"
@@ -222,15 +269,27 @@ if ! wait_for_stable_url "${BACKEND_BASE_URL}/actuator/health" "${BACKEND_PID}" 
   exit 1
 fi
 
+if ! check_health_status_up "${BACKEND_BASE_URL}/actuator/health" "后端健康检查"; then
+  exit 1
+fi
+
 LAST_HEALTH_STAGE="readiness"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/readiness" "${BACKEND_PID}" "后端 readiness" 60 2; then
   record_failure "后端 readiness 检查失败，请查看 ${BACKEND_LOG}"
   exit 1
 fi
 
+if ! check_health_status_up "${BACKEND_BASE_URL}/actuator/health/readiness" "后端 readiness probe"; then
+  exit 1
+fi
+
 LAST_HEALTH_STAGE="liveness"
 if ! wait_for_url "${BACKEND_BASE_URL}/actuator/health/liveness" "${BACKEND_PID}" "后端 liveness" 60 2; then
   record_failure "后端 liveness 检查失败，请查看 ${BACKEND_LOG}"
+  exit 1
+fi
+
+if ! check_health_status_up "${BACKEND_BASE_URL}/actuator/health/liveness" "后端 liveness probe"; then
   exit 1
 fi
 
@@ -256,6 +315,8 @@ export PLAYWRIGHT_MODULES="${MODULES}"
 export PLAYWRIGHT_ADMIN_USER_KEY="${PLAYWRIGHT_ADMIN_USER_KEY:-playwright-admin}"
 export PLAYWRIGHT_HTML_REPORT="${SMOKE_DIR}/playwright-report"
 export VITE_API_PROXY_TARGET="${BACKEND_BASE_URL}"
+
+validate_admin_scope
 
 log "开始执行 Playwright smoke"
 set +e
@@ -335,12 +396,6 @@ if [[ "${ADMIN_AUTOPILOT_MODE}" == "1" ]]; then
 
   if rg -q "PLAYWRIGHT_ADMIN_TOKEN" "${FRONTEND_DIR}/tests/e2e/admin-smoke.spec.ts"; then
     gate_check "后台 Playwright 仍依赖 PLAYWRIGHT_ADMIN_TOKEN"
-  fi
-
-  if rg -q "/admin/taxonomy|/resources|/roadmaps|/publish|full-site-walkthrough\\.spec\\.ts" \
-    "${FRONTEND_DIR}/tests/e2e/admin-smoke.spec.ts" \
-    "${PROJECT_ROOT}/scripts/overnight-browser-smoke.sh"; then
-    gate_check "后台 smoke 仍包含非专项页面或全站走查"
   fi
 fi
 
