@@ -72,6 +72,8 @@ public class SecurityConfig {
         }
 
         String appEnv = environment.getProperty("sharehub.app-env", "local");
-        return !"production".equalsIgnoreCase(appEnv);
+        return "local".equalsIgnoreCase(appEnv)
+            || "test".equalsIgnoreCase(appEnv)
+            || "cloud-dev".equalsIgnoreCase(appEnv);
     }
 }

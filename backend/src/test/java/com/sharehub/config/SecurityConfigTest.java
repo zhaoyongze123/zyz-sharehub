@@ -26,6 +26,24 @@ class SecurityConfigTest {
     }
 
     @Test
+    void shouldKeepAdminDevTokenEnabledInTestWhenConfigured() {
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("sharehub.app-env", "test")
+            .withProperty("sharehub.admin.dev-token-enabled", "true");
+
+        assertThat(SecurityConfig.isAdminDevTokenEnabled(environment)).isTrue();
+    }
+
+    @Test
+    void shouldDisableAdminDevTokenInStagingEvenWhenConfigured() {
+        MockEnvironment environment = new MockEnvironment()
+            .withProperty("sharehub.app-env", "staging")
+            .withProperty("sharehub.admin.dev-token-enabled", "true");
+
+        assertThat(SecurityConfig.isAdminDevTokenEnabled(environment)).isFalse();
+    }
+
+    @Test
     void shouldKeepAdminDevTokenDisabledWhenNotConfigured() {
         MockEnvironment environment = new MockEnvironment()
             .withProperty("sharehub.app-env", "local");
