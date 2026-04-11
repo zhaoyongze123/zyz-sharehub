@@ -63,7 +63,17 @@ public class SecurityConfig {
         RequestAccessService requestAccessService
     ) {
         String token = environment.getProperty("sharehub.admin.token", AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
-        boolean devTokenEnabled = environment.getProperty("sharehub.admin.dev-token-enabled", Boolean.class, false);
+        boolean devTokenEnabled = isAdminDevTokenEnabled(environment);
         return new AdminTokenFilter(token, devTokenEnabled, adminAccountRepository, requestAccessService);
+    }
+
+    static boolean isAdminDevTokenEnabled(Environment environment) {
+        boolean configured = environment.getProperty("sharehub.admin.dev-token-enabled", Boolean.class, false);
+        if (!configured) {
+            return false;
+        }
+
+        String appEnv = environment.getProperty("sharehub.app-env", "local");
+        return !"production".equalsIgnoreCase(appEnv);
     }
 }
