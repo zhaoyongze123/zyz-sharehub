@@ -161,6 +161,46 @@ grep -q '后台专项所有机器可判定检查项均已满足' "${TEST_ROOT}/c
   exit 1
 }
 
+cat >> "${TEST_PROJECT}/scripts/overnight-manager-prompt.md" <<'EOF'
+- 不再推进公开站点
+EOF
+
+python3 "${TEST_PROJECT}/scripts/overnight-completion-check.py" \
+  --project-root "${TEST_PROJECT}" \
+  --output "${OUTPUT_FILE}" || PROMPT_EXIT_CODE=$?
+
+PROMPT_EXIT_CODE="${PROMPT_EXIT_CODE:-0}"
+[[ "${PROMPT_EXIT_CODE}" -eq 1 ]] || {
+  KEEP_TEST_ROOT=1
+  echo "expected prompt scope completion check to exit with code 1"
+  echo "PROMPT_EXIT_CODE=${PROMPT_EXIT_CODE}"
+  cat "${OUTPUT_FILE}"
+  cat "${TEST_ROOT}/completion-summary.txt"
+  exit 1
+}
+
+grep -q '^PENDING_COUNT=1$' "${OUTPUT_FILE}" || {
+  KEEP_TEST_ROOT=1
+  echo "expected PENDING_COUNT=1 after polluting manager prompt scope"
+  cat "${OUTPUT_FILE}"
+  cat "${TEST_ROOT}/completion-summary.txt"
+  exit 1
+}
+
+grep -q '自动化 prompt 已切到后台专项' "${TEST_ROOT}/completion-summary.txt" || {
+  KEEP_TEST_ROOT=1
+  echo "expected prompt scope check in summary"
+  cat "${TEST_ROOT}/completion-summary.txt"
+  exit 1
+}
+
+cat > "${TEST_PROJECT}/scripts/overnight-manager-prompt.md" <<'EOF'
+你是 ShareHub 项目的夜间值守经理 agent。
+
+目标：
+- 只推进后台管理生产级改造专项，不再推进公开站点、资源广场、路线广场、笔记详情、发布页或全站走查。
+EOF
+
 python3 - "${TEST_PROJECT}/output/overnight/latest-meta.env" <<'PY'
 from pathlib import Path
 import sys

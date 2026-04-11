@@ -15,6 +15,27 @@ def lacks_text(path: Path, needle: str) -> bool:
     return needle not in read_text(path)
 
 
+def manager_prompt_is_admin_only(path: Path) -> bool:
+    text = read_text(path)
+    allowed_boundary_lines = (
+        "只推进后台管理生产级改造专项，不再推进公开站点、资源广场、路线广场、笔记详情、发布页或全站走查。",
+        "只能从后台专项待办里选任务，禁止跨到公开站点或全站走查。",
+    )
+    sanitized = text
+    for line in allowed_boundary_lines:
+        sanitized = sanitized.replace(line, "")
+    forbidden_terms = (
+        "公开站点",
+        "资源广场",
+        "路线广场",
+        "笔记详情",
+        "发布页",
+        "全站走查",
+        "批次 1：资源 + 路线公开读取链路",
+    )
+    return all(term not in sanitized for term in forbidden_terms)
+
+
 def env_value(path: Path, key: str) -> str:
     if not path.exists():
         return ""
@@ -57,11 +78,12 @@ def main() -> int:
 
     passed: list[str] = []
     pending: list[str] = []
+    manager_prompt = scripts_dir / "overnight-manager-prompt.md"
 
     check(
-        has_text(scripts_dir / "overnight-manager-prompt.md", "后台管理生产级改造专项")
-        and has_text(scripts_dir / "overnight-manager-prompt.md", "只推进后台管理生产级改造专项")
-        and lacks_text(scripts_dir / "overnight-manager-prompt.md", "批次 1：资源 + 路线公开读取链路"),
+        has_text(manager_prompt, "后台管理生产级改造专项")
+        and has_text(manager_prompt, "只推进后台管理生产级改造专项")
+        and manager_prompt_is_admin_only(manager_prompt),
         "自动化 prompt 已切到后台专项",
         passed,
         pending,
