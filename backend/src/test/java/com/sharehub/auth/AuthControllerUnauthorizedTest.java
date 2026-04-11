@@ -14,7 +14,12 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties = "sharehub.auth.require-login=true")
+@SpringBootTest(
+    properties = {
+        "sharehub.auth.require-login=true",
+        "sharehub.auth.dev-user-header-enabled=false"
+    }
+)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerUnauthorizedTest {
@@ -25,6 +30,15 @@ class AuthControllerUnauthorizedTest {
     @Test
     void returnsUnauthorizedWhenAccessingProfileWithoutLogin() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"))
+            .andExpect(jsonPath("$.message").value("NOT_LOGGED_IN"));
+    }
+
+    @Test
+    void returnsUnauthorizedWhenDevUserHeaderDisabled() throws Exception {
+        mockMvc.perform(get("/api/auth/me").header(RequestAccessService.USER_KEY_HEADER, "spoofed-user"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"))

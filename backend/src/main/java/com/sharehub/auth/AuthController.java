@@ -7,8 +7,11 @@ import com.sharehub.files.StoredFileDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,15 +26,18 @@ public class AuthController {
     private final FileStorageService fileStorageService;
     private final UserProfileRepository userProfileRepository;
     private final RequestAccessService requestAccessService;
+    private final boolean devUserHeaderEnabled;
 
     public AuthController(
         FileStorageService fileStorageService,
         UserProfileRepository userProfileRepository,
-        RequestAccessService requestAccessService
+        RequestAccessService requestAccessService,
+        @Value("${sharehub.auth.dev-user-header-enabled:false}") boolean devUserHeaderEnabled
     ) {
         this.fileStorageService = fileStorageService;
         this.userProfileRepository = userProfileRepository;
         this.requestAccessService = requestAccessService;
+        this.devUserHeaderEnabled = devUserHeaderEnabled;
     }
 
     @GetMapping("/github/login")
@@ -50,11 +56,11 @@ public class AuthController {
 
     @GetMapping("/me")
     public ApiResponse<UserProfileDto> me(Authentication authentication, HttpServletRequest request) {
-        String login = requestAccessService.requireUser(authentication, request);
+        String login = requireAuthUser(authentication, request);
         String name = resolveName(authentication, login);
-        UserProfileDto profile = userProfileRepository.upsert(login, name, null);
+        userProfileRepository.upsert(login, name, null);
         userProfileRepository.ensureActive(login);
-        return ApiResponse.ok(profile);
+        return ApiResponse.ok(userProfileRepository.findByLogin(login));
     }
 
     @PostMapping("/logout")
@@ -68,7 +74,7 @@ public class AuthController {
         HttpServletRequest request,
         @RequestPart("file") MultipartFile file
     ) {
-        String owner = requestAccessService.requireUser(authentication, request);
+        String owner = requireAuthUser(authentication, request);
         userProfileRepository.upsert(owner, resolveName(authentication, owner), null);
         userProfileRepository.ensureActive(owner);
         StoredFileDto stored = fileStorageService.storeMultipart(owner, FileCategory.AVATAR, "USER_AVATAR", owner, file);
@@ -84,6 +90,15 @@ public class AuthController {
             }
         }
         return fallback;
+    }
+
+    private String requireAuthUser(Authentication authentication, HttpServletRequest request) {
+        boolean usesDevUserHeader = request != null && request.getHeader(RequestAccessService.USER_KEY_HEADER) != null;
+        boolean oauthAuthenticated = authentication != null && authentication.getPrincipal() instanceof OAuth2User;
+        if (usesDevUserHeader && !devUserHeaderEnabled && !oauthAuthenticated) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "NOT_LOGGED_IN");
+        }
+        return requestAccessService.requireUser(authentication, request);
     }
 
 }

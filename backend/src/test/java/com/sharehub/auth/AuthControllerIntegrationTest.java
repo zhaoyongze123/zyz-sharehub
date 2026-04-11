@@ -1,5 +1,6 @@
 package com.sharehub.auth;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -25,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "sharehub.auth.dev-user-header-enabled=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerIntegrationTest {
@@ -43,6 +44,11 @@ class AuthControllerIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @BeforeEach
+    void cleanupAdminAccounts() {
+        jdbcTemplate.update("DELETE FROM admin_accounts");
+    }
 
     @Test
     void shouldReturnCurrentUserProfileWhenUserHeaderProvided() throws Exception {
