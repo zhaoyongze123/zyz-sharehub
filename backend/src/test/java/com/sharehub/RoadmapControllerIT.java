@@ -3,6 +3,7 @@ package com.sharehub;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 @SpringBootTest
@@ -25,15 +28,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @Transactional
 public class RoadmapControllerIT {
 
+  private static final String USER_KEY = "roadmap-it-user";
+
   @Autowired
   private MockMvc mvc;
 
   @Autowired
   private ObjectMapper objectMapper;
 
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
+
   @BeforeEach
   void cleanup() throws Exception {
-    // ensure database schema exists before tests run (roadmap repository handles DDL)
+    jdbcTemplate.update("DELETE FROM files");
+    jdbcTemplate.update("DELETE FROM roadmap_progress");
+    jdbcTemplate.update("DELETE FROM roadmap_nodes");
+    jdbcTemplate.update("DELETE FROM roadmaps");
+    jdbcTemplate.update("DELETE FROM users");
     mvc.perform(get("/api/roadmaps?page=1&pageSize=1"));
   }
 
@@ -62,12 +74,13 @@ public class RoadmapControllerIT {
     Map<String, Object> payload = Map.of("percent", 50, "completedNodeIds", new long[] {1});
     mvc.perform(
             post("/api/roadmaps/" + roadmapId + "/progress")
+                .header("X-User-Key", USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
         .andReturn();
 
     MvcResult detail =
-        mvc.perform(get("/api/roadmaps/" + roadmapId)).andReturn();
+        mvc.perform(get("/api/roadmaps/" + roadmapId).header("X-User-Key", USER_KEY)).andReturn();
     JsonNode node =
         objectMapper.readTree(detail.getResponse().getContentAsString(StandardCharsets.UTF_8));
     JsonNode responseData = node.get("data");
@@ -82,17 +95,19 @@ public class RoadmapControllerIT {
 
     mvc.perform(
             post("/api/roadmaps/" + roadmapId + "/progress")
+                .header("X-User-Key", USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("percent", 10))))
         .andReturn();
 
     mvc.perform(
             post("/api/roadmaps/" + roadmapId + "/progress")
+                .header("X-User-Key", USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("percent", 95))))
         .andReturn();
 
-    MvcResult detail = mvc.perform(get("/api/roadmaps/" + roadmapId)).andReturn();
+    MvcResult detail = mvc.perform(get("/api/roadmaps/" + roadmapId).header("X-User-Key", USER_KEY)).andReturn();
     JsonNode node =
         objectMapper.readTree(detail.getResponse().getContentAsString(StandardCharsets.UTF_8));
     JsonNode progress = node.get("data").get("progress");
@@ -104,6 +119,7 @@ public class RoadmapControllerIT {
         objectMapper.readTree(
             mvc.perform(
                     post("/api/roadmaps")
+                        .header("X-User-Key", USER_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                             objectMapper.writeValueAsString(
@@ -115,12 +131,16 @@ public class RoadmapControllerIT {
   }
 
   private void addNode(long roadmapId, String title, Long parent, int orderNo) throws Exception {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("title", title);
+    payload.put("description", "desc");
+    payload.put("orderNo", orderNo);
+    payload.put("parentId", parent);
     mvc.perform(
             post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header("X-User-Key", USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    objectMapper.writeValueAsString(
-                        Map.of("parentId", parent, "title", title, "orderNo", orderNo))))
+                .content(objectMapper.writeValueAsString(payload)))
         .andReturn();
   }
 }

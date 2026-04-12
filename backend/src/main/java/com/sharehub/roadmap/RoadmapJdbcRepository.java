@@ -162,15 +162,17 @@ public class RoadmapJdbcRepository {
 
   public List<RoadmapNodeDto> findNodes(Long roadmapId) {
     return jdbc.query(
-        "SELECT id, parent_id, title, order_no, resource_id, note_id FROM roadmap_nodes WHERE roadmap_id = ? ORDER BY order_no NULLS LAST, id",
+        "SELECT id, parent_id, title, description, order_no, resource_id, note_id FROM roadmap_nodes WHERE roadmap_id = ? ORDER BY order_no NULLS LAST, id",
         (rs, rowNum) ->
             new RoadmapNodeDto(
                 rs.getLong("id"),
                 nullableLong(rs, "parent_id"),
                 rs.getString("title"),
+                rs.getString("description"),
                 rs.getObject("order_no") == null ? null : rs.getInt("order_no"),
                 nullableLong(rs, "resource_id"),
-                nullableLong(rs, "note_id")),
+                nullableLong(rs, "note_id"),
+                List.of()),
         roadmapId);
   }
 
@@ -182,20 +184,37 @@ public class RoadmapJdbcRepository {
             connection -> {
               PreparedStatement statement =
                   connection.prepareStatement(
-                      "INSERT INTO roadmap_nodes (roadmap_id, parent_id, title, order_no, resource_id, note_id) VALUES (?, ?, ?, ?, ?, ?)");
+                      "INSERT INTO roadmap_nodes (roadmap_id, parent_id, title, description, order_no, resource_id, note_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
               statement.setLong(1, roadmapId);
               bindLong(statement, 2, req.parentId());
               statement.setString(3, req.title());
+              statement.setString(4, req.description());
               if (req.orderNo() == null) {
-                statement.setNull(4, java.sql.Types.INTEGER);
+                statement.setNull(5, java.sql.Types.INTEGER);
               } else {
-                statement.setInt(4, req.orderNo());
+                statement.setInt(5, req.orderNo());
               }
-              bindLong(statement, 5, req.resourceId());
-              bindLong(statement, 6, req.noteId());
+              bindLong(statement, 6, req.resourceId());
+              bindLong(statement, 7, req.noteId());
               return statement;
             });
     return findNodes(roadmapId);
+  }
+
+  public boolean existsOwnedNode(Long roadmapId, Long nodeId, String ownerKey) {
+    Integer count =
+        jdbc.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM roadmap_nodes n
+                JOIN roadmaps r ON r.id = n.roadmap_id
+                WHERE n.id = ? AND n.roadmap_id = ? AND r.owner_key = ?
+                """,
+            Integer.class,
+            nodeId,
+            roadmapId,
+            ownerKey);
+    return count != null && count > 0;
   }
 
   @Transactional

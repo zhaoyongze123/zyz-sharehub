@@ -320,6 +320,7 @@
 - `POST /api/roadmaps`
 - `GET /api/roadmaps/{id}`
 - `POST /api/roadmaps/{id}/nodes`
+- `POST /api/roadmaps/{id}/nodes/{nodeId}/attachments`
 - `POST /api/roadmaps/{id}/progress`
 
 当前状态：
@@ -329,11 +330,22 @@
 - `POST /api/roadmaps`、`POST /api/roadmaps/{id}/nodes`、`POST /api/roadmaps/{id}/progress` 未带用户身份时统一返回 `401 NOT_LOGGED_IN`
 - 上述 3 个写接口在请求用户已被封禁时统一返回 `403 USER_BANNED`
 - `POST /api/roadmaps` 创建后的 owner 为当前请求用户
-- `POST /api/roadmaps/{id}/nodes`、`POST /api/roadmaps/{id}/progress` 只允许当前 owner 操作；非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
+- `POST /api/roadmaps/{id}/nodes`、`POST /api/roadmaps/{id}/nodes/{nodeId}/attachments`、`POST /api/roadmaps/{id}/progress` 只允许当前 owner 操作；非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
 - `GET /api/roadmaps/{id}` 的 `progress` 按当前请求用户读取；未登录、未写入进度或切换到其他用户时返回空对象；如果请求里显式带了已封禁用户，则返回 `403 USER_BANNED`
 - `GET /api/roadmaps/{id}` 仅在路线不存在时返回 `404 ROADMAP_NOT_FOUND`
-- 节点树与进度已持久化
+- 节点标题、描述、顺序与进度已持久化
+- 节点附件通过 `files` 表持久化，按 `referenceType=ROADMAP_NODE` 与 `category=ROADMAP_NODE_ATTACHMENT` 绑定
 - 列表筛选仍较弱，暂未覆盖前端清单中的标签筛选
+
+### 6.1 `POST /api/roadmaps/{id}/nodes/{nodeId}/attachments`
+
+真实行为：
+
+- 需要当前用户身份
+- 只允许路线 owner 上传节点附件
+- 使用 `multipart/form-data`
+- 成功后返回附件元数据，包含 `downloadUrl`
+- 文件内容直接写入 `PostgreSQL files`
 
 ## 7. 文件存储模块
 
@@ -354,7 +366,7 @@
 
 - 使用 `multipart/form-data`
 - 必填参数：`owner`、`category`、`referenceType`、`referenceId`、`file`
-- `category` 当前真实枚举：`AVATAR`、`RESOURCE_ATTACHMENT`、`RESUME_PDF`
+- `category` 当前真实枚举：`AVATAR`、`RESOURCE_ATTACHMENT`、`ROADMAP_NODE_ATTACHMENT`、`RESUME_PDF`
 - 校验文件非空、文件名存在、引用归属存在、大小不超过 `5MB`
 - 成功后返回文件元数据，`downloadUrl` 形如 `/api/files/{uuid}`，返回体中的 `contentType` 始终有值；上传缺省或非法时回落为 `application/octet-stream`
 
@@ -512,14 +524,20 @@
 - `POST /api/resources/{id}/like`
 - `DELETE /api/resources/{id}/like`
 - `GET /api/resources/{id}/interactions`
+- `GET /api/notes/{id}/interactions`
+- `POST /api/notes/{id}/favorite`
+- `DELETE /api/notes/{id}/favorite`
+- `POST /api/notes/{id}/like`
+- `DELETE /api/notes/{id}/like`
 - `POST /api/reports`
 
 当前边界：
 
 - 评论、收藏、点赞主要围绕 `RESOURCE`
+- 笔记互动统计、收藏、点赞、举报按笔记详情同样的可见性规则校验：owner 可访问自己的任意笔记，其他用户和匿名只允许访问 `PUBLIC + PUBLISHED`
 - 举报支持 `RESOURCE` 与 `NOTE`
 - 还没有真正抽象成多内容类型互动模型
-- 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，用户被封禁时返回 `403/USER_BANNED`，举报目标不存在时返回 `404/RESOURCE_NOT_FOUND` 或 `404/NOTE_NOT_FOUND`
+- 上述互动写接口在未登录时返回 `401/NOT_LOGGED_IN`，用户被封禁时返回 `403/USER_BANNED`，举报目标不存在或当前访问者不可见时返回 `404/RESOURCE_NOT_FOUND` 或 `404/NOTE_NOT_FOUND`
 - `POST /api/resources/{id}/comments` 和 `POST /api/comments/{id}/reply` 在 `content` 缺失、空字符串或仅空白字符时返回 `400 COMMENT_CONTENT_REQUIRED`
 - `POST /api/reports` 的 `reason` 缺失、空字符串或仅空白时回落为 `无`；资源举报传 `resourceId`，笔记举报传 `targetType=NOTE` + `noteId`
 

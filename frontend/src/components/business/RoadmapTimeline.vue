@@ -12,10 +12,11 @@
           <h4>{{ item.title }}</h4>
           <div class="i-carbon-chevron-right timeline__arrow"></div>
         </div>
-        <p>{{ item.summary }}</p>
+        <p>{{ item.description || item.summary }}</p>
         <ul class="timeline__tasks">
           <li v-for="task in item.tasks" :key="task">{{ task }}</li>
         </ul>
+        <p v-if="item.attachments?.length" class="timeline__attachments">附件 {{ item.attachments.length }} 个</p>
       </div>
     </article>
   </div>
@@ -23,7 +24,7 @@
 
 <script setup lang="ts">
 defineProps<{
-  items: Array<{ title: string; summary?: string; tasks?: string[] }>
+  items: Array<{ title: string; summary?: string; description?: string; tasks?: string[]; attachments?: Array<{ filename: string }> }>
 }>()
 
 defineEmits<{
@@ -106,5 +107,11 @@ defineEmits<{
 
 .timeline__tasks li {
   margin-bottom: var(--space-1);
+}
+
+.timeline__attachments {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
 }
 </style>

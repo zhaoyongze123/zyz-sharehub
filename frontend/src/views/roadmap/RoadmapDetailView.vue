@@ -56,7 +56,7 @@
         <div class="modal-body">
           <div class="node-summary">
             <strong>阶段目标：</strong>
-            <p>{{ selectedNode.summary }}</p>
+            <p>{{ selectedNode.description || selectedNode.summary }}</p>
           </div>
           
           <div class="node-tasks">
@@ -80,6 +80,15 @@
               <button class="view-btn" @click="goToResource(selectedResource.id)">查看</button>
             </div>
             <p v-else class="text-muted text-sm">当前节点未绑定公开资料</p>
+          </div>
+
+          <div class="node-attachments" v-if="selectedNode.attachments.length">
+            <strong>节点附件：</strong>
+            <ul class="attachment-list">
+              <li v-for="attachment in selectedNode.attachments" :key="attachment.id">
+                <a :href="attachment.downloadUrl" target="_blank" rel="noreferrer">{{ attachment.filename }}</a>
+              </li>
+            </ul>
           </div>
         </div>
         <div class="modal-footer">
@@ -209,6 +218,15 @@ watch(() => route.params.id, () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+.attachment-list {
+  margin: var(--space-3) 0 0;
+  padding-left: 1.2rem;
+}
+
+.attachment-list a {
+  color: var(--color-primary);
 }
 
 /* Modal Styles */

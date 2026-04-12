@@ -28,6 +28,17 @@
               placeholder="阶段标题"
               :data-testid="`publish-roadmap-node-title-${index}`"
             />
+            <BaseTextarea
+              v-model="node.description"
+              :label="`节点 ${index + 1} 内容描述`"
+              placeholder="补充该节点的学习目标、交付物和完成标准"
+              :data-testid="`publish-roadmap-node-description-${index}`"
+            />
+            <BaseUploader
+              v-model:file="node.attachmentFile"
+              :input-testid="`publish-roadmap-node-attachment-${index}`"
+              hint="节点附件会在节点创建后通过真实接口上传。"
+            />
           </div>
         </div>
 
@@ -84,8 +95,16 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
-import { addRoadmapNode, createRoadmap } from '@/api/roadmaps'
+import BaseUploader from '@/components/base/BaseUploader.vue'
+import { addRoadmapNode, createRoadmap, uploadRoadmapNodeAttachment } from '@/api/roadmaps'
 import { useAppStore } from '@/stores/app'
+
+interface EditableRoadmapNode {
+  id: number
+  title: string
+  description: string
+  attachmentFile: File | null
+}
 
 const appStore = useAppStore()
 const title = ref('')
@@ -94,20 +113,26 @@ const isSubmitting = ref(false)
 const validationMessage = ref('')
 const lastCreatedRoadmapId = ref<number | null>(null)
 const lastCreatedNodeCount = ref(0)
-const nodes = reactive([
-  { id: 1, title: '阶段 1：协议与接入' },
-  { id: 2, title: '阶段 2：工作流编排' }
-])
+
+function createDefaultNodes(): EditableRoadmapNode[] {
+  return [
+    { id: 1, title: '阶段 1：协议与接入', description: '', attachmentFile: null },
+    { id: 2, title: '阶段 2：工作流编排', description: '', attachmentFile: null },
+    { id: 3, title: '阶段 3：发布验收', description: '', attachmentFile: null }
+  ]
+}
+
+const nodes = reactive<EditableRoadmapNode[]>(createDefaultNodes())
 
 const statusDescription = computed(() => {
   if (lastCreatedRoadmapId.value) {
     return `已通过真实接口创建路线 #${lastCreatedRoadmapId.value}，并写入 ${lastCreatedNodeCount.value} 个节点。`
   }
-  return `${nodes.length} 个节点待提交；当前真实接口仅写入节点标题和顺序。`
+  return `${nodes.length} 个节点待提交；当前真实接口仅写入节点标题、描述、顺序，附件单独上传。`
 })
 
 function addNode() {
-  nodes.push({ id: Date.now(), title: '' })
+  nodes.push({ id: Date.now(), title: '', description: '', attachmentFile: null })
 }
 
 function validateForm() {
@@ -128,7 +153,7 @@ function resetForm() {
   title.value = ''
   summary.value = ''
   validationMessage.value = ''
-  nodes.splice(0, nodes.length, { id: Date.now(), title: '阶段 1：协议与接入' })
+  nodes.splice(0, nodes.length, ...createDefaultNodes().map((node, index) => ({ ...node, id: Date.now() + index })))
 }
 
 function resolveSubmitError(error: unknown, fallbackMessage: string) {
@@ -160,10 +185,15 @@ async function submitRoadmap(status: 'DRAFT' | 'PUBLISHED') {
     })
 
     for (const [index, node] of nodes.entries()) {
-      await addRoadmapNode(created.id, {
+      const currentNodes = await addRoadmapNode(created.id, {
         title: node.title.trim(),
+        description: node.description.trim(),
         orderNo: index + 1
       })
+      const createdNode = currentNodes.find((item) => item.orderNo === index + 1 && item.title === node.title.trim())
+      if (node.attachmentFile && createdNode?.id) {
+        await uploadRoadmapNodeAttachment(created.id, createdNode.id, node.attachmentFile)
+      }
     }
 
     lastCreatedRoadmapId.value = created.id

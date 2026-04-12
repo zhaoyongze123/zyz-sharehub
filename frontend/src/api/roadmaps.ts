@@ -28,9 +28,20 @@ export interface RoadmapTimelineItem {
   id: number
   title: string
   summary: string
+  description: string
   tasks: string[]
   resourceId: number | null
   noteId: number | null
+  attachments: RoadmapNodeAttachment[]
+}
+
+export interface RoadmapNodeAttachment {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+  downloadUrl: string
+  createdAt: string | null
 }
 
 interface CreateRoadmapPayload {
@@ -43,6 +54,7 @@ interface CreateRoadmapPayload {
 interface CreateRoadmapNodePayload {
   parentId?: number | null
   title: string
+  description?: string
   orderNo: number
   resourceId?: number | null
   noteId?: number | null
@@ -60,9 +72,11 @@ interface RoadmapNodeTreeDto {
   id: number
   parentId: number | null
   title: string
+  description: string | null
   orderNo: number | null
   resourceId: number | null
   noteId: number | null
+  attachments: RoadmapNodeAttachment[] | null
   children: RoadmapNodeTreeDto[] | null
 }
 
@@ -109,12 +123,14 @@ function normalizeTimeline(nodes: RoadmapNodeTreeDto[]): RoadmapTimelineItem[] {
     .map((node) => ({
       id: node.id,
       title: node.title,
+      description: node.description?.trim() || '',
       summary: node.children?.length ? `包含 ${node.children.length} 个子节点` : '当前阶段暂未补充更多子任务',
       tasks: (node.children ?? [])
         .sort((left, right) => (left.orderNo ?? Number.MAX_SAFE_INTEGER) - (right.orderNo ?? Number.MAX_SAFE_INTEGER))
         .map((child) => child.title),
       resourceId: node.resourceId,
-      noteId: node.noteId
+      noteId: node.noteId,
+      attachments: Array.isArray(node.attachments) ? node.attachments : []
     }))
 }
 
@@ -170,5 +186,26 @@ export async function createRoadmap(payload: CreateRoadmapPayload) {
 
 export async function addRoadmapNode(id: string | number, payload: CreateRoadmapNodePayload) {
   const response = await apiClient.post<ApiResponse<RoadmapNodeTreeDto[]>>(`/roadmaps/${id}/nodes`, payload)
+  return response.data.data
+}
+
+export async function uploadRoadmapNodeAttachment(
+  roadmapId: string | number,
+  nodeId: string | number,
+  file: File
+) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await apiClient.post<ApiResponse<RoadmapNodeAttachment>>(
+    `/roadmaps/${roadmapId}/nodes/${nodeId}/attachments`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  )
+
   return response.data.data
 }

@@ -275,11 +275,15 @@ test('发布页走查', async ({ page, request }) => {
 
   const roadmapTitle = `Walkthrough Roadmap ${Date.now()}`
   await page.goto('/publish/roadmap')
-  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
+  await expect(page.getByText('当前真实接口仅写入节点标题、描述、顺序，附件单独上传。')).toBeVisible()
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过全站走查验证路线创建与节点追加闭环。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')
+  await page.getByTestId('publish-roadmap-node-description-0').fill('创建主体说明')
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：追加节点')
+  await page.getByTestId('publish-roadmap-node-description-1').fill('追加节点说明')
+  await page.getByTestId('publish-roadmap-node-title-2').fill('阶段 3：发布校验')
+  await page.getByTestId('publish-roadmap-node-description-2').fill('发布校验说明')
 
   const roadmapCreateResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&
@@ -289,7 +293,7 @@ test('发布页走查', async ({ page, request }) => {
   const nodeResponsesPromise = waitForResponses(page, (response) =>
     response.url().includes('/nodes') &&
     response.request().method() === 'POST'
-  , 2)
+  , 3)
 
   await page.getByTestId('publish-roadmap-submit').click()
 
@@ -299,7 +303,7 @@ test('发布页走查', async ({ page, request }) => {
   const roadmapId = roadmapCreateBody.data.id as number
 
   const nodeResponses = await nodeResponsesPromise
-  expect(nodeResponses).toHaveLength(2)
+  expect(nodeResponses).toHaveLength(3)
   for (const nodeResponse of nodeResponses) {
     expect(nodeResponse.url()).toContain(`/api/roadmaps/${roadmapId}/nodes`)
     expect(nodeResponse.ok()).toBeTruthy()

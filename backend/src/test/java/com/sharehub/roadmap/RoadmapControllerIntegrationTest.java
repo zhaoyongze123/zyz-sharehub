@@ -11,12 +11,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,6 +45,7 @@ class RoadmapControllerIntegrationTest {
 
     @BeforeEach
     void cleanUp() {
+        jdbcTemplate.update("DELETE FROM files");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
         jdbcTemplate.update("DELETE FROM roadmaps");
@@ -68,10 +71,23 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"title":"节点1","orderNo":1}
+                    {"title":"节点1","description":"节点1描述","orderNo":1}
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].title").value("节点1"));
+
+        Long nodeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND order_no = 1",
+            Long.class,
+            roadmapId
+        );
+
+        mockMvc.perform(multipart("/api/roadmaps/{id}/nodes/{nodeId}/attachments", roadmapId, nodeId)
+                .file(new MockMultipartFile("file", "node-1.txt", MediaType.TEXT_PLAIN_VALUE, "roadmap-node-file".getBytes()))
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.filename").value("node-1.txt"))
+            .andExpect(jsonPath("$.data.downloadUrl").exists());
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER)
@@ -98,7 +114,9 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.progress.percent").value(75))
-            .andExpect(jsonPath("$.data.nodes[0].title").value("节点1"));
+            .andExpect(jsonPath("$.data.nodes[0].title").value("节点1"))
+            .andExpect(jsonPath("$.data.nodes[0].description").value("节点1描述"))
+            .andExpect(jsonPath("$.data.nodes[0].attachments[0].filename").value("node-1.txt"));
 
         mockMvc.perform(get("/api/roadmaps/" + roadmapId)
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
@@ -122,6 +140,12 @@ class RoadmapControllerIntegrationTest {
                 .content("""
                     {"percent":100}
                     """))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
+
+        mockMvc.perform(multipart("/api/roadmaps/{id}/nodes/{nodeId}/attachments", roadmapId, nodeId)
+                .file(new MockMultipartFile("file", "deny.txt", MediaType.TEXT_PLAIN_VALUE, "deny".getBytes()))
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
     }
@@ -154,6 +178,11 @@ class RoadmapControllerIntegrationTest {
                 .content("""
                     {"title":"节点1","orderNo":1}
                     """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(multipart("/api/roadmaps/{id}/nodes/{nodeId}/attachments", roadmapId, 1L)
+                .file(new MockMultipartFile("file", "node.txt", MediaType.TEXT_PLAIN_VALUE, "node".getBytes())))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
 
@@ -199,6 +228,12 @@ class RoadmapControllerIntegrationTest {
                 .content("""
                     {"title":"节点1","orderNo":1}
                     """))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"));
+
+        mockMvc.perform(multipart("/api/roadmaps/{id}/nodes/{nodeId}/attachments", roadmapId, 1L)
+                .file(new MockMultipartFile("file", "node.txt", MediaType.TEXT_PLAIN_VALUE, "node".getBytes()))
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"));
 

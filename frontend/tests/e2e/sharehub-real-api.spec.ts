@@ -332,12 +332,21 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/publish/roadmap')
   await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
-  await expect(page.getByText('当前真实接口仅写入节点标题和顺序。')).toBeVisible()
+  await expect(page.getByText('当前真实接口仅写入节点标题、描述、顺序，附件单独上传。')).toBeVisible()
 
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过页面完成真实路线创建和节点追加闭环。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建')
+  await page.getByTestId('publish-roadmap-node-description-0').fill('阶段 1 描述')
+  await page.getByTestId('publish-roadmap-node-attachment-0').setInputFiles({
+    name: 'node-1.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('node-1-file')
+  })
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：节点落库')
+  await page.getByTestId('publish-roadmap-node-description-1').fill('阶段 2 描述')
+  await page.getByTestId('publish-roadmap-node-title-2').fill('阶段 3：发布验收')
+  await page.getByTestId('publish-roadmap-node-description-2').fill('阶段 3 描述')
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&
@@ -348,7 +357,12 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
     response.url().includes('/api/roadmaps/') &&
     response.url().includes('/nodes') &&
     response.request().method() === 'POST'
-  , 2)
+  , 3)
+  const attachmentResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/roadmaps/') &&
+    response.url().includes('/attachments') &&
+    response.request().method() === 'POST'
+  )
 
   await page.getByTestId('publish-roadmap-submit').click()
 
@@ -358,19 +372,23 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   const createdId = createBody.data.id as number
 
   const nodeResponses = await nodeResponsesPromise
-  expect(nodeResponses).toHaveLength(2)
+  expect(nodeResponses).toHaveLength(3)
   for (const nodeResponse of nodeResponses) {
     expect(nodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
     expect(nodeResponse.ok()).toBeTruthy()
   }
+  const attachmentResponse = await attachmentResponsePromise
+  expect(attachmentResponse.ok()).toBeTruthy()
 
   await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${createdId}`)
-  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：3')
   await page.getByRole('link', { name: '查看详情页' }).click()
   await expect(page).toHaveURL(new RegExp(`/roadmaps/${createdId}$`))
   await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
   await expect(page.getByText('阶段 1：创建')).toBeVisible()
   await expect(page.getByText('阶段 2：节点落库')).toBeVisible()
+  await expect(page.getByText('阶段 3：发布验收')).toBeVisible()
+  await expect(page.getByText('阶段 1 描述')).toBeVisible()
 
   const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${createdId}`, {
     headers: userHeaders()
@@ -380,7 +398,9 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   expect(detailBody.data.roadmap.id).toBe(createdId)
   expect(detailBody.data.roadmap.title).toBe(roadmapTitle)
   expect(detailBody.data.roadmap.status).toBe('PUBLISHED')
-  expect(detailBody.data.nodes).toHaveLength(2)
+  expect(detailBody.data.nodes).toHaveLength(3)
+  expect(detailBody.data.nodes[0].description).toBe('阶段 1 描述')
+  expect(detailBody.data.nodes[0].attachments).toHaveLength(1)
 })
 
 test('notes 模块真接口联调', async ({ page, request }) => {
@@ -424,9 +444,9 @@ test('notes 模块真接口联调', async ({ page, request }) => {
   await expect(page.getByTestId('note-detail-content')).toContainText('Playwright detail paragraph')
   await expect(page.getByTestId('note-outline')).toContainText('第一节')
   await expect(page.getByTestId('note-detail-side')).toContainText('当前状态 PUBLISHED，可见性 PUBLIC')
-  await expect(page.getByTestId('note-detail-interaction-hint')).toContainText('当前批次仅收口真实详情读取与举报闭环')
-  await expect(page.getByRole('button', { name: '点赞待接后端' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '收藏待接后端' }).first()).toBeDisabled()
+  await expect(page.getByTestId('note-detail-interaction-hint')).toContainText('点赞、收藏与举报都已接入真实后端')
+  await expect(page.getByRole('button', { name: '点赞 0' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '收藏 0' }).first()).toBeEnabled()
 
   await loginAs(page, 'user')
   await page.reload()

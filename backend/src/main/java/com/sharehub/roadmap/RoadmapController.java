@@ -7,8 +7,10 @@ import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 
@@ -66,6 +68,17 @@ public class RoadmapController {
         @Valid @RequestBody RoadmapNodeDto req
     ) {
         return ApiResponse.ok(service.addNode(requireActiveUser(authentication, request), id, req));
+    }
+
+    @PostMapping(path = "/{id}/nodes/{nodeId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<RoadmapNodeAttachmentDto> uploadNodeAttachment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id,
+        @PathVariable Long nodeId,
+        @RequestPart("file") MultipartFile file
+    ) {
+        return ApiResponse.ok(service.uploadNodeAttachment(requireActiveUser(authentication, request), id, nodeId, file));
     }
 
     @PostMapping("/{id}/progress")
