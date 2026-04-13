@@ -1,0 +1,102 @@
+name: 部署 Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-production:
+    name: 构建并部署到 production
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 构建前端产物
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: 安装 rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: 配置 SSH
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.PROD_PORT || 22 }}" -H "$PROD_HOST" >> ~/.ssh/known_hosts
+
+      - name: 同步仓库到 production
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'frontend/node_modules' \
+            --exclude 'frontend/dist' \
+            --exclude 'backend/target' \
+            --exclude '.playwright-cli' \
+            --exclude 'test-results' \
+            --exclude '.DS_Store' \
+            -e "ssh -p ${PROD_PORT:-22}" \
+            ./ "${PROD_USER}@${PROD_HOST}:${PROD_APP_DIR}/"
+
+      - name: 同步前端 dist 到 production
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -p ${PROD_PORT:-22}" \
+            frontend/dist/ "${PROD_USER}@${PROD_HOST}:${PROD_APP_DIR}/frontend/dist/"
+
+      - name: 写入 production 环境变量
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+          PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+        run: |
+          ssh -p "${PROD_PORT:-22}" "${PROD_USER}@${PROD_HOST}" \
+            "mkdir -p '${PROD_APP_DIR}/deploy'"
+          printf '%s\n' "${PROD_ENV_FILE}" | \
+            ssh -p "${PROD_PORT:-22}" "${PROD_USER}@${PROD_HOST}" \
+              "cat > '${PROD_APP_DIR}/deploy/.env.prod'"
+
+      - name: 执行远端 production 部署
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+        run: |
+          ssh -p "${PROD_PORT:-22}" "${PROD_USER}@${PROD_HOST}" \
+            "cd '${PROD_APP_DIR}' && bash scripts/deploy-production.sh"

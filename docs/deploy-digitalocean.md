@@ -175,6 +175,17 @@ docker compose -p sharehub-staging --env-file .env.staging -f docker-compose.sta
 systemctl reload nginx
 ```
 
+如果你已经接入 GitHub Actions，可按标准流程自动发布：
+
+- `feature/*` 合并到 `staging`
+- push `staging` 触发 `.github/workflows/deploy-staging.yml`
+- `staging` 验证通过后合并到 `main`
+- push `main` 触发 `.github/workflows/deploy-production.yml`
+
+对应说明见：
+
+- `docs/staging-cicd.md`
+
 ## 9. 回滚检查项
 
 - 先看 `docker compose ps` 是否某个单独环境失败
