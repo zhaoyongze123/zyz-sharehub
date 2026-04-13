@@ -7,13 +7,13 @@ services:
       - ./.env.prod
     environment:
       TZ: ${TZ:-Asia/Shanghai}
-      POSTGRES_DB: ${POSTGRES_DB:-sharehub}
-      POSTGRES_USER: ${POSTGRES_USER:-sharehub}
+      POSTGRES_DB: ${POSTGRES_DB:-sharehub_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-sharehub_prod}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-replace_postgres_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sharehub} -d ${POSTGRES_DB:-sharehub}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sharehub_prod} -d ${POSTGRES_DB:-sharehub_prod}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -54,8 +54,8 @@ services:
       SHAREHUB_ADMIN_DEV_TOKEN_ENABLED: ${SHAREHUB_ADMIN_DEV_TOKEN_ENABLED:-false}
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sharehub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sharehub}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sharehub_prod}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sharehub_prod}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-replace_postgres_password}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
