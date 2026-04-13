@@ -12,7 +12,7 @@
 
   <div class="page-shell detail-grid" v-else-if="note" data-testid="note-detail-page">
     <section class="detail-main" data-testid="note-detail-main">
-      <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
+      <HeroBanner :kicker="noteKicker" :title="note.title" :description="noteSummary">
         <template #actions>
           <BaseButton @click="handleFavoriteNote">收藏</BaseButton>
           <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
@@ -110,11 +110,20 @@ const relatedNotes = ref<RelatedNoteItem[]>([])
 
 const noteSummary = computed(() => extractSummary(note.value?.contentMd || ''))
 const noteOutline = computed(() => extractOutline(note.value?.contentMd || ''))
+const noteKicker = computed(() => {
+  if (!note.value) return '笔记详情'
+  if (note.value.isOfficial) {
+    return note.value.isPinned ? '平台公告 · 置顶' : '平台公告'
+  }
+  return '笔记详情'
+})
 const noteStatusDescription = computed(() => {
   if (!note.value) return '笔记状态读取中'
   const status = note.value.status?.trim() || '未标记'
   const visibility = note.value.visibility?.trim() || '仅自己可见'
-  return `当前状态 ${status}，可见性 ${visibility}`
+  const official = note.value.isOfficial ? '，官方公告' : ''
+  const pinned = note.value.isPinned ? '，当前已置顶' : ''
+  return `当前状态 ${status}，可见性 ${visibility}${official}${pinned}`
 })
 const renderedHtml = computed(() => {
   if (!note.value) return ''

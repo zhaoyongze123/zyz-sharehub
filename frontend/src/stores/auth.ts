@@ -7,6 +7,7 @@ export interface UserProfile {
   role: 'guest' | 'user' | 'admin'
   headline: string
   avatarUrl?: string
+  isSuperAdmin?: boolean
 }
 
 interface AuthMeResponse {
@@ -18,6 +19,7 @@ interface AuthMeResponse {
     avatarUrl?: string | null
     status?: string
     isAdmin?: boolean
+    isSuperAdmin?: boolean
   }
 }
 
@@ -46,7 +48,8 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.profile),
-    isAdmin: (state) => state.profile?.role === 'admin'
+    isAdmin: (state) => state.profile?.role === 'admin',
+    isSuperAdmin: (state) => Boolean(state.profile?.isSuperAdmin)
   },
   actions: {
     async syncProfileFromServer() {
@@ -63,7 +66,8 @@ export const useAuthStore = defineStore('auth', {
           nickname,
           role,
           headline: window.localStorage.getItem('ShareHub.headline') || 'ShareHub 用户',
-          avatarUrl: currentUser.avatarUrl || undefined
+          avatarUrl: currentUser.avatarUrl || undefined,
+          isSuperAdmin: currentUser.isSuperAdmin ?? false
         }
         window.localStorage.setItem('ShareHub.nickname', nickname)
         window.localStorage.setItem('ShareHub.userKey', currentUser.login)
@@ -101,7 +105,8 @@ export const useAuthStore = defineStore('auth', {
         id: 1,
         nickname,
         role,
-        headline
+        headline,
+        isSuperAdmin: role === 'admin'
       }
       this.initialized = true
     },

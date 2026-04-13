@@ -22,6 +22,8 @@ interface AdminUserDto {
   login: string
   name: string | null
   status: string | null
+  isAdmin: boolean
+  isSuperAdmin: boolean
 }
 
 interface AdminUserPageData {
@@ -62,6 +64,8 @@ export interface AdminUserItem {
   nickname: string
   login: string
   status: string
+  isAdmin: boolean
+  isSuperAdmin: boolean
 }
 
 export interface AdminAuditLogItem {
@@ -103,7 +107,9 @@ function normalizeUser(dto: AdminUserDto): AdminUserItem {
     id: dto.id,
     nickname: dto.name?.trim() || dto.login,
     login: dto.login,
-    status: normalizeUserStatus(dto.status)
+    status: normalizeUserStatus(dto.status),
+    isAdmin: dto.isAdmin,
+    isSuperAdmin: dto.isSuperAdmin
   }
 }
 
@@ -184,6 +190,14 @@ export async function banAdminUser(userId: number) {
 
 export async function unbanAdminUser(userId: number) {
   await apiClient.post(`/admin/users/${userId}/unban`)
+}
+
+export async function grantAdminUser(userId: number) {
+  await apiClient.post(`/admin/users/${userId}/grant-admin`)
+}
+
+export async function revokeAdminUser(userId: number) {
+  await apiClient.post(`/admin/users/${userId}/revoke-admin`)
 }
 
 export async function resolveAdminReport(reportId: number) {

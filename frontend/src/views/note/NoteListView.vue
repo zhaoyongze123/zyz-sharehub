@@ -111,40 +111,26 @@
       </div>
 
       <div class="topic-list">
-        <!-- Pinned Topic -->
-        <article class="topic-row pinned" v-if="currentNav === 'topics' && activeTab === 'latest' && !activeCategory">
-          <div class="topic-main">
-            <div class="topic-title-wrapper">
-              <div class="i-carbon-pin pin-icon"></div>
-              <h3 class="topic-title" @click="readTopic(null)">《 ShareHub AI 技术分享规范及内容标准 》</h3>
-            </div>
-            <div class="topic-meta">
-              <span class="meta-tag"><span class="dot tag-gray"></span> 平台公告</span>
-              <span class="badge blue">官方</span>
-            </div>
-            <p class="topic-excerpt">
-              为了保证社区内容的高质量，我们提倡大家分享：经过验证的 AI 工具、有深度的大模型研究文章、生产环境可用的 Agent 代码片段...
-            </p>
-          </div>
-          <div class="topic-author">
-            <div class="user-avatar author-initial">A</div>
-            <span class="author-name">系统管理员</span>
-          </div>
-          <div class="topic-time">置顶</div>
-        </article>
-
-        <div class="list-divider" v-if="currentNav === 'topics' && activeTab === 'latest' && !activeCategory"></div>
-
-        <!-- Normal Topics -->
-        <article class="topic-row" v-for="topic in displayedTopics" :key="topic.id" :class="{ 'has-read': topic.hasRead }">
+        <article
+          class="topic-row"
+          v-for="topic in displayedTopics"
+          :key="topic.id"
+          :class="{ 'has-read': topic.hasRead, pinned: topic.isPinned }"
+        >
           <div class="topic-main">
             <div class="title-with-link">
+               <div v-if="topic.isPinned" class="i-carbon-pin pin-icon"></div>
                <h3 class="topic-title" @click="readTopic(topic)">{{ topic.title }}</h3>
                <span v-if="topic.category" class="title-category" :class="topic.categoryColor">{{ topic.category }}</span>
                <div class="i-carbon-launch external-icon" v-if="topic.hasLink" title="包含外部链接" @click.stop="openExternal('https://github.com/github/copilot-chat')"></div>
             </div>
             <p class="topic-excerpt" v-if="topic.excerpt">{{ topic.excerpt }}</p>
             <div class="topic-meta">
+              <span v-if="topic.isOfficial" class="meta-tag">
+                <span class="dot tag-gray"></span>
+                平台公告
+              </span>
+              <span v-if="topic.isOfficial" class="badge blue">官方</span>
               <span class="meta-tag" @click="toggleCategory(topic.category)" style="cursor:pointer">
                 <span class="dot" :class="topic.categoryColor"></span> 
                 {{ topic.category }}
@@ -204,6 +190,11 @@
               <input type="checkbox" v-model="newDraft.hasLink">
               外链标志
             </label>
+
+            <label v-if="authStore.isAdmin" class="checkbox-label admin-checkbox">
+              <input type="checkbox" v-model="newDraft.isPinned">
+              置顶公告
+            </label>
           </div>
         </div>
 
@@ -246,9 +237,11 @@ import {
   type RelatedNoteItem
 } from '@/api/notes'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const currentNav = ref('topics')
 const activeTab = ref('latest')
 const activeCategory = ref('')
@@ -272,7 +265,8 @@ const newDraft = reactive({
   content: '',
   category: '',
   tags: [] as string[],
-  hasLink: false
+  hasLink: false,
+  isPinned: false
 })
 
 const categories = [
@@ -331,8 +325,10 @@ function mapNoteToTopic(note: NoteDTO) {
     isBookmarked: favoriteNoteIds.value.includes(note.id),
     hasRead: false,
     isMine: true,
-    time: '',
-    isFeatured: status === 'PUBLISHED'
+    time: note.isPinned ? '置顶' : '',
+    isFeatured: status === 'PUBLISHED',
+    isOfficial: Boolean(note.isOfficial),
+    isPinned: Boolean(note.isPinned)
   }
 }
 
@@ -356,7 +352,9 @@ function mapRelatedNoteToTopic(note: RelatedNoteItem, options: { hasRead?: boole
     hasRead: options.hasRead ?? false,
     isMine: options.isMine ?? false,
     time: note.updatedAt || '未知时间',
-    isFeatured: status === 'PUBLISHED'
+    isFeatured: status === 'PUBLISHED',
+    isOfficial: false,
+    isPinned: false
   }
 }
 
@@ -529,7 +527,8 @@ async function submitPublish() {
       contentMd: newDraft.content,
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
-      category: newDraft.category
+      category: newDraft.category,
+      isPinned: authStore.isAdmin ? newDraft.isPinned : false
     })
     await fetchList()
     appStore.showToast('发布成功', '笔记已保存到云端')
@@ -543,6 +542,7 @@ async function submitPublish() {
   newDraft.category = ''
   newDraft.tags = []
   newDraft.hasLink = false
+  newDraft.isPinned = false
   tagInput.value = ''
   showPublishModal.value = false
 

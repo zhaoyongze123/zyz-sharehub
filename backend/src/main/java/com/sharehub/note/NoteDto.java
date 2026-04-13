@@ -11,5 +11,7 @@ public record NoteDto(
     String category,
     String ownerKey,
     String ownerName,
-    String ownerAvatarUrl
+    String ownerAvatarUrl,
+    boolean isOfficial,
+    boolean isPinned
 ) {}

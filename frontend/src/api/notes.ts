@@ -24,6 +24,8 @@ export interface NoteDTO {
   ownerKey?: string
   ownerName?: string | null
   ownerAvatarUrl?: string | null
+  isOfficial?: boolean
+  isPinned?: boolean
 }
 
 export interface RelatedNoteItem {
@@ -66,6 +68,7 @@ export interface CreateNotePayload {
   visibility?: string | null
   status?: string | null
   category?: string | null
+  isPinned?: boolean
 }
 
 export interface UpdateNotePayload extends CreateNotePayload {}

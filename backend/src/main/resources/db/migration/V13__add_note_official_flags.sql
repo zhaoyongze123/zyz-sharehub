@@ -1,0 +1,9 @@
+ALTER TABLE notes
+  ADD COLUMN IF NOT EXISTS is_official BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE notes
+  ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_notes_community_sort
+  ON notes (is_pinned DESC, id DESC)
+  WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED';

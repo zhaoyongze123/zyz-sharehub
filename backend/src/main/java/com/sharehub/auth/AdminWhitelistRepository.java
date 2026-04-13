@@ -18,6 +18,18 @@ public class AdminWhitelistRepository {
             return false;
         }
         Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM admin_whitelist WHERE github_login = ? AND role IN ('SUPER_ADMIN', 'ADMIN')",
+            Integer.class,
+            login
+        );
+        return count != null && count > 0;
+    }
+
+    public boolean isSuperAdmin(String login) {
+        if (login == null || login.isBlank()) {
+            return false;
+        }
+        Integer count = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM admin_whitelist WHERE github_login = ? AND role = ?",
             Integer.class,
             login,
@@ -47,6 +59,36 @@ public class AdminWhitelistRepository {
                 operator
             );
         }
+    }
+
+    public void grantAdmin(String login, String createdBy) {
+        String operator = normalizeOperator(createdBy);
+        int updated = jdbcTemplate.update(
+            """
+                UPDATE admin_whitelist
+                SET role = 'ADMIN', created_by = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE github_login = ?
+                """,
+            operator,
+            login
+        );
+        if (updated == 0) {
+            jdbcTemplate.update(
+                """
+                    INSERT INTO admin_whitelist (github_login, role, created_by, created_at, updated_at)
+                    VALUES (?, 'ADMIN', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """,
+                login,
+                operator
+            );
+        }
+    }
+
+    public void revokeAdmin(String login) {
+        if (login == null || login.isBlank()) {
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM admin_whitelist WHERE github_login = ? AND role = 'ADMIN'", login);
     }
 
     public Optional<String> findRole(String login) {

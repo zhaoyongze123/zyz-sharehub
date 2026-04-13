@@ -22,6 +22,7 @@
             <th>昵称</th>
             <th>登录标识</th>
             <th>状态</th>
+            <th>权限</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -30,7 +31,17 @@
             <td>{{ item.nickname }}</td>
             <td>{{ item.login }}</td>
             <td>{{ item.status }}</td>
+            <td>{{ item.isSuperAdmin ? '超级管理员' : item.isAdmin ? '管理员' : '普通用户' }}</td>
             <td>
+              <BaseButton
+                v-if="authStore.isSuperAdmin && !item.isSuperAdmin"
+                size="sm"
+                variant="secondary"
+                :disabled="submittingUserId === item.id"
+                @click="toggleAdmin(item)"
+              >
+                {{ item.isAdmin ? '取消管理员' : '设为管理员' }}
+              </BaseButton>
               <BaseButton
                 size="sm"
                 variant="secondary"
@@ -55,15 +66,24 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { banAdminUser, fetchAdminUsers, type AdminUserItem, unbanAdminUser } from '@/api/admin'
+import {
+  banAdminUser,
+  fetchAdminUsers,
+  grantAdminUser,
+  revokeAdminUser,
+  type AdminUserItem,
+  unbanAdminUser
+} from '@/api/admin'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import BaseTable from '@/components/base/BaseTable.vue'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const loading = ref(true)
 const error = ref(false)
 const userItems = ref<AdminUserItem[]>([])
@@ -82,6 +102,25 @@ async function loadUsers() {
     console.error(loadError)
   } finally {
     loading.value = false
+  }
+}
+
+async function toggleAdmin(user: AdminUserItem) {
+  submittingUserId.value = user.id
+
+  try {
+    if (user.isAdmin) {
+      await revokeAdminUser(user.id)
+      appStore.showToast('管理员已撤销', `${user.nickname} 已恢复为普通用户`)
+    } else {
+      await grantAdminUser(user.id)
+      appStore.showToast('管理员已添加', `${user.nickname} 已拥有后台管理员权限`)
+    }
+    await loadUsers()
+  } catch (actionError) {
+    console.error(actionError)
+  } finally {
+    submittingUserId.value = null
   }
 }
 

@@ -37,8 +37,19 @@ public class NoteRepository {
             (PreparedStatementCreator) connection -> {
                 PreparedStatement statement = connection.prepareStatement(
                     """
-                        INSERT INTO notes (title, content_md, owner_key, visibility, status, category, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        INSERT INTO notes (
+                          title,
+                          content_md,
+                          owner_key,
+                          visibility,
+                          status,
+                          category,
+                          is_official,
+                          is_pinned,
+                          created_at,
+                          updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                     new String[] {"id"}
                 );
@@ -48,6 +59,8 @@ public class NoteRepository {
                 statement.setString(4, nullable(note.visibility()));
                 statement.setString(5, defaultStatus(note.status()));
                 statement.setString(6, nullable(note.category()));
+                statement.setBoolean(7, note.isOfficial());
+                statement.setBoolean(8, note.isPinned());
                 return statement;
             },
             keyHolder
@@ -81,6 +94,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.is_official,
+                  n.is_pinned,
                   n.owner_key,
                   COALESCE(u.name, n.owner_key) AS owner_name,
                   CASE
@@ -90,7 +105,7 @@ public class NoteRepository {
                 FROM notes n
                 LEFT JOIN users u ON u.login = n.owner_key
                 WHERE n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED'
-                ORDER BY n.id DESC
+                ORDER BY n.is_pinned DESC, n.id DESC
                 LIMIT ? OFFSET ?
                 """,
             (resultSet, rowNum) -> mapDto(
@@ -102,7 +117,9 @@ public class NoteRepository {
                 resultSet.getString("category"),
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
-                resultSet.getString("owner_avatar_url")
+                resultSet.getString("owner_avatar_url"),
+                resultSet.getBoolean("is_official"),
+                resultSet.getBoolean("is_pinned")
             ),
             safePageSize,
             offset
@@ -133,6 +150,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.is_official,
+                  n.is_pinned,
                   n.owner_key,
                   COALESCE(u.name, n.owner_key) AS owner_name,
                   CASE
@@ -165,7 +184,9 @@ public class NoteRepository {
                 resultSet.getString("category"),
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
-                resultSet.getString("owner_avatar_url")
+                resultSet.getString("owner_avatar_url"),
+                resultSet.getBoolean("is_official"),
+                resultSet.getBoolean("is_pinned")
             ),
             listArgs.toArray()
         );
@@ -191,7 +212,14 @@ public class NoteRepository {
         jdbcTemplate.update(
             """
                 UPDATE notes
-                SET title = ?, content_md = ?, visibility = ?, status = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+                SET title = ?,
+                    content_md = ?,
+                    visibility = ?,
+                    status = ?,
+                    category = ?,
+                    is_official = ?,
+                    is_pinned = ?,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND owner_key = ?
                 """,
             note.title(),
@@ -199,6 +227,8 @@ public class NoteRepository {
             nullable(note.visibility()),
             normalizeForUpdate(note.status(), existing.status()),
             nullable(note.category()),
+            note.isOfficial(),
+            note.isPinned(),
             id,
             ownerKey
         );
@@ -387,6 +417,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.is_official,
+                  n.is_pinned,
                   n.owner_key,
                   COALESCE(u.name, n.owner_key) AS owner_name,
                   CASE
@@ -406,7 +438,9 @@ public class NoteRepository {
                 resultSet.getString("category"),
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
-                resultSet.getString("owner_avatar_url")
+                resultSet.getString("owner_avatar_url"),
+                resultSet.getBoolean("is_official"),
+                resultSet.getBoolean("is_pinned")
             ),
             id,
             ownerKey
@@ -424,6 +458,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.is_official,
+                  n.is_pinned,
                   n.owner_key,
                   COALESCE(u.name, n.owner_key) AS owner_name,
                   CASE
@@ -443,7 +479,9 @@ public class NoteRepository {
                 resultSet.getString("category"),
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
-                resultSet.getString("owner_avatar_url")
+                resultSet.getString("owner_avatar_url"),
+                resultSet.getBoolean("is_official"),
+                resultSet.getBoolean("is_pinned")
             ),
             id
         );
@@ -459,9 +497,23 @@ public class NoteRepository {
         String category,
         String ownerKey,
         String ownerName,
-        String ownerAvatarUrl
+        String ownerAvatarUrl,
+        boolean isOfficial,
+        boolean isPinned
     ) {
-        return new NoteDto(id, title, contentMd, visibility, status, category, ownerKey, ownerName, ownerAvatarUrl);
+        return new NoteDto(
+            id,
+            title,
+            contentMd,
+            visibility,
+            status,
+            category,
+            ownerKey,
+            ownerName,
+            ownerAvatarUrl,
+            isOfficial,
+            isPinned
+        );
     }
 
     private NoteCandidate mapCandidate(ResultSet resultSet) throws SQLException {
