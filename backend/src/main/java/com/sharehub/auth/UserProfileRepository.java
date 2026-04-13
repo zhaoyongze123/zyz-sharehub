@@ -71,6 +71,7 @@ public class UserProfileRepository {
             avatarFileId,
             avatarFileId == null ? null : "/api/files/" + avatarFileId,
             "ACTIVE",
+            false,
             false
         );
     }
@@ -168,15 +169,19 @@ public class UserProfileRepository {
 
     private UserProfileDto mapUser(ResultSet resultSet) throws SQLException {
         UUID avatarFileId = resultSet.getObject("avatar_file_id", UUID.class);
+        String login = resultSet.getString("login");
+        boolean isSuperAdmin = isSuperAdmin(login);
+        boolean isAdmin = isSuperAdmin || isAdmin(login);
         return new UserProfileDto(
             resultSet.getLong("id"),
-            resultSet.getString("login"),
+            login,
             resultSet.getString("name"),
             resultSet.getString("bio"),
             avatarFileId,
             avatarFileId == null ? null : "/api/files/" + avatarFileId,
             resultSet.getString("status"),
-            false
+            isAdmin,
+            isSuperAdmin
         );
     }
 
@@ -195,5 +200,23 @@ public class UserProfileRepository {
             id
         );
         return results.stream().findFirst();
+    }
+
+    private boolean isAdmin(String login) {
+        Boolean result = jdbcTemplate.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM admin_whitelist WHERE github_login = ? AND role IN ('SUPER_ADMIN', 'ADMIN'))",
+            Boolean.class,
+            login
+        );
+        return Boolean.TRUE.equals(result);
+    }
+
+    private boolean isSuperAdmin(String login) {
+        Boolean result = jdbcTemplate.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM admin_whitelist WHERE github_login = ? AND role = 'SUPER_ADMIN')",
+            Boolean.class,
+            login
+        );
+        return Boolean.TRUE.equals(result);
     }
 }

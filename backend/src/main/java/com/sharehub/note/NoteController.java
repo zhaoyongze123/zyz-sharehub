@@ -2,13 +2,17 @@ package com.sharehub.note;
 
 import com.sharehub.auth.RequestAccessService;
 import com.sharehub.auth.UserProfileRepository;
+import com.sharehub.auth.AdminWhitelistRepository;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
 import java.util.List;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
+import com.sharehub.config.AdminTokenFilter;
 
 @RestController
 @RequestMapping("/api/notes")
@@ -17,15 +21,21 @@ public class NoteController {
     private final NoteRepository repository;
     private final RequestAccessService requestAccessService;
     private final UserProfileRepository userProfileRepository;
+    private final AdminWhitelistRepository adminWhitelistRepository;
+    private final String expectedAdminToken;
 
     public NoteController(
         NoteRepository repository,
         RequestAccessService requestAccessService,
-        UserProfileRepository userProfileRepository
+        UserProfileRepository userProfileRepository,
+        AdminWhitelistRepository adminWhitelistRepository,
+        Environment environment
     ) {
         this.repository = repository;
         this.requestAccessService = requestAccessService;
         this.userProfileRepository = userProfileRepository;
+        this.adminWhitelistRepository = adminWhitelistRepository;
+        this.expectedAdminToken = environment.getProperty("sharehub.admin.token", AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
 
     @PostMapping
@@ -35,6 +45,7 @@ public class NoteController {
         @Valid @RequestBody NoteDto req
     ) {
         String ownerKey = requireActiveUser(authentication, request);
+        boolean isAdmin = hasAdminPermission(authentication, request, ownerKey);
         NoteDto toSave = new NoteDto(
             null,
             req.title(),
@@ -44,7 +55,9 @@ public class NoteController {
             req.category(),
             null,
             null,
-            null
+            null,
+            isAdmin,
+            isAdmin && req.isPinned()
         );
         NoteDto saved = repository.save(ownerKey, toSave);
         return ApiResponse.ok(saved);
@@ -113,7 +126,7 @@ public class NoteController {
         @Valid @RequestBody NoteDto req
     ) {
         String ownerKey = requireActiveUser(authentication, request);
-        NoteDto updated = repository.upsertOwned(id, ownerKey, req);
+        NoteDto updated = repository.upsertOwned(id, ownerKey, sanitizeForUpdate(authentication, request, ownerKey, req));
         return ApiResponse.ok(updated);
     }
 
@@ -133,5 +146,46 @@ public class NoteController {
         userProfileRepository.upsert(login, login, null);
         userProfileRepository.ensureActive(login);
         return login;
+    }
+
+    private NoteDto sanitizeForUpdate(
+        Authentication authentication,
+        HttpServletRequest request,
+        String ownerKey,
+        NoteDto req
+    ) {
+        boolean isAdmin = hasAdminPermission(authentication, request, ownerKey);
+        return new NoteDto(
+            req.id(),
+            req.title(),
+            req.contentMd(),
+            req.visibility(),
+            req.status(),
+            req.category(),
+            req.ownerKey(),
+            req.ownerName(),
+            req.ownerAvatarUrl(),
+            isAdmin,
+            isAdmin && req.isPinned()
+        );
+    }
+
+    private boolean hasAdminPermission(Authentication authentication, HttpServletRequest request, String login) {
+        if (authentication != null && authentication.getAuthorities()
+            .stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch("ROLE_ADMIN"::equals)) {
+            return true;
+        }
+
+        if (adminWhitelistRepository.isAdmin(login)) {
+            return true;
+        }
+
+        if (request == null || expectedAdminToken == null || expectedAdminToken.isBlank()) {
+            return false;
+        }
+        String headerValue = request.getHeader(AdminTokenFilter.HEADER);
+        return headerValue != null && expectedAdminToken.equals(headerValue);
     }
 }

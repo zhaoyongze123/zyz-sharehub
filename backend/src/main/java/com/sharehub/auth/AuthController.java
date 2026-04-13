@@ -68,7 +68,8 @@ public class AuthController {
             profile.avatarFileId(),
             profile.avatarUrl(),
             profile.status(),
-            hasAdminRole(authentication, request)
+            hasAdminRole(authentication, request),
+            profile.isSuperAdmin()
         );
         return ApiResponse.ok(response);
     }
