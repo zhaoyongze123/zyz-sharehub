@@ -7,6 +7,7 @@ import com.sharehub.files.FileRecord;
 import com.sharehub.files.FileRepository;
 import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -35,8 +36,9 @@ public class RoadmapService {
   }
 
   public RoadmapDto create(String ownerKey, RoadmapDto req) {
+    String normalizedStatus = normalizeStatus(req.status());
     RoadmapDto payload =
-        new RoadmapDto(null, req.title(), req.description(), req.visibility(), normalizeStatus(req.status()));
+        new RoadmapDto(null, req.title(), req.description(), req.visibility(), normalizedStatus);
     return repository.save(ownerKey, payload);
   }
 
@@ -112,6 +114,10 @@ public class RoadmapService {
   public RoadmapEnrollmentDto completeEnrollment(String userKey, Long roadmapId) {
     repository.requireRoadmapExists(roadmapId);
     return enrollmentRepository.complete(roadmapId, userKey);
+  }
+
+  public void delete(String ownerKey, Long roadmapId) {
+    repository.softDelete(ownerKey, roadmapId, Instant.now());
   }
 
   private String normalizeStatus(String status) {

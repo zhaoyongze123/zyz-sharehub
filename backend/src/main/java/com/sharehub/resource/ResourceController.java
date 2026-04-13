@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -88,6 +89,7 @@ public class ResourceController {
         entity.setOwnerKey(ownerKey);
         entity.setVisibility(req.visibility());
         entity.setStatus("DRAFT");
+        entity.setPublishedAt(null);
         ResourceEntity saved = repository.save(entity);
         tagAssignmentRepository.syncResourceTags(saved.getId(), normalizedTags);
         return ApiResponse.ok(enrichResource(saved));
@@ -180,6 +182,9 @@ public class ResourceController {
     public ApiResponse<ResourceDto> detail(@PathVariable Long id) {
         return repository.findById(id)
             .map(entity -> {
+                if (entity.getDeletedAt() != null) {
+                    throw new NotFoundException("NOT_FOUND");
+                }
                 if ("REMOVED".equalsIgnoreCase(entity.getStatus())) {
                     throw new ResponseStatusException(HttpStatus.GONE, "RESOURCE_REMOVED");
                 }
@@ -229,6 +234,9 @@ public class ResourceController {
         existing.setObjectKey(req.objectKey());
         existing.setVisibility(req.visibility());
         existing.setStatus(req.status() == null ? existing.getStatus() : req.status());
+        if ("PUBLISHED".equalsIgnoreCase(existing.getStatus()) && existing.getPublishedAt() == null) {
+            existing.setPublishedAt(Instant.now());
+        }
         ResourceEntity saved = repository.save(existing);
         tagAssignmentRepository.syncResourceTags(saved.getId(), normalizedTags);
         return ApiResponse.ok(enrichResource(saved));
@@ -242,7 +250,9 @@ public class ResourceController {
     ) {
         String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity entity = requireOwnedResource(id, ownerKey, "RESOURCE_NOT_FOUND");
-        repository.delete(entity);
+        entity.setDeletedAt(Instant.now());
+        entity.setDeletedBy(ownerKey);
+        repository.save(entity);
         return ApiResponse.ok("DELETED");
     }
 
@@ -255,6 +265,9 @@ public class ResourceController {
         String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity entity = requireOwnedResource(id, ownerKey);
         entity.setStatus("PUBLISHED");
+        if (entity.getPublishedAt() == null) {
+            entity.setPublishedAt(Instant.now());
+        }
         return ApiResponse.ok(enrichResource(repository.save(entity)));
     }
 
@@ -382,6 +395,9 @@ public class ResourceController {
     private ResourceEntity requireOwnedResource(Long id, String ownerKey, String notFoundCode) {
         ResourceEntity entity = repository.findById(id)
             .orElseThrow(() -> new NotFoundException(notFoundCode));
+        if (entity.getDeletedAt() != null) {
+            throw new NotFoundException(notFoundCode);
+        }
         if (!entity.getOwnerKey().equals(ownerKey)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "RESOURCE_FORBIDDEN");
         }

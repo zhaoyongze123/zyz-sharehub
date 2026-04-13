@@ -58,7 +58,7 @@ public class MeService {
     public MeDto aggregate(String ownerKey) {
         UserProfileDto profile = userProfileRepository.upsert(ownerKey, null, null);
         Long resourceCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resources WHERE owner_key = ?",
+            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND deleted_at IS NULL",
             Long.class,
             ownerKey
         );
@@ -154,7 +154,7 @@ public class MeService {
 
     private long countResourcesByStatus(String ownerKey, String status) {
         Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND status = ?",
+            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND status = ? AND deleted_at IS NULL",
             Long.class,
             ownerKey,
             status
@@ -164,7 +164,7 @@ public class MeService {
 
     private long countNotesByStatus(String ownerKey, String status) {
         Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM notes WHERE owner_key = ? AND status = ?",
+            "SELECT COUNT(*) FROM notes WHERE owner_key = ? AND status = ? AND deleted_at IS NULL",
             Long.class,
             ownerKey,
             status
@@ -185,7 +185,7 @@ public class MeService {
     private long countResourcesCreatedWithin(String ownerKey, Duration window) {
         Instant threshold = Instant.now().minus(window);
         Long count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND created_at >= ?",
+            "SELECT COUNT(*) FROM resources WHERE owner_key = ? AND deleted_at IS NULL AND created_at >= ?",
             Long.class,
             ownerKey,
             Timestamp.from(threshold)

@@ -136,6 +136,16 @@ public class RoadmapController {
         return ApiResponse.ok(service.completeEnrollment(requireActiveUser(authentication, request), id));
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> delete(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        service.delete(requireActiveUser(authentication, request), id);
+        return ApiResponse.ok("DELETED");
+    }
+
     private String resolveActiveUser(Authentication authentication, HttpServletRequest request) {
         Optional<String> resolvedUser = requestAccessService.resolveUser(authentication, request);
         if (resolvedUser.isEmpty()) {

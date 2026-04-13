@@ -281,6 +281,13 @@ class ResourceControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value("DELETED"));
 
+        Map<String, Object> deletedRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM resources WHERE id = ?",
+            resourceId
+        );
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_at")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_by")).isEqualTo(DEFAULT_USER);
+
         mockMvc.perform(get("/api/resources/{id}", resourceId))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"));

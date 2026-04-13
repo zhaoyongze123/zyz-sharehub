@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -505,5 +506,43 @@ class RoadmapControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].status").value("PUBLISHED"))
             .andExpect(jsonPath("$.data.items[1].title").value("路线A"))
             .andExpect(jsonPath("$.data.items[1].status").value("DRAFT"));
+    }
+
+    @Test
+    void shouldSoftDeleteRoadmapAndHideItFromDefaultQueries() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"待删除路线","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(delete("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").value("DELETED"));
+
+        Map<String, Object> deletedRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM roadmaps WHERE id = ?",
+            roadmapId
+        );
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_at")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_by")).isEqualTo(OWNER);
+
+        mockMvc.perform(get("/api/roadmaps")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
     }
 }

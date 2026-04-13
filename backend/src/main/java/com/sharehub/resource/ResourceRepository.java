@@ -17,6 +17,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.ownerKey = :ownerKey
+          and r.deletedAt is null
           and (:status is null or r.status = :status)
           and (:visibility is null or r.visibility = :visibility)
         order by r.updatedAt desc
@@ -38,6 +39,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status in (:statuses)
+          and r.deletedAt is null
           and (
             :keyword = ''
             or lower(r.title) like lower(concat('%', :keyword, '%'))
@@ -58,6 +60,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select count(r)
         from ResourceEntity r
         where r.status in (:statuses)
+          and r.deletedAt is null
           and (
             :keyword = ''
             or lower(r.title) like lower(concat('%', :keyword, '%'))
@@ -77,6 +80,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.id in (:ids)
+          and r.deletedAt is null
           and r.status in (:statuses)
           and (
             :keyword = ''
@@ -99,6 +103,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select count(r)
         from ResourceEntity r
         where r.id in (:ids)
+          and r.deletedAt is null
           and r.status in (:statuses)
           and (
             :keyword = ''
@@ -124,6 +129,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status = 'PUBLISHED'
+          and r.deletedAt is null
         order by r.updatedAt desc
         """)
     List<ResourceEntity> findTop6ByPublishedOrderByUpdatedAtDesc();
@@ -132,6 +138,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status = 'PUBLISHED'
+          and r.deletedAt is null
           and r.id <> :id
         order by r.updatedAt desc
         """)
@@ -141,6 +148,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.id in :ids
+          and r.deletedAt is null
         order by r.updatedAt desc
         """)
     List<ResourceEntity> findAllByIdInOrderByUpdatedAtDesc(@Param("ids") Collection<Long> ids);

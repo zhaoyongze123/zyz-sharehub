@@ -145,7 +145,7 @@ public class NoteController {
     ) {
         String ownerKey = requireActiveUser(authentication, request);
         if (hasAdminPermission(authentication, request, ownerKey)) {
-            repository.deleteById(id);
+            repository.deleteById(id, ownerKey);
         } else {
             repository.deleteOwned(id, ownerKey);
         }

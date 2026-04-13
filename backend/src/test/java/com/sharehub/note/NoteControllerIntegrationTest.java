@@ -97,6 +97,13 @@ public class NoteControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value("DELETED"));
+
+        Map<String, Object> deletedRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM notes WHERE id = ?",
+            id
+        );
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_at")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_by")).isEqualTo(USER_KEY);
     }
 
     @Test

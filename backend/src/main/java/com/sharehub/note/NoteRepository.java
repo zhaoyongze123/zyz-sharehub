@@ -50,10 +50,11 @@ public class NoteRepository {
                           category,
                           is_official,
                           is_pinned,
+                          published_at,
                           created_at,
                           updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                     new String[] {"id"}
                 );
@@ -65,6 +66,11 @@ public class NoteRepository {
                 statement.setString(6, nullable(note.category()));
                 statement.setBoolean(7, note.isOfficial());
                 statement.setBoolean(8, note.isPinned());
+                if ("PUBLISHED".equalsIgnoreCase(defaultStatus(note.status()))) {
+                    statement.setTimestamp(9, Timestamp.from(Instant.now()));
+                } else {
+                    statement.setNull(9, java.sql.Types.TIMESTAMP);
+                }
                 return statement;
             },
             keyHolder
@@ -85,7 +91,7 @@ public class NoteRepository {
             """
                 SELECT COUNT(*)
                 FROM notes
-                WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED'
+                WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED' AND deleted_at IS NULL
                 """,
             Long.class
         );
@@ -112,7 +118,7 @@ public class NoteRepository {
                   END AS owner_avatar_url
                 FROM notes n
                 LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED'
+                WHERE n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED' AND n.deleted_at IS NULL
                 ORDER BY n.is_pinned DESC, n.id DESC
                 LIMIT ? OFFSET ?
                 """,
@@ -141,7 +147,7 @@ public class NoteRepository {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
         String normalizedStatus = normalize(status);
-        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM notes WHERE owner_key = ?");
+        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM notes WHERE owner_key = ? AND deleted_at IS NULL");
         List<Object> countArgs = new ArrayList<>();
         countArgs.add(ownerKey);
         if (normalizedStatus != null) {
@@ -172,7 +178,7 @@ public class NoteRepository {
                   END AS owner_avatar_url
                 FROM notes n
                 LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.owner_key = ?
+                WHERE n.owner_key = ? AND n.deleted_at IS NULL
                 """
         );
         List<Object> listArgs = new ArrayList<>();
@@ -233,6 +239,10 @@ public class NoteRepository {
                     category = ?,
                     is_official = ?,
                     is_pinned = ?,
+                    published_at = CASE
+                      WHEN ? = 'PUBLISHED' AND published_at IS NULL THEN CURRENT_TIMESTAMP
+                      ELSE published_at
+                    END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND owner_key = ?
                 """,
@@ -243,6 +253,7 @@ public class NoteRepository {
             nullable(note.category()),
             note.isOfficial(),
             note.isPinned(),
+            normalizeForUpdate(note.status(), existing.status()),
             id,
             ownerKey
         );
@@ -251,21 +262,30 @@ public class NoteRepository {
     }
 
     public void deleteOwned(Long id, String ownerKey) {
-        int affected = jdbcTemplate.update("DELETE FROM notes WHERE id = ? AND owner_key = ?", id, ownerKey);
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ? AND owner_key = ? AND deleted_at IS NULL",
+            ownerKey,
+            id,
+            ownerKey
+        );
         if (affected == 0) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
     }
 
-    public void deleteById(Long id) {
-        int affected = jdbcTemplate.update("DELETE FROM notes WHERE id = ?", id);
+    public void deleteById(Long id, String operatorKey) {
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+            operatorKey,
+            id
+        );
         if (affected == 0) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
     }
 
     public long countByOwner(String ownerKey) {
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notes WHERE owner_key = ?", Long.class, ownerKey);
+        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notes WHERE owner_key = ? AND deleted_at IS NULL", Long.class, ownerKey);
         return count == null ? 0L : count;
     }
 
@@ -274,7 +294,7 @@ public class NoteRepository {
             return false;
         }
         Boolean exists = jdbcTemplate.queryForObject(
-            "SELECT EXISTS(SELECT 1 FROM notes WHERE id = ?)",
+            "SELECT EXISTS(SELECT 1 FROM notes WHERE id = ? AND deleted_at IS NULL)",
             Boolean.class,
             id
         );
@@ -302,6 +322,7 @@ public class NoteRepository {
                 FROM notes n
                 LEFT JOIN users u ON u.login = n.owner_key
                 WHERE n.id <> ?
+                  AND n.deleted_at IS NULL
                   AND (
                     (? IS NOT NULL AND n.owner_key = ?)
                     OR (n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED')
@@ -361,7 +382,7 @@ public class NoteRepository {
                 SELECT COUNT(*)
                 FROM note_view_history h
                 JOIN notes n ON n.id = h.note_id
-                WHERE h.user_key = ?
+                WHERE h.user_key = ? AND n.deleted_at IS NULL
                 """,
             Long.class,
             viewerKey
@@ -392,7 +413,7 @@ public class NoteRepository {
                   ON uf.note_id = n.id
                  AND uf.resource_id IS NULL
                  AND uf.user_key = ?
-                WHERE h.user_key = ?
+                WHERE h.user_key = ? AND n.deleted_at IS NULL
                 GROUP BY
                   n.id,
                   n.title,
@@ -452,7 +473,7 @@ public class NoteRepository {
                   END AS owner_avatar_url
                 FROM notes n
                 LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.id = ? AND n.owner_key = ?
+                WHERE n.id = ? AND n.owner_key = ? AND n.deleted_at IS NULL
                 """,
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),
@@ -497,7 +518,7 @@ public class NoteRepository {
                   END AS owner_avatar_url
                 FROM notes n
                 LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.id = ? AND n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED'
+                WHERE n.id = ? AND n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED' AND n.deleted_at IS NULL
                 """,
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),

@@ -248,7 +248,7 @@ public class InteractionRepository {
                 SELECT COUNT(*)
                 FROM favorites f
                 JOIN resources r ON r.id = f.resource_id
-                WHERE f.user_key = ? AND f.resource_id IS NOT NULL
+                WHERE f.user_key = ? AND f.resource_id IS NOT NULL AND r.deleted_at IS NULL
                 """,
             Long.class,
             userKey
@@ -259,7 +259,7 @@ public class InteractionRepository {
                 SELECT r.id, r.title, r.type, r.summary, r.tags, r.external_url, r.object_key, r.visibility, r.status
                 FROM favorites f
                 JOIN resources r ON r.id = f.resource_id
-                WHERE f.user_key = ? AND f.resource_id IS NOT NULL
+                WHERE f.user_key = ? AND f.resource_id IS NOT NULL AND r.deleted_at IS NULL
                 ORDER BY f.id DESC
                 LIMIT ? OFFSET ?
                 """,
@@ -289,7 +289,7 @@ public class InteractionRepository {
                 SELECT COUNT(*)
                 FROM favorites f
                 JOIN notes n ON n.id = f.note_id
-                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL
+                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL AND n.deleted_at IS NULL
                 """,
             Long.class,
             userKey
@@ -315,7 +315,7 @@ public class InteractionRepository {
                 JOIN notes n ON n.id = f.note_id
                 LEFT JOIN users u ON u.login = n.owner_key
                 LEFT JOIN favorites all_f ON all_f.note_id = n.id AND all_f.resource_id IS NULL
-                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL
+                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL AND n.deleted_at IS NULL
                 GROUP BY
                   n.id,
                   n.title,
@@ -367,6 +367,7 @@ public class InteractionRepository {
                 JOIN notes n ON n.id = f.note_id
                 WHERE n.owner_key = ?
                   AND n.status = 'PUBLISHED'
+                  AND n.deleted_at IS NULL
                   AND f.note_id IS NOT NULL
                   AND f.resource_id IS NULL
                 """,

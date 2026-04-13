@@ -38,13 +38,18 @@ public class RoadmapJdbcRepository {
             connection -> {
               PreparedStatement statement =
                   connection.prepareStatement(
-                      "INSERT INTO roadmaps (title, description, owner_key, visibility, status) VALUES (?, ?, ?, ?, ?)",
+                      "INSERT INTO roadmaps (title, description, owner_key, visibility, status, published_at) VALUES (?, ?, ?, ?, ?, ?)",
                       new String[] {"id"});
               statement.setString(1, dto.title());
               statement.setString(2, dto.description());
               statement.setString(3, ownerKey);
               statement.setString(4, dto.visibility());
               statement.setString(5, dto.status());
+              if ("PUBLISHED".equalsIgnoreCase(dto.status())) {
+                statement.setTimestamp(6, Timestamp.from(Instant.now()));
+              } else {
+                statement.setNull(6, java.sql.Types.TIMESTAMP);
+              }
               return statement;
             },
         holder);
@@ -52,11 +57,11 @@ public class RoadmapJdbcRepository {
   }
 
   public PageResponse<RoadmapDto> list(int page, int pageSize) {
-    long total = Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps", Long.class)).orElse(0L);
+    long total = Optional.ofNullable(jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE deleted_at IS NULL", Long.class)).orElse(0L);
     int offset = Math.max(0, page - 1) * pageSize;
     List<RoadmapDto> records =
         jdbc.query(
-            "SELECT id, title, description, visibility, status FROM roadmaps ORDER BY id DESC LIMIT ? OFFSET ?",
+            "SELECT id, title, description, visibility, status FROM roadmaps WHERE deleted_at IS NULL ORDER BY id DESC LIMIT ? OFFSET ?",
             (rs, rowNum) ->
                 new RoadmapDto(
                     rs.getLong("id"),
@@ -74,7 +79,7 @@ public class RoadmapJdbcRepository {
     int safePageSize = Math.max(1, pageSize);
     long total =
         Optional.ofNullable(
-                jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ?", Long.class, ownerKey))
+                jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ? AND deleted_at IS NULL", Long.class, ownerKey))
             .orElse(0L);
     int offset = (safePage - 1) * safePageSize;
     List<RoadmapDto> records =
@@ -82,7 +87,7 @@ public class RoadmapJdbcRepository {
             """
                 SELECT id, title, description, visibility, status
                 FROM roadmaps
-                WHERE owner_key = ?
+                WHERE owner_key = ? AND deleted_at IS NULL
                 ORDER BY id DESC
                 LIMIT ? OFFSET ?
                 """,
@@ -108,12 +113,13 @@ public class RoadmapJdbcRepository {
             ? """
                 SELECT COUNT(*)
                 FROM roadmaps
-                WHERE owner_key = ?
+                WHERE owner_key = ? AND deleted_at IS NULL
                 """
             : """
                 SELECT COUNT(*)
                 FROM roadmaps
                 WHERE owner_key = ?
+                  AND deleted_at IS NULL
                   AND status = ?
                 """;
     Long total =
@@ -146,6 +152,7 @@ public class RoadmapJdbcRepository {
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
                 WHERE r.owner_key = ?
+                  AND r.deleted_at IS NULL
                 GROUP BY r.id, r.title, r.description, r.visibility, r.status, np.completed_node_count, p.payload
                 ORDER BY r.id DESC
                 LIMIT ? OFFSET ?
@@ -173,6 +180,7 @@ public class RoadmapJdbcRepository {
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
                 WHERE r.owner_key = ?
+                  AND r.deleted_at IS NULL
                   AND r.status = ?
                 GROUP BY r.id, r.title, r.description, r.visibility, r.status, np.completed_node_count, p.payload
                 ORDER BY r.id DESC
@@ -223,6 +231,8 @@ public class RoadmapJdbcRepository {
                         AND e.user_key = p.user_key
                     )
                 ) t
+                JOIN roadmaps r ON r.id = t.roadmap_id
+                WHERE r.deleted_at IS NULL
                 """
             : """
                 SELECT COUNT(*)
@@ -243,6 +253,8 @@ public class RoadmapJdbcRepository {
                         AND e.user_key = p.user_key
                     )
                 ) t
+                JOIN roadmaps r ON r.id = t.roadmap_id
+                WHERE r.deleted_at IS NULL
                 """;
     Long total =
         normalizedStatus == null
@@ -289,7 +301,7 @@ public class RoadmapJdbcRepository {
                        es.started_at,
                        es.completed_at
                 FROM enrollment_source es
-                JOIN roadmaps r ON r.id = es.roadmap_id
+                JOIN roadmaps r ON r.id = es.roadmap_id AND r.deleted_at IS NULL
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
                 LEFT JOIN (
                   SELECT roadmap_id, user_key, COUNT(*) AS completed_node_count
@@ -345,7 +357,7 @@ public class RoadmapJdbcRepository {
                        es.started_at,
                        es.completed_at
                 FROM enrollment_source es
-                JOIN roadmaps r ON r.id = es.roadmap_id
+                JOIN roadmaps r ON r.id = es.roadmap_id AND r.deleted_at IS NULL
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
                 LEFT JOIN (
                   SELECT roadmap_id, user_key, COUNT(*) AS completed_node_count
@@ -380,7 +392,7 @@ public class RoadmapJdbcRepository {
   public Optional<RoadmapDto> findById(Long id) {
     List<RoadmapDto> results =
         jdbc.query(
-            "SELECT id, title, description, visibility, status FROM roadmaps WHERE id = ?",
+            "SELECT id, title, description, visibility, status FROM roadmaps WHERE id = ? AND deleted_at IS NULL",
             (rs, rowNum) ->
                 new RoadmapDto(
                     rs.getLong("id"),
@@ -440,7 +452,7 @@ public class RoadmapJdbcRepository {
                 SELECT COUNT(*)
                 FROM roadmap_nodes n
                 JOIN roadmaps r ON r.id = n.roadmap_id
-                WHERE n.id = ? AND n.roadmap_id = ? AND r.owner_key = ?
+                WHERE n.id = ? AND n.roadmap_id = ? AND r.owner_key = ? AND r.deleted_at IS NULL
                 """,
             Integer.class,
             nodeId,
@@ -492,12 +504,12 @@ public class RoadmapJdbcRepository {
   }
 
   public long countByOwner(String ownerKey) {
-    Long count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ?", Long.class, ownerKey);
+    Long count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ? AND deleted_at IS NULL", Long.class, ownerKey);
     return count == null ? 0L : count;
   }
 
   public void requireRoadmapExists(Long roadmapId) {
-    Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE id = ?", Integer.class, roadmapId);
+    Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE id = ? AND deleted_at IS NULL", Integer.class, roadmapId);
     if (count == null || count == 0) {
       throw new NotFoundException("ROADMAP_NOT_FOUND");
     }
@@ -506,11 +518,24 @@ public class RoadmapJdbcRepository {
   private void requireRoadmap(Long roadmapId, String ownerKey) {
     Integer count =
         jdbc.queryForObject(
-            "SELECT COUNT(*) FROM roadmaps WHERE id = ? AND owner_key = ?",
+            "SELECT COUNT(*) FROM roadmaps WHERE id = ? AND owner_key = ? AND deleted_at IS NULL",
             Integer.class,
             roadmapId,
             ownerKey);
     if (count == null || count == 0) {
+      throw new NotFoundException("ROADMAP_NOT_FOUND");
+    }
+  }
+
+  public void softDelete(String ownerKey, Long roadmapId, Instant deletedAt) {
+    int affected =
+        jdbc.update(
+            "UPDATE roadmaps SET deleted_at = ?, deleted_by = ? WHERE id = ? AND owner_key = ? AND deleted_at IS NULL",
+            Timestamp.from(deletedAt),
+            ownerKey,
+            roadmapId,
+            ownerKey);
+    if (affected == 0) {
       throw new NotFoundException("ROADMAP_NOT_FOUND");
     }
   }

@@ -35,6 +35,16 @@ public class ResourceEntity {
 
     private String status;
 
+    private Instant publishedAt;
+
+    private Instant reviewedAt;
+
+    private String reviewedBy;
+
+    private Instant deletedAt;
+
+    private String deletedBy;
+
     private Instant createdAt = Instant.now();
 
     private Instant updatedAt = Instant.now();
@@ -124,6 +134,46 @@ public class ResourceEntity {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(Instant publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public Instant getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(Instant reviewedAt) {
+        this.reviewedAt = reviewedAt;
+    }
+
+    public String getReviewedBy() {
+        return reviewedBy;
+    }
+
+    public void setReviewedBy(String reviewedBy) {
+        this.reviewedBy = reviewedBy;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public String getDeletedBy() {
+        return deletedBy;
+    }
+
+    public void setDeletedBy(String deletedBy) {
+        this.deletedBy = deletedBy;
     }
 
     public Instant getUpdatedAt() {
