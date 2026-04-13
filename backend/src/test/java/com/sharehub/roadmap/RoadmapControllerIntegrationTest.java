@@ -70,6 +70,9 @@ class RoadmapControllerIntegrationTest {
             .getContentAsString();
 
         Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+        Long ownerId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, OWNER);
+        Long roadmapUserId = jdbcTemplate.queryForObject("SELECT user_id FROM roadmaps WHERE id = ?", Long.class, roadmapId);
+        org.assertj.core.api.Assertions.assertThat(roadmapUserId).isEqualTo(ownerId);
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER)
@@ -109,6 +112,21 @@ class RoadmapControllerIntegrationTest {
             OWNER
         );
         org.assertj.core.api.Assertions.assertThat(completedNodeProgressCount).isEqualTo(1);
+        Long progressUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM roadmap_progress WHERE roadmap_id = ? AND user_key = ?",
+            Long.class,
+            roadmapId,
+            OWNER
+        );
+        Long nodeProgressUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM roadmap_node_progress WHERE roadmap_id = ? AND user_key = ? AND node_id = ?",
+            Long.class,
+            roadmapId,
+            OWNER,
+            nodeId
+        );
+        org.assertj.core.api.Assertions.assertThat(progressUserId).isEqualTo(ownerId);
+        org.assertj.core.api.Assertions.assertThat(nodeProgressUserId).isEqualTo(ownerId);
 
         mockMvc.perform(get("/api/me/authored-roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER))
@@ -227,6 +245,15 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+        Long otherUserId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, OTHER_USER);
+        Long enrollmentUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM roadmap_enrollments WHERE roadmap_id = ? AND user_key = ?",
+            Long.class,
+            roadmapId,
+            OTHER_USER
+        );
+        org.assertj.core.api.Assertions.assertThat(enrollmentUserId).isEqualTo(otherUserId);
     }
 
     @Test

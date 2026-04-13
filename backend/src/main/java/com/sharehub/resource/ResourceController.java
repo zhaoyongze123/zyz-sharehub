@@ -87,6 +87,7 @@ public class ResourceController {
         entity.setExternalUrl(req.externalUrl());
         entity.setObjectKey(req.objectKey());
         entity.setOwnerKey(ownerKey);
+        entity.setUserId(userProfileRepository.findIdOptionalByLogin(ownerKey).orElse(null));
         entity.setVisibility(req.visibility());
         entity.setStatus("DRAFT");
         entity.setPublishedAt(null);

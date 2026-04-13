@@ -1,5 +1,6 @@
 package com.sharehub.note;
 
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
@@ -29,13 +30,20 @@ public class NoteRepository {
 
     private final JdbcTemplate jdbcTemplate;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final UserProfileRepository userProfileRepository;
 
-    public NoteRepository(JdbcTemplate jdbcTemplate, TagAssignmentRepository tagAssignmentRepository) {
+    public NoteRepository(
+        JdbcTemplate jdbcTemplate,
+        TagAssignmentRepository tagAssignmentRepository,
+        UserProfileRepository userProfileRepository
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.tagAssignmentRepository = tagAssignmentRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     public NoteDto save(String ownerKey, NoteDto note) {
+        Long userId = userProfileRepository.findIdOptionalByLogin(ownerKey).orElse(null);
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
@@ -45,6 +53,7 @@ public class NoteRepository {
                           title,
                           content_md,
                           owner_key,
+                          user_id,
                           visibility,
                           status,
                           category,
@@ -54,22 +63,23 @@ public class NoteRepository {
                           created_at,
                           updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                     new String[] {"id"}
                 );
                 statement.setString(1, note.title());
                 statement.setString(2, note.contentMd());
                 statement.setString(3, ownerKey);
-                statement.setString(4, nullable(note.visibility()));
-                statement.setString(5, defaultStatus(note.status()));
-                statement.setString(6, nullable(note.category()));
-                statement.setBoolean(7, note.isOfficial());
-                statement.setBoolean(8, note.isPinned());
+                statement.setObject(4, userId);
+                statement.setString(5, nullable(note.visibility()));
+                statement.setString(6, defaultStatus(note.status()));
+                statement.setString(7, nullable(note.category()));
+                statement.setBoolean(8, note.isOfficial());
+                statement.setBoolean(9, note.isPinned());
                 if ("PUBLISHED".equalsIgnoreCase(defaultStatus(note.status()))) {
-                    statement.setTimestamp(9, Timestamp.from(Instant.now()));
+                    statement.setTimestamp(10, Timestamp.from(Instant.now()));
                 } else {
-                    statement.setNull(9, java.sql.Types.TIMESTAMP);
+                    statement.setNull(10, java.sql.Types.TIMESTAMP);
                 }
                 return statement;
             },

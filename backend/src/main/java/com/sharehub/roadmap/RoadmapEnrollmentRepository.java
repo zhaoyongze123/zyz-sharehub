@@ -1,5 +1,6 @@
 package com.sharehub.roadmap;
 
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.NotFoundException;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
@@ -18,9 +19,11 @@ public class RoadmapEnrollmentRepository {
     private static final String STATUS_COMPLETED = "COMPLETED";
 
     private final JdbcTemplate jdbcTemplate;
+    private final UserProfileRepository userProfileRepository;
 
-    public RoadmapEnrollmentRepository(JdbcTemplate jdbcTemplate) {
+    public RoadmapEnrollmentRepository(JdbcTemplate jdbcTemplate, UserProfileRepository userProfileRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.userProfileRepository = userProfileRepository;
     }
 
     public Optional<RoadmapEnrollmentDto> findByRoadmapIdAndUserKey(Long roadmapId, String userKey) {
@@ -41,15 +44,17 @@ public class RoadmapEnrollmentRepository {
     public RoadmapEnrollmentDto createOrActivate(Long roadmapId, String userKey) {
         Optional<RoadmapEnrollmentDto> existing = findByRoadmapIdAndUserKey(roadmapId, userKey);
         Instant now = Instant.now();
+        Long userId = resolveUserId(userKey);
         if (existing.isEmpty()) {
             jdbcTemplate.update(
                 """
                     INSERT INTO roadmap_enrollments
-                    (roadmap_id, user_key, status, started_at, completed_at, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (roadmap_id, user_key, user_id, status, started_at, completed_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 roadmapId,
                 userKey,
+                userId,
                 STATUS_ACTIVE,
                 Timestamp.from(now),
                 null,
@@ -163,5 +168,9 @@ public class RoadmapEnrollmentRepository {
 
     private Instant toInstant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    private Long resolveUserId(String login) {
+        return userProfileRepository.findIdOptionalByLogin(login).orElse(null);
     }
 }

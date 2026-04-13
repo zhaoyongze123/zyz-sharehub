@@ -109,6 +109,10 @@ public class UserProfileRepository {
         return findOptional(login);
     }
 
+    public Optional<Long> findIdOptionalByLogin(String login) {
+        return findOptional(login).map(UserProfileDto::id);
+    }
+
     public UserProfileDto findById(Long id) {
         return findOptionalById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
     }

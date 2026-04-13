@@ -38,3 +38,11 @@ npm run dev
 
 ## 说明
 当前版本实现了可运行骨架与接口契约，便于你在此基础上继续填充真实持久化、审核策略、全文检索与高保真页面。
+
+## 当前数据结构进度
+- 已完成标签标准化、内容治理字段与软删除。
+- 已完成内容域 `user_id` 渐进迁移第一阶段：
+  - 新增 `resources`、`roadmaps`、`notes`、`roadmap_enrollments`、`roadmap_progress`、`roadmap_node_progress`、`comments`、`favorites`、`likes`、`reports` 的 nullable `user_id` 列。
+  - Flyway 迁移脚本会按 `users.login` 回填历史 `user_id`。
+  - 新创建的资料、路线、笔记、路线报名、路线进度、评论、点赞、收藏、举报会同步写入 `user_id`。
+  - 现阶段仍保留原有字符串键读取逻辑，保证兼容窗口。

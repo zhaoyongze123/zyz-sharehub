@@ -112,6 +112,30 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.likes").value(1))
             .andExpect(jsonPath("$.data.reports").value(1));
 
+        Long actorUserId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, USER_KEY);
+        Long commentUserId = jdbcTemplate.queryForObject("SELECT user_id FROM comments WHERE id = ?", Long.class, commentId);
+        Long favoriteUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM favorites WHERE resource_id = ? AND user_key = ? ORDER BY id DESC LIMIT 1",
+            Long.class,
+            resourceId,
+            USER_KEY
+        );
+        Long likeUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM likes WHERE resource_id = ? AND user_key = ? ORDER BY id DESC LIMIT 1",
+            Long.class,
+            resourceId,
+            USER_KEY
+        );
+        Long reportUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM reports WHERE target_type = 'RESOURCE' AND target_id = ? ORDER BY id DESC LIMIT 1",
+            Long.class,
+            resourceId
+        );
+        Assertions.assertThat(commentUserId).isEqualTo(actorUserId);
+        Assertions.assertThat(favoriteUserId).isEqualTo(actorUserId);
+        Assertions.assertThat(likeUserId).isEqualTo(actorUserId);
+        Assertions.assertThat(reportUserId).isEqualTo(actorUserId);
+
         mvc.perform(post("/api/resources/" + resourceId + "/favorite")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())

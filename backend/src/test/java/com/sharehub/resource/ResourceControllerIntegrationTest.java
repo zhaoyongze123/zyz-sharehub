@@ -84,6 +84,9 @@ class ResourceControllerIntegrationTest {
             Integer.class
         );
         org.assertj.core.api.Assertions.assertThat(relationCount).isEqualTo(2);
+        Long creatorId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, DEFAULT_USER);
+        Long resourceUserId = jdbcTemplate.queryForObject("SELECT user_id FROM resources WHERE title = ?", Long.class, "Spring 实战");
+        org.assertj.core.api.Assertions.assertThat(resourceUserId).isEqualTo(creatorId);
     }
 
     @Test

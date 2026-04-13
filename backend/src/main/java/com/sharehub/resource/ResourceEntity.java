@@ -31,6 +31,9 @@ public class ResourceEntity {
     @Column(nullable = false)
     private String ownerKey = "local-dev-user";
 
+    @Column(name = "user_id")
+    private Long userId;
+
     private String visibility;
 
     private String status;
@@ -114,6 +117,14 @@ public class ResourceEntity {
 
     public void setOwnerKey(String ownerKey) {
         this.ownerKey = ownerKey;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public String getVisibility() {

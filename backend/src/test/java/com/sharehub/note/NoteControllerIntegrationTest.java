@@ -69,6 +69,9 @@ public class NoteControllerIntegrationTest {
         Map<?, ?> created = mapper.readValue(response, Map.class);
         Map<?, ?> data = (Map<?, ?>) created.get("data");
         Long id = Long.valueOf(data.get("id").toString());
+        Long creatorId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, USER_KEY);
+        Long noteUserId = jdbcTemplate.queryForObject("SELECT user_id FROM notes WHERE id = ?", Long.class, id);
+        org.assertj.core.api.Assertions.assertThat(noteUserId).isEqualTo(creatorId);
 
         mvc.perform(get("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)

@@ -2,6 +2,7 @@ package com.sharehub.roadmap;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
@@ -24,31 +25,35 @@ public class RoadmapJdbcRepository {
 
   private final JdbcTemplate jdbc;
   private final ObjectMapper objectMapper;
+  private final UserProfileRepository userProfileRepository;
 
-  public RoadmapJdbcRepository(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+  public RoadmapJdbcRepository(JdbcTemplate jdbc, ObjectMapper objectMapper, UserProfileRepository userProfileRepository) {
     this.jdbc = jdbc;
     this.objectMapper = objectMapper;
+    this.userProfileRepository = userProfileRepository;
   }
 
   @Transactional
   public RoadmapDto save(String ownerKey, RoadmapDto dto) {
+    Long userId = resolveUserId(ownerKey);
     KeyHolder holder = new GeneratedKeyHolder();
     jdbc.update(
         (PreparedStatementCreator)
             connection -> {
               PreparedStatement statement =
                   connection.prepareStatement(
-                      "INSERT INTO roadmaps (title, description, owner_key, visibility, status, published_at) VALUES (?, ?, ?, ?, ?, ?)",
+                      "INSERT INTO roadmaps (title, description, owner_key, user_id, visibility, status, published_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                       new String[] {"id"});
               statement.setString(1, dto.title());
               statement.setString(2, dto.description());
               statement.setString(3, ownerKey);
-              statement.setString(4, dto.visibility());
-              statement.setString(5, dto.status());
+              statement.setObject(4, userId);
+              statement.setString(5, dto.visibility());
+              statement.setString(6, dto.status());
               if ("PUBLISHED".equalsIgnoreCase(dto.status())) {
-                statement.setTimestamp(6, Timestamp.from(Instant.now()));
+                statement.setTimestamp(7, Timestamp.from(Instant.now()));
               } else {
-                statement.setNull(6, java.sql.Types.TIMESTAMP);
+                statement.setNull(7, java.sql.Types.TIMESTAMP);
               }
               return statement;
             },
@@ -468,18 +473,21 @@ public class RoadmapJdbcRepository {
     syncNodeProgress(roadmapId, ownerKey, extractCompletedNodeIds(normalizedPayload));
     String json = serialize(normalizedPayload);
     Instant now = Instant.now();
+    Long userId = resolveUserId(ownerKey);
     int updated =
         jdbc.update(
-            "UPDATE roadmap_progress SET payload = CAST(? AS jsonb), updated_at = ? WHERE roadmap_id = ? AND user_key = ?",
+            "UPDATE roadmap_progress SET user_id = COALESCE(user_id, ?), payload = CAST(? AS jsonb), updated_at = ? WHERE roadmap_id = ? AND user_key = ?",
+            userId,
             json,
             Timestamp.from(now),
             roadmapId,
             ownerKey);
     if (updated == 0) {
       jdbc.update(
-          "INSERT INTO roadmap_progress (roadmap_id, user_key, payload, updated_at) VALUES (?, ?, CAST(? AS jsonb), ?)",
+          "INSERT INTO roadmap_progress (roadmap_id, user_key, user_id, payload, updated_at) VALUES (?, ?, ?, CAST(? AS jsonb), ?)",
           roadmapId,
           ownerKey,
+          userId,
           json,
           Timestamp.from(now));
     }
@@ -730,14 +738,16 @@ public class RoadmapJdbcRepository {
     if (completedNodeIds.isEmpty()) {
       return;
     }
+    Long userId = resolveUserId(userKey);
     String sql =
         """
             INSERT INTO roadmap_node_progress
-              (roadmap_id, node_id, user_key, status, completed_at, created_at, updated_at)
-            VALUES (?, ?, ?, 'COMPLETED', ?, ?, ?)
+              (roadmap_id, node_id, user_key, user_id, status, completed_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'COMPLETED', ?, ?, ?)
             ON CONFLICT (node_id, user_key)
             DO UPDATE SET
               roadmap_id = EXCLUDED.roadmap_id,
+              user_id = COALESCE(roadmap_node_progress.user_id, EXCLUDED.user_id),
               status = EXCLUDED.status,
               completed_at = EXCLUDED.completed_at,
               updated_at = EXCLUDED.updated_at
@@ -751,9 +761,10 @@ public class RoadmapJdbcRepository {
           statement.setLong(1, roadmapId);
           statement.setLong(2, nodeId);
           statement.setString(3, userKey);
-          statement.setTimestamp(4, timestamp);
+          statement.setObject(4, userId);
           statement.setTimestamp(5, timestamp);
           statement.setTimestamp(6, timestamp);
+          statement.setTimestamp(7, timestamp);
         });
   }
 
@@ -787,5 +798,9 @@ public class RoadmapJdbcRepository {
       params[index + 3] = completedNodeIds.get(index);
     }
     jdbc.update(sql, params);
+  }
+
+  private Long resolveUserId(String login) {
+    return userProfileRepository.findIdOptionalByLogin(login).orElse(null);
   }
 }
