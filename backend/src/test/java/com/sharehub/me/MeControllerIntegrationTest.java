@@ -44,6 +44,7 @@ class MeControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM note_view_history");
+        jdbcTemplate.update("DELETE FROM roadmap_enrollments");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
         jdbcTemplate.update("DELETE FROM roadmaps");
@@ -255,7 +256,31 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("我的资料B"));
 
-        mockMvc.perform(get("/api/me/roadmaps")
+        String enrolledRoadmapResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, "enrollment-owner")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"跟学路线A","description":"desc-b","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long enrolledRoadmapId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(enrolledRoadmapResponse, Map.class).get("data")).get("id").toString());
+
+        jdbcTemplate.update(
+            "INSERT INTO roadmap_progress (roadmap_id, user_key, payload, updated_at) VALUES (?, ?, CAST(? AS jsonb), CURRENT_TIMESTAMP)",
+            enrolledRoadmapId,
+            USER_KEY,
+            "{\"percent\":50,\"completedNodeIds\":[1]}"
+        );
+
+        mockMvc.perform(post("/api/roadmaps/" + enrolledRoadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/me/authored-roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .param("page", "1")
                 .param("pageSize", "10")
@@ -266,6 +291,20 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].nodeCount").value(2))
             .andExpect(jsonPath("$.data.items[0].completedNodeCount").value(1))
             .andExpect(jsonPath("$.data.items[0].progressPercent").value(50));
+
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10")
+                .param("status", "ACTIVE"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].title").value("跟学路线A"))
+            .andExpect(jsonPath("$.data.items[0].enrollmentStatus").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.items[0].progressPercent").value(50))
+            .andExpect(jsonPath("$.data.items[1].title").value("路线A"))
+            .andExpect(jsonPath("$.data.items[1].enrollmentStatus").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.items[1].progressPercent").value(50));
 
         mockMvc.perform(get("/api/me/favorites")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
@@ -543,20 +582,42 @@ class MeControllerIntegrationTest {
 
     @Test
     void shouldTreatBlankRoadmapStatusAsUnfilteredAndClampInvalidPagination() throws Exception {
-        mockMvc.perform(post("/api/roadmaps")
-                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+        String firstRoadmapResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, "roadmap-enrollment-owner-a")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"路线A","description":"desc-a","visibility":"PUBLIC","status":"PUBLISHED"}
                     """))
-            .andExpect(status().isOk());
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
 
-        mockMvc.perform(post("/api/roadmaps")
-                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+        Long firstRoadmapId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(firstRoadmapResponse, Map.class).get("data")).get("id").toString());
+
+        String secondRoadmapResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, "roadmap-enrollment-owner-b")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"title":"路线B","description":"desc-b","visibility":"PRIVATE","status":"DRAFT"}
                     """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long secondRoadmapId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(secondRoadmapResponse, Map.class).get("data")).get("id").toString());
+
+        mockMvc.perform(post("/api/roadmaps/" + firstRoadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + secondRoadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + secondRoadmapId + "/enrollment/pause")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/me/roadmaps")

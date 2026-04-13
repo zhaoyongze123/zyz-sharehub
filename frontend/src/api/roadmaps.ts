@@ -22,6 +22,14 @@ export interface RoadmapDetail {
   progressPercent: number
   timeline: RoadmapTimelineItem[]
   relatedResources: ResourceItem[]
+  enrollment: RoadmapEnrollment | null
+}
+
+export interface RoadmapEnrollment {
+  roadmapId: number
+  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'QUIT'
+  startedAt: string | null
+  completedAt: string | null
 }
 
 export interface RoadmapTimelineItem {
@@ -91,6 +99,7 @@ interface RoadmapDetailData {
   roadmap: RoadmapDto
   nodes: RoadmapNodeTreeDto[]
   progress: Record<string, unknown> | null
+  enrollment: RoadmapEnrollment | null
 }
 
 const ROADMAP_PROGRESS_STORAGE_PREFIX = 'ShareHub.roadmapProgress.'
@@ -177,8 +186,84 @@ export async function fetchRoadmapDetail(id: string | number): Promise<RoadmapDe
     status: response.data.data.roadmap.status?.trim() || 'PUBLISHED',
     progressPercent,
     timeline,
-    relatedResources
+    relatedResources,
+    enrollment: response.data.data.enrollment ?? null
   }
+}
+
+export async function fetchMyEnrolledRoadmaps(query: { page: number; pageSize: number; status?: string }) {
+  const response = await apiClient.get<ApiResponse<{
+    items: Array<RoadmapItem & {
+      visibility?: string
+      status?: string
+      nodeCount?: number
+      completedNodeCount?: number
+      progressPercent?: number
+      enrollmentStatus?: string | null
+      startedAt?: string | null
+      completedAt?: string | null
+    }>
+    total: number
+    page: number
+    pageSize: number
+  }>>('/me/roadmaps', {
+    params: {
+      page: Math.max(1, query.page),
+      pageSize: query.pageSize,
+      status: query.status?.trim() || undefined
+    }
+  })
+  return response.data.data
+}
+
+export async function fetchMyAuthoredRoadmaps(query: { page: number; pageSize: number; status?: string }) {
+  const response = await apiClient.get<ApiResponse<{
+    items: Array<RoadmapItem & {
+      visibility?: string
+      status?: string
+      nodeCount?: number
+      completedNodeCount?: number
+      progressPercent?: number
+      enrollmentStatus?: string | null
+      startedAt?: string | null
+      completedAt?: string | null
+    }>
+    total: number
+    page: number
+    pageSize: number
+  }>>('/me/authored-roadmaps', {
+    params: {
+      page: Math.max(1, query.page),
+      pageSize: query.pageSize,
+      status: query.status?.trim() || undefined
+    }
+  })
+  return response.data.data
+}
+
+export async function enrollRoadmap(id: string | number) {
+  const response = await apiClient.post<ApiResponse<RoadmapEnrollment>>(`/roadmaps/${id}/enrollment`)
+  return response.data.data
+}
+
+export async function fetchRoadmapEnrollment(id: string | number) {
+  const response = await apiClient.get<ApiResponse<RoadmapEnrollment | null>>(`/roadmaps/${id}/enrollment`)
+  return response.data.data
+}
+
+export async function pauseRoadmapEnrollment(id: string | number) {
+  const response = await apiClient.post<ApiResponse<RoadmapEnrollment>>(`/roadmaps/${id}/enrollment/pause`)
+  return response.data.data
+}
+
+export async function resumeRoadmapEnrollment(id: string | number) {
+  const response = await apiClient.post<ApiResponse<RoadmapEnrollment>>(`/roadmaps/${id}/enrollment/resume`)
+  return response.data.data
+}
+
+export async function completeRoadmapEnrollment(id: string | number) {
+  const response = await apiClient.post<ApiResponse<RoadmapEnrollment>>(`/roadmaps/${id}/enrollment/complete`)
+  return response.data.data
 }
 
 function getRoadmapProgressStorageKey(roadmapId: string | number) {

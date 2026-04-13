@@ -75,7 +75,19 @@ public class MeController {
         @RequestParam(required = false) String status
     ) {
         String ownerKey = requireActiveUser(authentication, request);
-        return ApiResponse.ok(meService.myRoadmaps(ownerKey, status, page, pageSize));
+        return ApiResponse.ok(meService.myEnrolledRoadmaps(ownerKey, status, page, pageSize));
+    }
+
+    @GetMapping("/authored-roadmaps")
+    public ApiResponse<PageResponse<RoadmapWorkbenchDto>> myAuthoredRoadmaps(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int pageSize,
+        @RequestParam(required = false) String status
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(meService.myAuthoredRoadmaps(ownerKey, status, page, pageSize));
     }
 
     @GetMapping("/favorites")

@@ -106,8 +106,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
   /api/me/roadmaps:
     get:
-      summary: 获取我的路线列表
-      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      summary: 获取我的跟学路线列表
+      description: 当前实现按请求用户返回 enrollment 数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；`status` 传空字符串或仅空白时按未传处理，带前后空白时会先裁剪再参与筛选；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
       parameters:
         - name: page
           in: query
@@ -128,6 +128,24 @@ paths:
       responses:
         '200':
           description: 成功
+  /api/me/authored-roadmaps:
+    get:
+      summary: 获取我发布的路线列表
+      description: 返回当前用户自己发布的路线工作台数据，支持按路线状态筛选
+  /api/roadmaps/{id}/enrollment:
+    get:
+      summary: 获取当前用户路线报名状态
+    post:
+      summary: 加入路线
+  /api/roadmaps/{id}/enrollment/pause:
+    post:
+      summary: 暂停路线跟学
+  /api/roadmaps/{id}/enrollment/resume:
+    post:
+      summary: 恢复路线跟学
+  /api/roadmaps/{id}/enrollment/complete:
+    post:
+      summary: 完成路线
           content:
             application/json:
               schema:

@@ -4,7 +4,10 @@
       <HeroBanner kicker="路线详情" :title="roadmap.title" :description="roadmap.summary">
         <template #actions>
           <BaseButton variant="secondary" @click="openStudyView()">Markdown 学习视图</BaseButton>
-          <BaseButton @click="markComplete">标记本阶段完成</BaseButton>
+          <BaseButton v-if="!enrollmentStatus" @click="joinRoadmap">加入路线</BaseButton>
+          <BaseButton v-else-if="enrollmentStatus === 'ACTIVE'" @click="pauseEnrollment">暂停跟学</BaseButton>
+          <BaseButton v-else-if="enrollmentStatus === 'PAUSED'" @click="resumeEnrollment">继续跟学</BaseButton>
+          <BaseButton v-if="enrollmentStatus === 'ACTIVE'" @click="completeEnrollment">完成路线</BaseButton>
           <BaseButton variant="secondary" @click="favoriteRoadmap">收藏路线</BaseButton>
         </template>
       </HeroBanner>
@@ -71,6 +74,7 @@
         <div class="progress-panel__summary">
           <strong>{{ progressHeadline }}</strong>
           <p>{{ progressDescription }}</p>
+          <p v-if="enrollmentLabel" class="progress-panel__enrollment">{{ enrollmentLabel }}</p>
         </div>
 
         <dl class="progress-panel__stats">
@@ -161,9 +165,13 @@ import ResourceCard from '@/components/business/ResourceCard.vue'
 import RoadmapTimeline from '@/components/business/RoadmapTimeline.vue'
 import {
   calculateRoadmapProgressPercent,
+  completeRoadmapEnrollment,
+  enrollRoadmap,
   fetchRoadmapDetail,
   getVisitedRoadmapNodeIds,
   markRoadmapNodeVisited,
+  pauseRoadmapEnrollment,
+  resumeRoadmapEnrollment,
   type RoadmapDetail,
   type RoadmapTimelineItem
 } from '@/api/roadmaps'
@@ -184,6 +192,7 @@ const status = computed(() => {
 
 const selectedNode = ref<RoadmapTimelineItem | null>(null)
 const selectedNodeIndex = ref<number | null>(null)
+const enrollmentStatus = computed(() => roadmap.value?.enrollment?.status ?? '')
 const selectedResource = computed(() => {
   if (selectedNodeIndex.value === null) return null
   return roadmap.value?.relatedResources.find((item) => item.id === selectedNode.value?.resourceId) ?? null
@@ -207,6 +216,13 @@ const progressHeadline = computed(() => {
 const progressDescription = computed(() => {
   if (!roadmap.value) return ''
   return `进度基于当前浏览器中已点击的路线节点实时计算，本路线共 ${roadmap.value.timeline.length} 个阶段。`
+})
+const enrollmentLabel = computed(() => {
+  if (!roadmap.value?.enrollment) return ''
+  if (roadmap.value.enrollment.status === 'ACTIVE') return '当前状态：已加入路线，正在跟学'
+  if (roadmap.value.enrollment.status === 'PAUSED') return '当前状态：已暂停跟学，可随时继续'
+  if (roadmap.value.enrollment.status === 'COMPLETED') return '当前状态：该路线已完成'
+  return `当前状态：${roadmap.value.enrollment.status}`
 })
 const roadmapMarkdown = computed(() => {
   if (!roadmap.value) return ''
@@ -257,18 +273,36 @@ async function loadRoadmapDetail() {
   }
 }
 
-function markComplete() {
-  if (!selectedNode.value) {
-    appStore.showToast('请先选择阶段', '点击时间线节点后再更新学习进度')
-    return
-  }
-
-  syncProgress(selectedNode.value.id)
-  appStore.showToast('进度已更新', `已按点击节点记录，当前路线完成度 ${progress.value}%`)
-}
-
 function favoriteRoadmap() {
   appStore.showToast('已收藏路线', '后续可在个人中心继续学习')
+}
+
+async function joinRoadmap() {
+  if (!roadmap.value) return
+  await enrollRoadmap(roadmap.value.id)
+  await loadRoadmapDetail()
+  appStore.showToast('已加入路线', '当前路线已进入你的跟学列表')
+}
+
+async function pauseEnrollment() {
+  if (!roadmap.value) return
+  await pauseRoadmapEnrollment(roadmap.value.id)
+  await loadRoadmapDetail()
+  appStore.showToast('已暂停跟学', '你可以稍后继续当前路线')
+}
+
+async function resumeEnrollment() {
+  if (!roadmap.value) return
+  await resumeRoadmapEnrollment(roadmap.value.id)
+  await loadRoadmapDetail()
+  appStore.showToast('已恢复跟学', '当前路线重新进入学习中状态')
+}
+
+async function completeEnrollment() {
+  if (!roadmap.value) return
+  await completeRoadmapEnrollment(roadmap.value.id)
+  await loadRoadmapDetail()
+  appStore.showToast('已完成路线', '当前路线已标记为完成')
 }
 
 function openNodeDetail(node: RoadmapTimelineItem, index: number) {
@@ -485,6 +519,12 @@ watch(() => route.params.id, () => {
   color: #475569;
   line-height: 1.65;
   font-size: 0.92rem;
+}
+
+.progress-panel__enrollment {
+  margin-top: 0.55rem;
+  font-weight: 600;
+  color: #0369a1;
 }
 
 .progress-panel__stats {

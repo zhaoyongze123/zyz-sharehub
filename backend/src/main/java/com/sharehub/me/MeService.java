@@ -103,7 +103,11 @@ public class MeService {
         );
     }
 
-    public PageResponse<RoadmapWorkbenchDto> myRoadmaps(String ownerKey, String status, int page, int pageSize) {
+    public PageResponse<RoadmapWorkbenchDto> myEnrolledRoadmaps(String ownerKey, String status, int page, int pageSize) {
+        return roadmapJdbcRepository.listWorkbenchByEnrollment(ownerKey, status, page, pageSize);
+    }
+
+    public PageResponse<RoadmapWorkbenchDto> myAuthoredRoadmaps(String ownerKey, String status, int page, int pageSize) {
         return roadmapJdbcRepository.listWorkbenchByOwner(ownerKey, status, page, pageSize);
     }
 

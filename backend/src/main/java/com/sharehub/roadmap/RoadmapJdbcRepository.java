@@ -129,7 +129,10 @@ public class RoadmapJdbcRepository {
                        r.visibility,
                        r.status,
                        COUNT(n.id) AS node_count,
-                       p.payload AS progress_payload
+                       p.payload AS progress_payload,
+                       CAST(NULL AS VARCHAR(32)) AS enrollment_status,
+                       CAST(NULL AS TIMESTAMP) AS started_at,
+                       CAST(NULL AS TIMESTAMP) AS completed_at
                 FROM roadmaps r
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
                 LEFT JOIN roadmap_progress p
@@ -146,7 +149,10 @@ public class RoadmapJdbcRepository {
                        r.visibility,
                        r.status,
                        COUNT(n.id) AS node_count,
-                       p.payload AS progress_payload
+                       p.payload AS progress_payload,
+                       CAST(NULL AS VARCHAR(32)) AS enrollment_status,
+                       CAST(NULL AS TIMESTAMP) AS started_at,
+                       CAST(NULL AS TIMESTAMP) AS completed_at
                 FROM roadmaps r
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
                 LEFT JOIN roadmap_progress p
@@ -174,6 +180,169 @@ public class RoadmapJdbcRepository {
                 normalizedStatus,
                 safePageSize,
                 offset);
+    return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
+  }
+
+  public PageResponse<RoadmapWorkbenchDto> listWorkbenchByEnrollment(String userKey, String status, int page, int pageSize) {
+    int safePage = Math.max(1, page);
+    int safePageSize = Math.max(1, pageSize);
+    String normalizedStatus = normalize(status);
+    String countSql =
+        normalizedStatus == null
+            ? """
+                SELECT COUNT(*)
+                FROM (
+                  SELECT e.roadmap_id
+                  FROM roadmap_enrollments e
+                  WHERE e.user_key = ?
+                  UNION
+                  SELECT p.roadmap_id
+                  FROM roadmap_progress p
+                  WHERE p.user_key = ?
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM roadmap_enrollments e
+                      WHERE e.roadmap_id = p.roadmap_id
+                        AND e.user_key = p.user_key
+                    )
+                ) t
+                """
+            : """
+                SELECT COUNT(*)
+                FROM (
+                  SELECT e.roadmap_id
+                  FROM roadmap_enrollments e
+                  WHERE e.user_key = ?
+                    AND e.status = ?
+                  UNION
+                  SELECT p.roadmap_id
+                  FROM roadmap_progress p
+                  WHERE p.user_key = ?
+                    AND ? = 'ACTIVE'
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM roadmap_enrollments e
+                      WHERE e.roadmap_id = p.roadmap_id
+                        AND e.user_key = p.user_key
+                    )
+                ) t
+                """;
+    Long total =
+        normalizedStatus == null
+            ? jdbc.queryForObject(countSql, Long.class, userKey, userKey)
+            : jdbc.queryForObject(countSql, Long.class, userKey, normalizedStatus, userKey, normalizedStatus);
+    int offset = (safePage - 1) * safePageSize;
+    String listSql =
+        normalizedStatus == null
+            ? """
+                WITH enrollment_source AS (
+                  SELECT e.roadmap_id,
+                         e.user_key,
+                         e.status AS enrollment_status,
+                         e.started_at,
+                         e.completed_at,
+                         e.updated_at
+                  FROM roadmap_enrollments e
+                  WHERE e.user_key = ?
+                  UNION ALL
+                  SELECT p.roadmap_id,
+                         p.user_key,
+                         'ACTIVE' AS enrollment_status,
+                         NULL AS started_at,
+                         NULL AS completed_at,
+                         p.updated_at
+                  FROM roadmap_progress p
+                  WHERE p.user_key = ?
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM roadmap_enrollments e
+                      WHERE e.roadmap_id = p.roadmap_id
+                        AND e.user_key = p.user_key
+                    )
+                )
+                SELECT r.id,
+                       r.title,
+                       r.description,
+                       r.visibility,
+                       r.status,
+                       COUNT(n.id) AS node_count,
+                       p.payload AS progress_payload,
+                       es.enrollment_status,
+                       es.started_at,
+                       es.completed_at
+                FROM enrollment_source es
+                JOIN roadmaps r ON r.id = es.roadmap_id
+                LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN roadmap_progress p
+                  ON p.roadmap_id = r.id AND p.user_key = es.user_key
+                GROUP BY
+                  r.id, r.title, r.description, r.visibility, r.status,
+                  p.payload, es.enrollment_status, es.started_at, es.completed_at, es.updated_at
+                ORDER BY es.updated_at DESC, r.id DESC
+                LIMIT ? OFFSET ?
+                """
+            : """
+                WITH enrollment_source AS (
+                  SELECT e.roadmap_id,
+                         e.user_key,
+                         e.status AS enrollment_status,
+                         e.started_at,
+                         e.completed_at,
+                         e.updated_at
+                  FROM roadmap_enrollments e
+                  WHERE e.user_key = ?
+                    AND e.status = ?
+                  UNION ALL
+                  SELECT p.roadmap_id,
+                         p.user_key,
+                         'ACTIVE' AS enrollment_status,
+                         NULL AS started_at,
+                         NULL AS completed_at,
+                         p.updated_at
+                  FROM roadmap_progress p
+                  WHERE p.user_key = ?
+                    AND ? = 'ACTIVE'
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM roadmap_enrollments e
+                      WHERE e.roadmap_id = p.roadmap_id
+                        AND e.user_key = p.user_key
+                    )
+                )
+                SELECT r.id,
+                       r.title,
+                       r.description,
+                       r.visibility,
+                       r.status,
+                       COUNT(n.id) AS node_count,
+                       p.payload AS progress_payload,
+                       es.enrollment_status,
+                       es.started_at,
+                       es.completed_at
+                FROM enrollment_source es
+                JOIN roadmaps r ON r.id = es.roadmap_id
+                LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN roadmap_progress p
+                  ON p.roadmap_id = r.id AND p.user_key = es.user_key
+                GROUP BY
+                  r.id, r.title, r.description, r.visibility, r.status,
+                  p.payload, es.enrollment_status, es.started_at, es.completed_at, es.updated_at
+                ORDER BY es.updated_at DESC, r.id DESC
+                LIMIT ? OFFSET ?
+                """;
+    List<RoadmapWorkbenchDto> items =
+        normalizedStatus == null
+            ? jdbc.query(listSql, (rs, rowNum) -> mapWorkbench(rs), userKey, userKey, safePageSize, offset)
+            : jdbc.query(
+                listSql,
+                (rs, rowNum) -> mapWorkbench(rs),
+                userKey,
+                normalizedStatus,
+                userKey,
+                normalizedStatus,
+                safePageSize,
+                offset
+            );
     return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
   }
 
@@ -284,6 +453,13 @@ public class RoadmapJdbcRepository {
     return count == null ? 0L : count;
   }
 
+  public void requireRoadmapExists(Long roadmapId) {
+    Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE id = ?", Integer.class, roadmapId);
+    if (count == null || count == 0) {
+      throw new NotFoundException("ROADMAP_NOT_FOUND");
+    }
+  }
+
   private void requireRoadmap(Long roadmapId, String ownerKey) {
     Integer count =
         jdbc.queryForObject(
@@ -341,7 +517,14 @@ public class RoadmapJdbcRepository {
         resultSet.getString("status"),
         nodeCount,
         completedNodeCount,
-        percent);
+        percent,
+        resultSet.getString("enrollment_status"),
+        toInstant(resultSet.getTimestamp("started_at")),
+        toInstant(resultSet.getTimestamp("completed_at")));
+  }
+
+  private Instant toInstant(Timestamp timestamp) {
+    return timestamp == null ? null : timestamp.toInstant();
   }
 
   private int extractCompletedNodeCount(Map<String, Object> progress) {

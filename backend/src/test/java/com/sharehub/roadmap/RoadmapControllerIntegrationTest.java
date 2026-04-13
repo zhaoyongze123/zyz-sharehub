@@ -47,6 +47,7 @@ class RoadmapControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
+        jdbcTemplate.update("DELETE FROM roadmap_enrollments");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
         jdbcTemplate.update("DELETE FROM roadmaps");
@@ -99,12 +100,13 @@ class RoadmapControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.percent").value(75));
 
-        mockMvc.perform(get("/api/me/roadmaps")
+        mockMvc.perform(get("/api/me/authored-roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("路线A"))
-            .andExpect(jsonPath("$.data.items[0].progressPercent").value(75));
+            .andExpect(jsonPath("$.data.items[0].progressPercent").value(75))
+            .andExpect(jsonPath("$.data.items[0].enrollmentStatus").isEmpty());
 
         mockMvc.perform(get("/api/me/roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
@@ -124,7 +126,26 @@ class RoadmapControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.progress").isMap())
             .andExpect(jsonPath("$.data.progress.percent").doesNotExist())
+            .andExpect(jsonPath("$.data.enrollment").isEmpty())
             .andExpect(jsonPath("$.data.nodes[0].title").value("节点1"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.roadmapId").value(roadmapId))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线A"))
+            .andExpect(jsonPath("$.data.items[0].enrollmentStatus").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.enrollment.status").value("ACTIVE"));
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER)
@@ -149,6 +170,53 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
+    }
+
+    @Test
+    void enrollmentLifecycleShouldBeIdempotentAndQueryable() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线生命周期","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment/pause")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PAUSED"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment/resume")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment/complete")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.data.completedAt").exists());
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"));
     }
 
     @Test
