@@ -117,6 +117,10 @@ public class UserProfileRepository {
         return findOptionalById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
     }
 
+    public Optional<UserProfileDto> findOptionalById(Long id) {
+        return findOptionalByIdInternal(id);
+    }
+
     public UserProfileDto updateStatus(Long id, String status) {
         int affected = jdbcTemplate.update("UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", status, id);
         if (affected == 0) {
@@ -193,7 +197,7 @@ public class UserProfileRepository {
         return value == null || value.isBlank() ? null : value;
     }
 
-    private Optional<UserProfileDto> findOptionalById(Long id) {
+    private Optional<UserProfileDto> findOptionalByIdInternal(Long id) {
         List<UserProfileDto> results = jdbcTemplate.query(
             """
                 SELECT id, login, name, bio, avatar_file_id, status

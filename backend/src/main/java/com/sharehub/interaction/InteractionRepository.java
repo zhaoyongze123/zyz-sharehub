@@ -323,7 +323,9 @@ public class InteractionRepository {
                   COUNT(all_f.id) AS favorite_count
                 FROM favorites f
                 JOIN notes n ON n.id = f.note_id
-                LEFT JOIN users u ON u.login = n.owner_key
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
                 LEFT JOIN favorites all_f ON all_f.note_id = n.id AND all_f.resource_id IS NULL
                 WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL AND n.deleted_at IS NULL
                 GROUP BY
@@ -370,19 +372,20 @@ public class InteractionRepository {
     }
 
     public long countFavoritedPublishedNotesByOwner(String ownerKey) {
+        Long userId = resolveUserId(ownerKey);
         Long total = jdbcTemplate.queryForObject(
             """
                 SELECT COUNT(*)
                 FROM favorites f
                 JOIN notes n ON n.id = f.note_id
-                WHERE n.owner_key = ?
+                WHERE (%s)
                   AND n.status = 'PUBLISHED'
                   AND n.deleted_at IS NULL
                   AND f.note_id IS NOT NULL
                   AND f.resource_id IS NULL
-                """,
+                """.formatted(noteOwnerMatchClause(userId)),
             Long.class,
-            ownerKey
+            noteOwnerArgs(userId, ownerKey)
         );
         return total == null ? 0L : total;
     }
@@ -671,6 +674,20 @@ public class InteractionRepository {
 
     private Long resolveUserId(String login) {
         return userProfileRepository.findIdOptionalByLogin(login).orElse(null);
+    }
+
+    private String noteOwnerMatchClause(Long userId) {
+        if (userId != null) {
+            return "n.user_id = ? OR (n.user_id IS NULL AND n.owner_key = ?)";
+        }
+        return "n.owner_key = ?";
+    }
+
+    private Object[] noteOwnerArgs(Long userId, String ownerKey) {
+        if (userId != null) {
+            return new Object[] {userId, ownerKey};
+        }
+        return new Object[] {ownerKey};
     }
 
     private List<String> splitTags(String tags) {

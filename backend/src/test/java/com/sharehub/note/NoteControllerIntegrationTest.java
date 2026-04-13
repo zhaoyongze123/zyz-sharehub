@@ -354,6 +354,23 @@ public class NoteControllerIntegrationTest {
     }
 
     @Test
+    void shouldPreferUserIdWhenResolvingPublishedNoteAuthor() throws Exception {
+        long noteId = createPublishedNote(USER_KEY, "user-id-author-note", "# 标题\n\n正文");
+        jdbcTemplate.update("UPDATE notes SET owner_key = ? WHERE id = ?", "legacy-note-owner", noteId);
+
+        mvc.perform(get("/api/notes/community")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].id").value(noteId))
+            .andExpect(jsonPath("$.data.items[0].ownerName").value(USER_KEY));
+
+        mvc.perform(get("/api/notes/" + noteId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.ownerName").value(USER_KEY));
+    }
+
+    @Test
     void shouldAllowAnonymousAccessToPublishedPublicNoteDetail() throws Exception {
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
@@ -759,14 +776,16 @@ public class NoteControllerIntegrationTest {
     }
 
     private long createPublishedNote(String ownerKey, String title, String contentMd) {
+        Long userId = userProfileRepository.upsert(ownerKey, ownerKey, null).id();
         jdbcTemplate.update(
             """
-                INSERT INTO notes (title, content_md, owner_key, visibility, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'PUBLIC', 'PUBLISHED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                INSERT INTO notes (title, content_md, owner_key, user_id, visibility, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'PUBLIC', 'PUBLISHED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
             title,
             contentMd,
-            ownerKey
+            ownerKey,
+            userId
         );
         Long id = jdbcTemplate.queryForObject(
             "SELECT MAX(id) FROM notes WHERE owner_key = ? AND title = ?",

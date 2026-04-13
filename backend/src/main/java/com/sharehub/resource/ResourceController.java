@@ -302,7 +302,10 @@ public class ResourceController {
     }
 
     private ResourceDto toDto(ResourceEntity resource, InteractionSummaryDto summary, List<String> tags) {
-        Optional<UserProfileDto> profile = userProfileRepository.findOptionalByLogin(resource.getOwnerKey());
+        Optional<UserProfileDto> profile = resource.getUserId() == null
+            ? userProfileRepository.findOptionalByLogin(resource.getOwnerKey())
+            : userProfileRepository.findOptionalById(resource.getUserId())
+                .or(() -> userProfileRepository.findOptionalByLogin(resource.getOwnerKey()));
         String author = profile.map(item -> item.name() == null || item.name().isBlank() ? item.login() : item.name())
             .orElse(resource.getOwnerKey());
         long likes = summary == null ? 0L : summary.likes();

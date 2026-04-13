@@ -70,6 +70,7 @@ class RoadmapControllerIntegrationTest {
             .getContentAsString();
 
         Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+        jdbcTemplate.update("UPDATE roadmaps SET owner_key = ? WHERE id = ?", "legacy-roadmap-owner", roadmapId);
         Long ownerId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, OWNER);
         Long roadmapUserId = jdbcTemplate.queryForObject("SELECT user_id FROM roadmaps WHERE id = ?", Long.class, roadmapId);
         org.assertj.core.api.Assertions.assertThat(roadmapUserId).isEqualTo(ownerId);

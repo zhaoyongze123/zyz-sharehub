@@ -184,6 +184,16 @@ class ResourceControllerIntegrationTest {
     }
 
     @Test
+    void shouldPreferUserIdWhenResolvingResourceAuthor() throws Exception {
+        long resourceId = createResource("作者关联资料", "PDF", "PUBLIC", "java", "作者校验");
+        jdbcTemplate.update("UPDATE resources SET owner_key = ? WHERE id = ?", "legacy-owner-key", resourceId);
+
+        mockMvc.perform(get("/api/resources/{id}", resourceId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.author").value(DEFAULT_USER));
+    }
+
+    @Test
     void shouldUpdateAndPublishResource() throws Exception {
         long resourceId = createResource("旧标题", "PDF", "PUBLIC", "java", "旧简介");
 

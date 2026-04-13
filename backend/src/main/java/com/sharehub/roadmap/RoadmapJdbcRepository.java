@@ -82,9 +82,13 @@ public class RoadmapJdbcRepository {
   public PageResponse<RoadmapDto> listByOwner(String ownerKey, int page, int pageSize) {
     int safePage = Math.max(1, page);
     int safePageSize = Math.max(1, pageSize);
+    Long userId = resolveUserId(ownerKey);
     long total =
         Optional.ofNullable(
-                jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ? AND deleted_at IS NULL", Long.class, ownerKey))
+                jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM roadmaps WHERE " + ownerMatchClause("roadmaps", userId) + " AND deleted_at IS NULL",
+                    Long.class,
+                    ownerArgs(userId, ownerKey)))
             .orElse(0L);
     int offset = (safePage - 1) * safePageSize;
     List<RoadmapDto> records =
@@ -92,10 +96,10 @@ public class RoadmapJdbcRepository {
             """
                 SELECT id, title, description, visibility, status
                 FROM roadmaps
-                WHERE owner_key = ? AND deleted_at IS NULL
+                WHERE %s AND deleted_at IS NULL
                 ORDER BY id DESC
                 LIMIT ? OFFSET ?
-                """,
+                """.formatted(ownerMatchClause("roadmaps", userId)),
             (rs, rowNum) ->
                 new RoadmapDto(
                     rs.getLong("id"),
@@ -103,9 +107,7 @@ public class RoadmapJdbcRepository {
                     rs.getString("description"),
                     rs.getString("visibility"),
                     rs.getString("status")),
-            ownerKey,
-            safePageSize,
-            offset);
+            concatArgs(ownerArgs(userId, ownerKey), new Object[] {safePageSize, offset}));
     return PageResponse.of(records, safePage, safePageSize, total);
   }
 
@@ -113,24 +115,25 @@ public class RoadmapJdbcRepository {
     int safePage = Math.max(1, page);
     int safePageSize = Math.max(1, pageSize);
     String normalizedStatus = normalize(status);
+    Long userId = resolveUserId(ownerKey);
     String countSql =
         normalizedStatus == null
             ? """
                 SELECT COUNT(*)
                 FROM roadmaps
-                WHERE owner_key = ? AND deleted_at IS NULL
-                """
+                WHERE %s AND deleted_at IS NULL
+                """.formatted(ownerMatchClause("roadmaps", userId))
             : """
                 SELECT COUNT(*)
                 FROM roadmaps
-                WHERE owner_key = ?
+                WHERE %s
                   AND deleted_at IS NULL
                   AND status = ?
-                """;
+                """.formatted(ownerMatchClause("roadmaps", userId));
     Long total =
         normalizedStatus == null
-            ? jdbc.queryForObject(countSql, Long.class, ownerKey)
-            : jdbc.queryForObject(countSql, Long.class, ownerKey, normalizedStatus);
+            ? jdbc.queryForObject(countSql, Long.class, ownerArgs(userId, ownerKey))
+            : jdbc.queryForObject(countSql, Long.class, concatArgs(ownerArgs(userId, ownerKey), new Object[] {normalizedStatus}));
     int offset = (safePage - 1) * safePageSize;
     String listSql =
         normalizedStatus == null
@@ -156,12 +159,12 @@ public class RoadmapJdbcRepository {
                 ) np ON np.roadmap_id = r.id AND np.user_key = ?
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
-                WHERE r.owner_key = ?
+                WHERE %s
                   AND r.deleted_at IS NULL
                 GROUP BY r.id, r.title, r.description, r.visibility, r.status, np.completed_node_count, p.payload
                 ORDER BY r.id DESC
                 LIMIT ? OFFSET ?
-                """
+                """.formatted(ownerMatchClause("r", userId))
             : """
                 SELECT r.id,
                        r.title,
@@ -184,32 +187,27 @@ public class RoadmapJdbcRepository {
                 ) np ON np.roadmap_id = r.id AND np.user_key = ?
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
-                WHERE r.owner_key = ?
+                WHERE %s
                   AND r.deleted_at IS NULL
                   AND r.status = ?
                 GROUP BY r.id, r.title, r.description, r.visibility, r.status, np.completed_node_count, p.payload
                 ORDER BY r.id DESC
                 LIMIT ? OFFSET ?
-                """;
+                """.formatted(ownerMatchClause("r", userId));
     List<RoadmapWorkbenchDto> items =
         normalizedStatus == null
             ? jdbc.query(
                 listSql,
                 (rs, rowNum) -> mapWorkbench(rs),
-                ownerKey,
-                ownerKey,
-                ownerKey,
-                safePageSize,
-                offset)
+                concatArgs(new Object[] {ownerKey, ownerKey}, ownerArgs(userId, ownerKey), new Object[] {safePageSize, offset}))
             : jdbc.query(
                 listSql,
                 (rs, rowNum) -> mapWorkbench(rs),
-                ownerKey,
-                ownerKey,
-                ownerKey,
-                normalizedStatus,
-                safePageSize,
-                offset);
+                concatArgs(
+                    new Object[] {ownerKey, ownerKey},
+                    ownerArgs(userId, ownerKey),
+                    new Object[] {normalizedStatus, safePageSize, offset}
+                ));
     return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
   }
 
@@ -451,18 +449,17 @@ public class RoadmapJdbcRepository {
   }
 
   public boolean existsOwnedNode(Long roadmapId, Long nodeId, String ownerKey) {
+    Long userId = resolveUserId(ownerKey);
     Integer count =
         jdbc.queryForObject(
             """
                 SELECT COUNT(*)
                 FROM roadmap_nodes n
                 JOIN roadmaps r ON r.id = n.roadmap_id
-                WHERE n.id = ? AND n.roadmap_id = ? AND r.owner_key = ? AND r.deleted_at IS NULL
-                """,
+                WHERE n.id = ? AND n.roadmap_id = ? AND %s AND r.deleted_at IS NULL
+                """.formatted(ownerMatchClause("r", userId)),
             Integer.class,
-            nodeId,
-            roadmapId,
-            ownerKey);
+            concatArgs(new Object[] {nodeId, roadmapId}, ownerArgs(userId, ownerKey)));
     return count != null && count > 0;
   }
 
@@ -512,7 +509,11 @@ public class RoadmapJdbcRepository {
   }
 
   public long countByOwner(String ownerKey) {
-    Long count = jdbc.queryForObject("SELECT COUNT(*) FROM roadmaps WHERE owner_key = ? AND deleted_at IS NULL", Long.class, ownerKey);
+    Long userId = resolveUserId(ownerKey);
+    Long count = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM roadmaps WHERE " + ownerMatchClause("roadmaps", userId) + " AND deleted_at IS NULL",
+        Long.class,
+        ownerArgs(userId, ownerKey));
     return count == null ? 0L : count;
   }
 
@@ -524,25 +525,23 @@ public class RoadmapJdbcRepository {
   }
 
   private void requireRoadmap(Long roadmapId, String ownerKey) {
+    Long userId = resolveUserId(ownerKey);
     Integer count =
         jdbc.queryForObject(
-            "SELECT COUNT(*) FROM roadmaps WHERE id = ? AND owner_key = ? AND deleted_at IS NULL",
+            "SELECT COUNT(*) FROM roadmaps WHERE id = ? AND " + ownerMatchClause("roadmaps", userId) + " AND deleted_at IS NULL",
             Integer.class,
-            roadmapId,
-            ownerKey);
+            concatArgs(new Object[] {roadmapId}, ownerArgs(userId, ownerKey)));
     if (count == null || count == 0) {
       throw new NotFoundException("ROADMAP_NOT_FOUND");
     }
   }
 
   public void softDelete(String ownerKey, Long roadmapId, Instant deletedAt) {
+    Long userId = resolveUserId(ownerKey);
     int affected =
         jdbc.update(
-            "UPDATE roadmaps SET deleted_at = ?, deleted_by = ? WHERE id = ? AND owner_key = ? AND deleted_at IS NULL",
-            Timestamp.from(deletedAt),
-            ownerKey,
-            roadmapId,
-            ownerKey);
+            "UPDATE roadmaps SET deleted_at = ?, deleted_by = ? WHERE id = ? AND " + ownerMatchClause("roadmaps", userId) + " AND deleted_at IS NULL",
+            concatArgs(new Object[] {Timestamp.from(deletedAt), ownerKey, roadmapId}, ownerArgs(userId, ownerKey)));
     if (affected == 0) {
       throw new NotFoundException("ROADMAP_NOT_FOUND");
     }
@@ -802,5 +801,34 @@ public class RoadmapJdbcRepository {
 
   private Long resolveUserId(String login) {
     return userProfileRepository.findIdOptionalByLogin(login).orElse(null);
+  }
+
+  private String ownerMatchClause(String alias, Long userId) {
+    String prefix = alias == null || alias.isBlank() ? "" : alias + ".";
+    if (userId != null) {
+      return "(" + prefix + "user_id = ? OR (" + prefix + "user_id IS NULL AND " + prefix + "owner_key = ?))";
+    }
+    return prefix + "owner_key = ?";
+  }
+
+  private Object[] ownerArgs(Long userId, String ownerKey) {
+    if (userId != null) {
+      return new Object[] {userId, ownerKey};
+    }
+    return new Object[] {ownerKey};
+  }
+
+  private Object[] concatArgs(Object[]... groups) {
+    int length = 0;
+    for (Object[] group : groups) {
+      length += group.length;
+    }
+    Object[] args = new Object[length];
+    int offset = 0;
+    for (Object[] group : groups) {
+      System.arraycopy(group, 0, args, offset, group.length);
+      offset += group.length;
+    }
+    return args;
   }
 }
