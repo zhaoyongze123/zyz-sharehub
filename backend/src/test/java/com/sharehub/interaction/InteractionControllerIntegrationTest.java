@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sharehub.auth.RequestAccessService;
 import com.sharehub.auth.UserProfileDto;
 import com.sharehub.auth.UserProfileRepository;
+import org.assertj.core.api.Assertions;
 import com.sharehub.config.AdminTokenFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -456,6 +458,67 @@ public class InteractionControllerIntegrationTest {
                 ))))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+    }
+
+    @Test
+    void databaseConstraintShouldRejectInvalidInteractionTargets() {
+        long resourceId = createResource("非法目标资源");
+        long noteId = createPublishedPublicNote("非法目标笔记");
+
+        Assertions.assertThatThrownBy(() -> jdbcTemplate.update(
+            """
+                INSERT INTO likes (resource_id, note_id, user_key, created_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+            resourceId,
+            noteId,
+            USER_KEY
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        Assertions.assertThatThrownBy(() -> jdbcTemplate.update(
+            """
+                INSERT INTO favorites (resource_id, note_id, user_key, created_at)
+                VALUES (NULL, NULL, ?, CURRENT_TIMESTAMP)
+                """,
+            USER_KEY
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        Assertions.assertThatThrownBy(() -> jdbcTemplate.update(
+            """
+                INSERT INTO comments (resource_id, note_id, parent_id, author_key, content, status, created_at)
+                VALUES (NULL, NULL, NULL, ?, ?, 'VISIBLE', CURRENT_TIMESTAMP)
+                """,
+            USER_KEY,
+            "invalid comment"
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void databaseConstraintShouldRejectDuplicateInteractionRows() {
+        long resourceId = createResource("重复约束资源");
+        long noteId = createPublishedPublicNote("重复约束笔记");
+
+        jdbcTemplate.update(
+            "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
+            resourceId,
+            USER_KEY
+        );
+        Assertions.assertThatThrownBy(() -> jdbcTemplate.update(
+            "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
+            resourceId,
+            USER_KEY
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
+        jdbcTemplate.update(
+            "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP)",
+            noteId,
+            USER_KEY
+        );
+        Assertions.assertThatThrownBy(() -> jdbcTemplate.update(
+            "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP)",
+            noteId,
+            USER_KEY
+        )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {

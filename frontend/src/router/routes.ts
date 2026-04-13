@@ -63,7 +63,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'community',
         name: 'notes',
         component: () => import('@/views/note/NoteListView.vue'),
-        meta: { title: '社区' }
+        meta: { title: '笔记广场' }
       },
       {
         path: 'notes/settings',

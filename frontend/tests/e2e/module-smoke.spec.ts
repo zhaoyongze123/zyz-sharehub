@@ -334,7 +334,7 @@ test('路线发布真实写入 smoke', async ({ page, request }) => {
   expect(detailBody.data.nodes).toHaveLength(3)
 })
 
-test('社区笔记模块 smoke', async ({ page }) => {
+test('笔记广场笔记模块 smoke', async ({ page }) => {
   test.skip(!shouldRun('notes'))
   await page.goto('/community')
   await expect(page.getByText('AI 资源类别')).toBeVisible()

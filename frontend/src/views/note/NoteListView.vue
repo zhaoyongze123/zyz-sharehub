@@ -75,7 +75,7 @@
         专注 AI 技术分享，打造极客知识库。管理员发布的公告支持全领域透出与置顶，普通用户只展示自己的真实内容链路。
       </div>
       <div class="forum-intro-banner" v-else-if="currentNav === 'my-shares'">
-        这里展示你发布过的全部社区帖子，可直接进入详情或删除自己的内容。
+        这里展示你发布过的全部笔记广场内容，可直接进入详情或删除自己的内容。
       </div>
       <div class="forum-intro-banner" v-else-if="currentNav === 'bookmarks'">
         你收藏的优质 AI 资源都在这里，方便随时回看。
@@ -509,7 +509,7 @@ async function handleDeleteTopic(topic: any) {
   if (!confirmed) return
   try {
     await deleteNote(Number(topic.id))
-    appStore.showToast('删除成功', '帖子已从社区移除')
+    appStore.showToast('删除成功', '内容已从笔记广场移除')
     await fetchList()
   } catch (e: any) {
     appStore.showToast('删除失败', e?.response?.data?.msg ?? '请稍后再试', 'error')
