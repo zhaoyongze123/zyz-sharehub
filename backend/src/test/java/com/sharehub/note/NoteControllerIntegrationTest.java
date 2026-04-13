@@ -49,7 +49,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void createListDetailUpdateDelete() throws Exception {
-        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", null, null, null);
+        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", null, null, null, false, false);
         String body = mapper.writeValueAsString(payload);
 
         String response = mvc.perform(post("/api/notes")
@@ -79,7 +79,7 @@ public class NoteControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("Test"));
 
-        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", null, null, null);
+        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", null, null, null, false, false);
         mvc.perform(put("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -165,7 +165,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void shouldRestrictNotesToOwner() throws Exception {
-        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", null, null, null);
+        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", null, null, null, false, false);
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
