@@ -728,7 +728,7 @@ paths:
   /api/roadmaps/{id}/progress:
     post:
       summary: 更新路线学习进度
-      description: 需要当前用户身份；进度按请求用户隔离写入，且只允许路线 owner 更新，联调可通过 `X-User-Key` 指定用户；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`，非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
+      description: 需要当前用户身份；进度按请求用户隔离写入，且只允许路线 owner 更新，联调可通过 `X-User-Key` 指定用户；写入时会先同步 `roadmap_node_progress` 节点明细，再刷新 `roadmap_progress` 快照，因此返回体仍保持 `completedNodeIds` 与 `percent` 兼容；未带身份时返回 `401 NOT_LOGGED_IN`，用户已被封禁时返回 `403 USER_BANNED`，非 owner 按 `404 ROADMAP_NOT_FOUND` 返回
       responses:
         '200':
           description: 成功

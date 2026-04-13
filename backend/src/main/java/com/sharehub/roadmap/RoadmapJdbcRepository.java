@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -129,16 +130,23 @@ public class RoadmapJdbcRepository {
                        r.visibility,
                        r.status,
                        COUNT(n.id) AS node_count,
+                       np.completed_node_count AS structured_completed_node_count,
                        p.payload AS progress_payload,
                        CAST(NULL AS VARCHAR(32)) AS enrollment_status,
                        CAST(NULL AS TIMESTAMP) AS started_at,
                        CAST(NULL AS TIMESTAMP) AS completed_at
                 FROM roadmaps r
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN (
+                  SELECT roadmap_id, user_key, COUNT(*) AS completed_node_count
+                  FROM roadmap_node_progress
+                  WHERE status = 'COMPLETED'
+                  GROUP BY roadmap_id, user_key
+                ) np ON np.roadmap_id = r.id AND np.user_key = ?
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
                 WHERE r.owner_key = ?
-                GROUP BY r.id, r.title, r.description, r.visibility, r.status, p.payload
+                GROUP BY r.id, r.title, r.description, r.visibility, r.status, np.completed_node_count, p.payload
                 ORDER BY r.id DESC
                 LIMIT ? OFFSET ?
                 """
@@ -149,17 +157,24 @@ public class RoadmapJdbcRepository {
                        r.visibility,
                        r.status,
                        COUNT(n.id) AS node_count,
+                       np.completed_node_count AS structured_completed_node_count,
                        p.payload AS progress_payload,
                        CAST(NULL AS VARCHAR(32)) AS enrollment_status,
                        CAST(NULL AS TIMESTAMP) AS started_at,
                        CAST(NULL AS TIMESTAMP) AS completed_at
                 FROM roadmaps r
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN (
+                  SELECT roadmap_id, user_key, COUNT(*) AS completed_node_count
+                  FROM roadmap_node_progress
+                  WHERE status = 'COMPLETED'
+                  GROUP BY roadmap_id, user_key
+                ) np ON np.roadmap_id = r.id AND np.user_key = ?
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
                 WHERE r.owner_key = ?
                   AND r.status = ?
-                GROUP BY r.id, r.title, r.description, r.visibility, r.status, p.payload
+                GROUP BY r.id, r.title, r.description, r.visibility, r.status, np.completed_node_count, p.payload
                 ORDER BY r.id DESC
                 LIMIT ? OFFSET ?
                 """;
@@ -170,11 +185,13 @@ public class RoadmapJdbcRepository {
                 (rs, rowNum) -> mapWorkbench(rs),
                 ownerKey,
                 ownerKey,
+                ownerKey,
                 safePageSize,
                 offset)
             : jdbc.query(
                 listSql,
                 (rs, rowNum) -> mapWorkbench(rs),
+                ownerKey,
                 ownerKey,
                 ownerKey,
                 normalizedStatus,
@@ -266,6 +283,7 @@ public class RoadmapJdbcRepository {
                        r.visibility,
                        r.status,
                        COUNT(n.id) AS node_count,
+                       np.completed_node_count AS structured_completed_node_count,
                        p.payload AS progress_payload,
                        es.enrollment_status,
                        es.started_at,
@@ -273,11 +291,17 @@ public class RoadmapJdbcRepository {
                 FROM enrollment_source es
                 JOIN roadmaps r ON r.id = es.roadmap_id
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN (
+                  SELECT roadmap_id, user_key, COUNT(*) AS completed_node_count
+                  FROM roadmap_node_progress
+                  WHERE status = 'COMPLETED'
+                  GROUP BY roadmap_id, user_key
+                ) np ON np.roadmap_id = r.id AND np.user_key = es.user_key
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = es.user_key
                 GROUP BY
                   r.id, r.title, r.description, r.visibility, r.status,
-                  p.payload, es.enrollment_status, es.started_at, es.completed_at, es.updated_at
+                  np.completed_node_count, p.payload, es.enrollment_status, es.started_at, es.completed_at, es.updated_at
                 ORDER BY es.updated_at DESC, r.id DESC
                 LIMIT ? OFFSET ?
                 """
@@ -315,6 +339,7 @@ public class RoadmapJdbcRepository {
                        r.visibility,
                        r.status,
                        COUNT(n.id) AS node_count,
+                       np.completed_node_count AS structured_completed_node_count,
                        p.payload AS progress_payload,
                        es.enrollment_status,
                        es.started_at,
@@ -322,11 +347,17 @@ public class RoadmapJdbcRepository {
                 FROM enrollment_source es
                 JOIN roadmaps r ON r.id = es.roadmap_id
                 LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN (
+                  SELECT roadmap_id, user_key, COUNT(*) AS completed_node_count
+                  FROM roadmap_node_progress
+                  WHERE status = 'COMPLETED'
+                  GROUP BY roadmap_id, user_key
+                ) np ON np.roadmap_id = r.id AND np.user_key = es.user_key
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = es.user_key
                 GROUP BY
                   r.id, r.title, r.description, r.visibility, r.status,
-                  p.payload, es.enrollment_status, es.started_at, es.completed_at, es.updated_at
+                  np.completed_node_count, p.payload, es.enrollment_status, es.started_at, es.completed_at, es.updated_at
                 ORDER BY es.updated_at DESC, r.id DESC
                 LIMIT ? OFFSET ?
                 """;
@@ -421,12 +452,15 @@ public class RoadmapJdbcRepository {
   @Transactional
   public Map<String, Object> saveProgress(String ownerKey, Long roadmapId, Map<String, Object> payload) {
     requireRoadmap(roadmapId, ownerKey);
-    String json = serialize(payload);
+    Map<String, Object> normalizedPayload = normalizeProgressPayload(roadmapId, payload);
+    syncNodeProgress(roadmapId, ownerKey, extractCompletedNodeIds(normalizedPayload));
+    String json = serialize(normalizedPayload);
+    Instant now = Instant.now();
     int updated =
         jdbc.update(
             "UPDATE roadmap_progress SET payload = CAST(? AS jsonb), updated_at = ? WHERE roadmap_id = ? AND user_key = ?",
             json,
-            Timestamp.from(Instant.now()),
+            Timestamp.from(now),
             roadmapId,
             ownerKey);
     if (updated == 0) {
@@ -435,17 +469,26 @@ public class RoadmapJdbcRepository {
           roadmapId,
           ownerKey,
           json,
-          Timestamp.from(Instant.now()));
+          Timestamp.from(now));
     }
-    return payload;
+    return normalizedPayload;
   }
 
   public Map<String, Object> findProgress(Long roadmapId, String ownerKey) {
-    return jdbc.query(
-        "SELECT payload FROM roadmap_progress WHERE roadmap_id = ? AND user_key = ?",
-        (ResultSet rs) -> rs.next() ? deserialize(rs.getString("payload")) : null,
-        roadmapId,
-        ownerKey);
+    Map<String, Object> progress =
+        jdbc.query(
+            "SELECT payload FROM roadmap_progress WHERE roadmap_id = ? AND user_key = ?",
+            (ResultSet rs) -> rs.next() ? deserialize(rs.getString("payload")) : null,
+            roadmapId,
+            ownerKey);
+    if (progress != null) {
+      return progress;
+    }
+    List<Long> completedNodeIds = findCompletedNodeIds(roadmapId, ownerKey);
+    if (completedNodeIds.isEmpty()) {
+      return null;
+    }
+    return buildProgressPayload(roadmapId, completedNodeIds, null);
   }
 
   public long countByOwner(String ownerKey) {
@@ -507,7 +550,10 @@ public class RoadmapJdbcRepository {
   private RoadmapWorkbenchDto mapWorkbench(ResultSet resultSet) throws java.sql.SQLException {
     Map<String, Object> progress = deserialize(resultSet.getString("progress_payload"));
     int nodeCount = resultSet.getInt("node_count");
-    int completedNodeCount = extractCompletedNodeCount(progress);
+    Integer structuredCompletedNodeCount = nullableInteger(resultSet, "structured_completed_node_count");
+    int completedNodeCount = structuredCompletedNodeCount == null
+        ? extractCompletedNodeCount(progress)
+        : structuredCompletedNodeCount;
     int percent = extractPercent(progress, nodeCount, completedNodeCount);
     return new RoadmapWorkbenchDto(
         resultSet.getLong("id"),
@@ -528,14 +574,7 @@ public class RoadmapJdbcRepository {
   }
 
   private int extractCompletedNodeCount(Map<String, Object> progress) {
-    if (progress == null) {
-      return 0;
-    }
-    Object value = progress.get("completedNodeIds");
-    if (value instanceof List<?> list) {
-      return list.size();
-    }
-    return 0;
+    return extractCompletedNodeIds(progress).size();
   }
 
   private int extractPercent(Map<String, Object> progress, int nodeCount, int completedNodeCount) {
@@ -552,6 +591,176 @@ public class RoadmapJdbcRepository {
     if (value == null || value.isBlank()) {
       return null;
     }
-    return value;
+    return value.trim();
+  }
+
+  private Integer nullableInteger(ResultSet resultSet, String column) throws java.sql.SQLException {
+    Object value = resultSet.getObject(column);
+    return value == null ? null : resultSet.getInt(column);
+  }
+
+  private Map<String, Object> normalizeProgressPayload(Long roadmapId, Map<String, Object> payload) {
+    List<Long> completedNodeIds = normalizeCompletedNodeIds(roadmapId, extractCompletedNodeIds(payload));
+    Integer requestedPercent = extractRequestedPercent(payload);
+    return buildProgressPayload(roadmapId, completedNodeIds, requestedPercent);
+  }
+
+  private Map<String, Object> buildProgressPayload(Long roadmapId, List<Long> completedNodeIds, Integer requestedPercent) {
+    Map<String, Object> normalizedPayload = new HashMap<>();
+    normalizedPayload.put("completedNodeIds", completedNodeIds);
+    normalizedPayload.put("percent", requestedPercent == null ? calculatePercent(roadmapId, completedNodeIds.size()) : requestedPercent);
+    return normalizedPayload;
+  }
+
+  private Integer extractRequestedPercent(Map<String, Object> payload) {
+    if (payload == null) {
+      return null;
+    }
+    Object value = payload.get("percent");
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+    return null;
+  }
+
+  private List<Long> extractCompletedNodeIds(Map<String, Object> progress) {
+    if (progress == null) {
+      return List.of();
+    }
+    Object value = progress.get("completedNodeIds");
+    if (!(value instanceof List<?> list)) {
+      return List.of();
+    }
+    return list.stream()
+        .map(this::toLong)
+        .filter(id -> id != null)
+        .distinct()
+        .toList();
+  }
+
+  private Long toLong(Object value) {
+    if (value instanceof Number number) {
+      return number.longValue();
+    }
+    if (value instanceof String text) {
+      try {
+        return Long.valueOf(text.trim());
+      } catch (NumberFormatException exception) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private List<Long> normalizeCompletedNodeIds(Long roadmapId, List<Long> completedNodeIds) {
+    if (completedNodeIds.isEmpty()) {
+      return List.of();
+    }
+    List<Long> validNodeIds = findNodeIds(roadmapId);
+    if (validNodeIds.isEmpty()) {
+      return List.of();
+    }
+    return completedNodeIds.stream()
+        .filter(validNodeIds::contains)
+        .distinct()
+        .toList();
+  }
+
+  private List<Long> findNodeIds(Long roadmapId) {
+    return jdbc.queryForList(
+        "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? ORDER BY order_no NULLS LAST, id",
+        Long.class,
+        roadmapId);
+  }
+
+  private int calculatePercent(Long roadmapId, int completedNodeCount) {
+    Integer nodeCount = jdbc.queryForObject("SELECT COUNT(*) FROM roadmap_nodes WHERE roadmap_id = ?", Integer.class, roadmapId);
+    if (nodeCount == null || nodeCount <= 0) {
+      return 0;
+    }
+    return (int) Math.round((completedNodeCount * 100.0) / nodeCount);
+  }
+
+  private List<Long> findCompletedNodeIds(Long roadmapId, String userKey) {
+    return jdbc.queryForList(
+        """
+            SELECT node_id
+            FROM roadmap_node_progress
+            WHERE roadmap_id = ? AND user_key = ? AND status = 'COMPLETED'
+            ORDER BY node_id
+            """,
+        Long.class,
+        roadmapId,
+        userKey);
+  }
+
+  @Transactional
+  private void syncNodeProgress(Long roadmapId, String userKey, List<Long> completedNodeIds) {
+    Instant now = Instant.now();
+    upsertCompletedNodeProgress(roadmapId, userKey, completedNodeIds, now);
+    resetIncompleteNodeProgress(roadmapId, userKey, completedNodeIds, now);
+  }
+
+  private void upsertCompletedNodeProgress(Long roadmapId, String userKey, List<Long> completedNodeIds, Instant now) {
+    if (completedNodeIds.isEmpty()) {
+      return;
+    }
+    String sql =
+        """
+            INSERT INTO roadmap_node_progress
+              (roadmap_id, node_id, user_key, status, completed_at, created_at, updated_at)
+            VALUES (?, ?, ?, 'COMPLETED', ?, ?, ?)
+            ON CONFLICT (node_id, user_key)
+            DO UPDATE SET
+              roadmap_id = EXCLUDED.roadmap_id,
+              status = EXCLUDED.status,
+              completed_at = EXCLUDED.completed_at,
+              updated_at = EXCLUDED.updated_at
+            """;
+    Timestamp timestamp = Timestamp.from(now);
+    jdbc.batchUpdate(
+        sql,
+        completedNodeIds,
+        completedNodeIds.size(),
+        (statement, nodeId) -> {
+          statement.setLong(1, roadmapId);
+          statement.setLong(2, nodeId);
+          statement.setString(3, userKey);
+          statement.setTimestamp(4, timestamp);
+          statement.setTimestamp(5, timestamp);
+          statement.setTimestamp(6, timestamp);
+        });
+  }
+
+  private void resetIncompleteNodeProgress(Long roadmapId, String userKey, List<Long> completedNodeIds, Instant now) {
+    Timestamp timestamp = Timestamp.from(now);
+    if (completedNodeIds.isEmpty()) {
+      jdbc.update(
+          """
+              UPDATE roadmap_node_progress
+              SET status = 'NOT_STARTED', completed_at = NULL, updated_at = ?
+              WHERE roadmap_id = ? AND user_key = ?
+              """,
+          timestamp,
+          roadmapId,
+          userKey);
+      return;
+    }
+    String placeholders = String.join(", ", completedNodeIds.stream().map(nodeId -> "?").toList());
+    String sql =
+        """
+            UPDATE roadmap_node_progress
+            SET status = 'NOT_STARTED', completed_at = NULL, updated_at = ?
+            WHERE roadmap_id = ? AND user_key = ? AND node_id NOT IN (%s)
+            """
+            .formatted(placeholders);
+    Object[] params = new Object[completedNodeIds.size() + 3];
+    params[0] = timestamp;
+    params[1] = roadmapId;
+    params[2] = userKey;
+    for (int index = 0; index < completedNodeIds.size(); index++) {
+      params[index + 3] = completedNodeIds.get(index);
+    }
+    jdbc.update(sql, params);
   }
 }

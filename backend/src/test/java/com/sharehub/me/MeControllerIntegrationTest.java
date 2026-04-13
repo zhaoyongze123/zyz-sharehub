@@ -44,6 +44,7 @@ class MeControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM note_view_history");
+        jdbcTemplate.update("DELETE FROM roadmap_node_progress");
         jdbcTemplate.update("DELETE FROM roadmap_enrollments");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
@@ -195,12 +196,18 @@ class MeControllerIntegrationTest {
                     """))
             .andExpect(status().isOk());
 
+        Long firstNodeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND order_no = 1",
+            Long.class,
+            roadmapId
+        );
+
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"percent":50,"completedNodeIds":[1]}
-                    """))
+                    {"percent":50,"completedNodeIds":[%d]}
+                    """.formatted(firstNodeId)))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/notes")

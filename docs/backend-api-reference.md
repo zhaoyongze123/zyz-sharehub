@@ -341,6 +341,8 @@
 - `GET /api/roadmaps/{id}` 的 `progress` 按当前请求用户读取；未登录、未写入进度或切换到其他用户时返回空对象；如果请求里显式带了已封禁用户，则返回 `403 USER_BANNED`
 - `GET /api/roadmaps/{id}` 仅在路线不存在时返回 `404 ROADMAP_NOT_FOUND`
 - 节点标题、描述、顺序与进度已持久化
+- 路线进度现已拆为 `roadmap_node_progress` 节点明细表与 `roadmap_progress` 汇总快照；外部接口仍返回 `progress.completedNodeIds` 与 `progress.percent` 兼容旧前端
+- `POST /api/roadmaps/{id}/progress` 会先同步节点明细，再刷新快照；工作台完成节点数优先以节点明细统计
 - 节点附件通过 `files` 表持久化，按 `referenceType=ROADMAP_NODE` 与 `category=ROADMAP_NODE_ATTACHMENT` 绑定
 - 列表筛选仍较弱，暂未覆盖前端清单中的标签筛选
 

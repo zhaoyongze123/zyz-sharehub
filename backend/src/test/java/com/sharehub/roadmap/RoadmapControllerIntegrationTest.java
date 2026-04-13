@@ -47,6 +47,7 @@ class RoadmapControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
+        jdbcTemplate.update("DELETE FROM roadmap_node_progress");
         jdbcTemplate.update("DELETE FROM roadmap_enrollments");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
@@ -95,10 +96,18 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"percent":75,"completedNodeIds":[1]}
-                    """))
+                    {"percent":75,"completedNodeIds":[%d]}
+                    """.formatted(nodeId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.percent").value(75));
+
+        Integer completedNodeProgressCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM roadmap_node_progress WHERE roadmap_id = ? AND user_key = ? AND status = 'COMPLETED'",
+            Integer.class,
+            roadmapId,
+            OWNER
+        );
+        org.assertj.core.api.Assertions.assertThat(completedNodeProgressCount).isEqualTo(1);
 
         mockMvc.perform(get("/api/me/authored-roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER))
@@ -217,6 +226,98 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+    }
+
+    @Test
+    void shouldSyncNodeProgressAndSupportRevokingCompletedNodes() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线进度同步","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点1","orderNo":1}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点2","orderNo":2}
+                    """))
+            .andExpect(status().isOk());
+
+        Long firstNodeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND order_no = 1",
+            Long.class,
+            roadmapId
+        );
+        Long secondNodeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND order_no = 2",
+            Long.class,
+            roadmapId
+        );
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"completedNodeIds":[%d,%d]}
+                    """.formatted(firstNodeId, secondNodeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.percent").value(100))
+            .andExpect(jsonPath("$.data.completedNodeIds.length()").value(2));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"completedNodeIds":[%d]}
+                    """.formatted(firstNodeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.percent").value(50))
+            .andExpect(jsonPath("$.data.completedNodeIds.length()").value(1));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.progress.percent").value(50))
+            .andExpect(jsonPath("$.data.progress.completedNodeIds.length()").value(1));
+
+        mockMvc.perform(get("/api/me/authored-roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].completedNodeCount").value(1))
+            .andExpect(jsonPath("$.data.items[0].progressPercent").value(50));
+
+        String firstNodeStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM roadmap_node_progress WHERE roadmap_id = ? AND node_id = ? AND user_key = ?",
+            String.class,
+            roadmapId,
+            firstNodeId,
+            OWNER
+        );
+        String secondNodeStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM roadmap_node_progress WHERE roadmap_id = ? AND node_id = ? AND user_key = ?",
+            String.class,
+            roadmapId,
+            secondNodeId,
+            OWNER
+        );
+        org.assertj.core.api.Assertions.assertThat(firstNodeStatus).isEqualTo("COMPLETED");
+        org.assertj.core.api.Assertions.assertThat(secondNodeStatus).isEqualTo("NOT_STARTED");
     }
 
     @Test
