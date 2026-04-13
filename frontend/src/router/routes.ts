@@ -54,6 +54,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '路线详情' }
       },
       {
+        path: 'roadmaps/:id/learn/:nodeId?',
+        name: 'roadmap-study',
+        component: () => import('@/views/roadmap/RoadmapStudyView.vue'),
+        meta: { title: '路线学习' }
+      },
+      {
         path: 'community',
         name: 'notes',
         component: () => import('@/views/note/NoteListView.vue'),

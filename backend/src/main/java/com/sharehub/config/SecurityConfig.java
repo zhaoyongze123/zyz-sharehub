@@ -1,5 +1,6 @@
 package com.sharehub.config;
 
+import com.sharehub.auth.GitHubOAuth2UserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -10,6 +11,20 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 public class SecurityConfig {
+
+    private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
+    private final OAuthRedirectCaptureFilter oAuthRedirectCaptureFilter;
+    private final GitHubOAuth2UserService gitHubOAuth2UserService;
+
+    public SecurityConfig(
+        OAuthLoginSuccessHandler oAuthLoginSuccessHandler,
+        OAuthRedirectCaptureFilter oAuthRedirectCaptureFilter,
+        GitHubOAuth2UserService gitHubOAuth2UserService
+    ) {
+        this.oAuthLoginSuccessHandler = oAuthLoginSuccessHandler;
+        this.oAuthRedirectCaptureFilter = oAuthRedirectCaptureFilter;
+        this.gitHubOAuth2UserService = gitHubOAuth2UserService;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, Environment environment) throws Exception {
@@ -40,12 +55,16 @@ public class SecurityConfig {
                 .anyRequest().authenticated());
 
         if (oauthEnabled) {
-            http.oauth2Login(Customizer.withDefaults());
+            http.oauth2Login(oauth -> oauth
+                .successHandler(oAuthLoginSuccessHandler)
+                .userInfoEndpoint(userInfo -> userInfo.userService(gitHubOAuth2UserService))
+            );
         }
 
         http
             .logout(logout -> logout.logoutUrl("/api/auth/logout"));
 
+        http.addFilterBefore(oAuthRedirectCaptureFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(adminTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

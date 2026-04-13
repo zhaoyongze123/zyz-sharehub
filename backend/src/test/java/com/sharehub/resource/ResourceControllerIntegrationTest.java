@@ -55,6 +55,7 @@ class ResourceControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM comments");
         jdbcTemplate.update("DELETE FROM reports");
         jdbcTemplate.update("DELETE FROM resources");
+        jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
         jdbcTemplate.update("DELETE FROM users");
     }

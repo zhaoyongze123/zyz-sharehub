@@ -22,6 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const message = ref('正在校验授权状态并恢复回跳目标页。')
+const OAUTH_REDIRECT_KEY = 'ShareHub.oauthRedirect'
 
 function retry() {
   message.value = '正在重新校验授权状态并恢复回跳目标页。'
@@ -40,10 +41,16 @@ async function restoreSession() {
     }
 
     message.value = '真实登录状态已恢复，正在跳转。'
-    await router.replace(String(route.query.redirect || '/'))
+    const sessionRedirect = window.sessionStorage.getItem(OAUTH_REDIRECT_KEY)
+    const redirect = typeof route.query.redirect === 'string'
+      ? route.query.redirect
+      : (sessionRedirect || (profile.role === 'admin' ? '/admin' : '/me'))
+    window.sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
+    await router.replace(String(redirect))
   } catch {
     authStore.profile = null
     authStore.initialized = true
+    window.sessionStorage.removeItem(OAUTH_REDIRECT_KEY)
     message.value = '登录回调校验失败，请确认后端会话有效后重试。'
   }
 }

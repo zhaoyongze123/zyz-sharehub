@@ -4,6 +4,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:14173'
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: ['../.git-main-merge/**'],
   timeout: 30_000,
   workers: 1,
   expect: {

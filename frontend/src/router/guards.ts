@@ -10,7 +10,7 @@ export function setupRouterGuards(router: Router) {
     }
 
     if (typeof to.meta.title === 'string') {
-      document.title = `${to.meta.title} - ShareBase`
+      document.title = `${to.meta.title} - ShareHub`
     }
 
     if (to.meta.auth && !authStore.isLoggedIn) {

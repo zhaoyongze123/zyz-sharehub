@@ -3,8 +3,8 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-brand" @click="router.push('/')">
-        <div class="brand-logo">SB</div>
-        <span class="brand-name">ShareBase</span>
+        <img class="brand-logo" :src="brandLogoUrl" alt="ShareHub logo" />
+        <span class="brand-name">ShareHub</span>
       </div>
 
       <nav class="sidebar-nav">
@@ -122,7 +122,7 @@
     <div class="main-container">
       <header class="top-header">
         <div class="header-left">
-          <h1 class="page-title">{{ route.meta.title || 'ShareBase' }}</h1>
+          <h1 class="page-title">{{ route.meta.title || 'ShareHub' }}</h1>
         </div>
         <div class="header-right">
           <div class="search-trigger" @click="handleSearch">
@@ -163,6 +163,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import brandLogoUrl from '@/assets/logo/sharehub-favicon.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -228,15 +229,8 @@ const handleLogout = () => {
 .brand-logo {
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, #111 0%, var(--app-text-sub) 100%);
-  color: white;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: -0.5px;
+  object-fit: contain;
+  display: block;
 }
 
 .brand-name {

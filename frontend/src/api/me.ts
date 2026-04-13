@@ -5,6 +5,7 @@ interface UserProfileDto {
   id: number
   login: string
   name: string | null
+  bio: string | null
   avatarUrl: string | null
   status: string | null
 }
@@ -58,6 +59,7 @@ export interface MeDashboardData {
     id: number
     login: string
     displayName: string
+    bio: string
     avatarUrl?: string
     status: string
   }
@@ -123,6 +125,7 @@ export async function fetchMeDashboard(): Promise<MeDashboardData> {
       id: profile?.id ?? 0,
       login: profile?.login ?? '',
       displayName: profile?.name?.trim() || profile?.login || '未命名用户',
+      bio: profile?.bio?.trim() || '',
       avatarUrl: profile?.avatarUrl || undefined,
       status: profile?.status?.trim() || 'ACTIVE'
     },
@@ -169,5 +172,10 @@ export async function uploadMyAvatar(file: File) {
     }
   })
 
+  return response.data.data
+}
+
+export async function updateMyProfile(payload: { displayName: string; bio: string }) {
+  const response = await apiClient.put<ApiResponse<MeDto>>('/me/profile', payload)
   return response.data.data
 }

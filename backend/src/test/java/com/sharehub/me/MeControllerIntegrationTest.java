@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,6 +43,7 @@ class MeControllerIntegrationTest {
     @BeforeEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM favorites");
+        jdbcTemplate.update("DELETE FROM note_view_history");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
         jdbcTemplate.update("DELETE FROM roadmaps");
@@ -83,14 +85,27 @@ class MeControllerIntegrationTest {
                     """))
             .andExpect(status().isOk());
 
+        String publishedNoteResponse = mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"已发布笔记","contentMd":"# published","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long publishedNoteId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(publishedNoteResponse, Map.class).get("data")).get("id").toString());
+
         mockMvc.perform(post("/api/resumes/generate")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("templateKey", "me"))))
             .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/resources/" + resourceId + "/favorite")
-                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+        mockMvc.perform(post("/api/notes/" + publishedNoteId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, "another-user"))
             .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/me").header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
@@ -99,12 +114,32 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.myResourceCount").value(1))
             .andExpect(jsonPath("$.data.myFavoriteCount").value(1))
             .andExpect(jsonPath("$.data.myRoadmapCount").value(1))
-            .andExpect(jsonPath("$.data.myNoteCount").value(1))
+            .andExpect(jsonPath("$.data.myNoteCount").value(2))
             .andExpect(jsonPath("$.data.myResumeCount").value(1))
             .andExpect(jsonPath("$.data.recentResourceCount").value(1))
             .andExpect(jsonPath("$.data.publishedResourceCount").value(0))
             .andExpect(jsonPath("$.data.draftNoteCount").value(1))
             .andExpect(jsonPath("$.data.generatedResumeCount").value(1));
+    }
+
+    @Test
+    void shouldUpdatePersonalProfile() throws Exception {
+        mockMvc.perform(put("/api/me/profile")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"displayName":"新昵称","bio":"真实个人简介"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.profile.login").value(USER_KEY))
+            .andExpect(jsonPath("$.data.profile.name").value("新昵称"))
+            .andExpect(jsonPath("$.data.profile.bio").value("真实个人简介"));
+
+        mockMvc.perform(get("/api/me")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.profile.name").value("新昵称"))
+            .andExpect(jsonPath("$.data.profile.bio").value("真实个人简介"));
     }
 
     @Test
@@ -309,6 +344,54 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.publishedResourceCount").value(0))
             .andExpect(jsonPath("$.data.draftNoteCount").value(0))
             .andExpect(jsonPath("$.data.generatedResumeCount").value(2));
+    }
+
+    @Test
+    void shouldReturnFavoriteNotesAndPersistedNoteHistory() throws Exception {
+        String noteResponse = mockMvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"闭环笔记","contentMd":"# title\\n真正的摘要内容","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long noteId = Long.valueOf(((Map<?, ?>) objectMapper.readValue(noteResponse, Map.class).get("data")).get("id").toString());
+
+        mockMvc.perform(post("/api/notes/" + noteId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(1));
+
+        mockMvc.perform(get("/api/notes/" + noteId)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(noteId));
+
+        mockMvc.perform(get("/api/me/favorite-notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].id").value(noteId))
+            .andExpect(jsonPath("$.data.items[0].title").value("闭环笔记"))
+            .andExpect(jsonPath("$.data.items[0].favorited").value(true))
+            .andExpect(jsonPath("$.data.items[0].favorites").value(1));
+
+        mockMvc.perform(get("/api/me/note-history")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].id").value(noteId))
+            .andExpect(jsonPath("$.data.items[0].title").value("闭环笔记"))
+            .andExpect(jsonPath("$.data.items[0].favorited").value(true))
+            .andExpect(jsonPath("$.data.items[0].favorites").value(1));
     }
 
     @Test
@@ -555,7 +638,15 @@ class MeControllerIntegrationTest {
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
 
+        mockMvc.perform(get("/api/me/favorite-notes"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
         mockMvc.perform(get("/api/me/notes"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
+
+        mockMvc.perform(get("/api/me/note-history"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.code").value("NOT_LOGGED_IN"));
 
@@ -593,7 +684,19 @@ class MeControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("USER_BANNED"))
             .andExpect(jsonPath("$.message").value("USER_BANNED"));
 
+        mockMvc.perform(get("/api/me/favorite-notes")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
         mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("USER_BANNED"))
+            .andExpect(jsonPath("$.message").value("USER_BANNED"));
+
+        mockMvc.perform(get("/api/me/note-history")
                 .header(RequestAccessService.USER_KEY_HEADER, bannedUser.login()))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("USER_BANNED"))
@@ -638,7 +741,17 @@ class MeControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(0));
 
+        mockMvc.perform(get("/api/me/favorite-notes")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
         mockMvc.perform(get("/api/me/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/me/note-history")
                 .header(RequestAccessService.USER_KEY_HEADER, firstAccessUser))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(0));

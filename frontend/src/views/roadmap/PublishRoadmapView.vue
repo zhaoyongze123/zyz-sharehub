@@ -22,15 +22,27 @@
 
         <div class="node-stack">
           <div v-for="(node, index) in nodes" :key="node.id" class="glass-panel node-card">
+            <div class="node-card__header">
+              <p class="node-card__title">节点 {{ index + 1 }}</p>
+              <BaseButton
+                v-if="nodes.length > 1"
+                variant="secondary"
+                :disabled="isSubmitting"
+                :data-testid="`publish-roadmap-remove-node-${index}`"
+                @click="removeNode(index)"
+              >
+                删除节点
+              </BaseButton>
+            </div>
             <BaseInput
               v-model="node.title"
-              :label="`节点 ${index + 1}`"
+              label="阶段标题"
               placeholder="阶段标题"
               :data-testid="`publish-roadmap-node-title-${index}`"
             />
             <BaseTextarea
               v-model="node.description"
-              :label="`节点 ${index + 1} 内容描述`"
+              label="内容描述"
               placeholder="补充该节点的学习目标、交付物和完成标准"
               :data-testid="`publish-roadmap-node-description-${index}`"
             />
@@ -74,10 +86,8 @@
       </div>
     </section>
 
-    <aside class="side-stack">
-      <BaseEmpty title="关联资料" description="当前批次先收口路线创建与节点顺序写入，资料绑定后续再补。" />
-      <BaseEmpty title="发布校验" :description="statusDescription" />
-      <div v-if="lastCreatedRoadmapId" class="glass-panel publish-result" data-testid="publish-roadmap-result">
+    <aside v-if="lastCreatedRoadmapId" class="side-stack">
+      <div class="glass-panel publish-result" data-testid="publish-roadmap-result">
         <p class="publish-result__title">真实路线写入已完成</p>
         <p>路线 ID：{{ lastCreatedRoadmapId }}</p>
         <p>节点数：{{ lastCreatedNodeCount }}</p>
@@ -89,10 +99,9 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
-import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseUploader from '@/components/base/BaseUploader.vue'
@@ -124,15 +133,17 @@ function createDefaultNodes(): EditableRoadmapNode[] {
 
 const nodes = reactive<EditableRoadmapNode[]>(createDefaultNodes())
 
-const statusDescription = computed(() => {
-  if (lastCreatedRoadmapId.value) {
-    return `已通过真实接口创建路线 #${lastCreatedRoadmapId.value}，并写入 ${lastCreatedNodeCount.value} 个节点。`
-  }
-  return `${nodes.length} 个节点待提交；当前真实接口仅写入节点标题、描述、顺序，附件单独上传。`
-})
-
 function addNode() {
   nodes.push({ id: Date.now(), title: '', description: '', attachmentFile: null })
+}
+
+function removeNode(index: number) {
+  if (nodes.length <= 1) {
+    validationMessage.value = '至少保留 1 个节点'
+    return
+  }
+  validationMessage.value = ''
+  nodes.splice(index, 1)
 }
 
 function validateForm() {
@@ -253,6 +264,18 @@ async function publishRoadmap() {
 
 .node-card {
   padding: var(--space-4);
+}
+
+.node-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.node-card__title {
+  margin: 0;
+  font-weight: 600;
 }
 
 .form-actions {

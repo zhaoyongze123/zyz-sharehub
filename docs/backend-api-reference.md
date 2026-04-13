@@ -176,7 +176,9 @@
 - `GET /api/me/resources`
 - `GET /api/me/roadmaps`
 - `GET /api/me/favorites`
+- `GET /api/me/favorite-notes`
 - `GET /api/me/notes`
+- `GET /api/me/note-history`
 - `GET /api/me/resumes`
 
 都要求：
@@ -203,6 +205,8 @@
 - `GET /api/me/resources` 的 `status`、`visibility` 若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/roadmaps` 的 `status` 为空字符串或仅空白时，按未传处理；若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/notes` 的 `status` 为空字符串或仅空白时，按未传处理，不额外收窄结果；若带前后空白，会先裁剪再参与筛选
+- `GET /api/me/favorite-notes` 返回当前用户收藏的笔记列表，按收藏时间倒序
+- `GET /api/me/note-history` 返回当前用户浏览过的笔记列表，按最近浏览时间倒序
 - `GET /api/me/resumes` 的 `status`、`templateKey`、`keyword` 为空字符串或仅空白时，按未传处理；若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/resumes` 列表项会带出简历文件元数据，重点字段包括 `fileUrl`、`fileName`、`fileSize`、`fileCreatedAt`、`fileUpdatedAt`
 

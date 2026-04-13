@@ -102,22 +102,27 @@ public class RoadmapJdbcRepository {
     int safePage = Math.max(1, page);
     int safePageSize = Math.max(1, pageSize);
     String normalizedStatus = normalize(status);
-    Long total =
-        jdbc.queryForObject(
-            """
+    String countSql =
+        normalizedStatus == null
+            ? """
                 SELECT COUNT(*)
                 FROM roadmaps
                 WHERE owner_key = ?
-                  AND (? IS NULL OR status = ?)
-                """,
-            Long.class,
-            ownerKey,
-            normalizedStatus,
-            normalizedStatus);
+                """
+            : """
+                SELECT COUNT(*)
+                FROM roadmaps
+                WHERE owner_key = ?
+                  AND status = ?
+                """;
+    Long total =
+        normalizedStatus == null
+            ? jdbc.queryForObject(countSql, Long.class, ownerKey)
+            : jdbc.queryForObject(countSql, Long.class, ownerKey, normalizedStatus);
     int offset = (safePage - 1) * safePageSize;
-    List<RoadmapWorkbenchDto> items =
-        jdbc.query(
-            """
+    String listSql =
+        normalizedStatus == null
+            ? """
                 SELECT r.id,
                        r.title,
                        r.description,
@@ -130,18 +135,45 @@ public class RoadmapJdbcRepository {
                 LEFT JOIN roadmap_progress p
                   ON p.roadmap_id = r.id AND p.user_key = ?
                 WHERE r.owner_key = ?
-                  AND (? IS NULL OR r.status = ?)
                 GROUP BY r.id, r.title, r.description, r.visibility, r.status, p.payload
                 ORDER BY r.id DESC
                 LIMIT ? OFFSET ?
-                """,
-            (rs, rowNum) -> mapWorkbench(rs),
-            ownerKey,
-            ownerKey,
-            normalizedStatus,
-            normalizedStatus,
-            safePageSize,
-            offset);
+                """
+            : """
+                SELECT r.id,
+                       r.title,
+                       r.description,
+                       r.visibility,
+                       r.status,
+                       COUNT(n.id) AS node_count,
+                       p.payload AS progress_payload
+                FROM roadmaps r
+                LEFT JOIN roadmap_nodes n ON n.roadmap_id = r.id
+                LEFT JOIN roadmap_progress p
+                  ON p.roadmap_id = r.id AND p.user_key = ?
+                WHERE r.owner_key = ?
+                  AND r.status = ?
+                GROUP BY r.id, r.title, r.description, r.visibility, r.status, p.payload
+                ORDER BY r.id DESC
+                LIMIT ? OFFSET ?
+                """;
+    List<RoadmapWorkbenchDto> items =
+        normalizedStatus == null
+            ? jdbc.query(
+                listSql,
+                (rs, rowNum) -> mapWorkbench(rs),
+                ownerKey,
+                ownerKey,
+                safePageSize,
+                offset)
+            : jdbc.query(
+                listSql,
+                (rs, rowNum) -> mapWorkbench(rs),
+                ownerKey,
+                ownerKey,
+                normalizedStatus,
+                safePageSize,
+                offset);
     return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
   }
 
@@ -223,14 +255,14 @@ public class RoadmapJdbcRepository {
     String json = serialize(payload);
     int updated =
         jdbc.update(
-            "UPDATE roadmap_progress SET payload = ?, updated_at = ? WHERE roadmap_id = ? AND user_key = ?",
+            "UPDATE roadmap_progress SET payload = CAST(? AS jsonb), updated_at = ? WHERE roadmap_id = ? AND user_key = ?",
             json,
             Timestamp.from(Instant.now()),
             roadmapId,
             ownerKey);
     if (updated == 0) {
       jdbc.update(
-          "INSERT INTO roadmap_progress (roadmap_id, user_key, payload, updated_at) VALUES (?, ?, ?, ?)",
+          "INSERT INTO roadmap_progress (roadmap_id, user_key, payload, updated_at) VALUES (?, ?, CAST(? AS jsonb), ?)",
           roadmapId,
           ownerKey,
           json,

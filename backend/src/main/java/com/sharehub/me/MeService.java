@@ -6,6 +6,7 @@ import com.sharehub.common.PageResponse;
 import com.sharehub.interaction.InteractionRepository;
 import com.sharehub.note.NoteDto;
 import com.sharehub.note.NoteRepository;
+import com.sharehub.note.RelatedNoteDto;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resource.ResourceEntity;
 import com.sharehub.resource.ResourceRepository;
@@ -55,19 +56,14 @@ public class MeService {
     }
 
     public MeDto aggregate(String ownerKey) {
-        UserProfileDto profile = userProfileRepository.upsert(ownerKey, ownerKey, null);
+        UserProfileDto profile = userProfileRepository.upsert(ownerKey, null, null);
         Long resourceCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM resources WHERE owner_key = ?",
             Long.class,
             ownerKey
         );
-        Long favoriteCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM favorites WHERE user_key = ?",
-            Long.class,
-            ownerKey
-        );
         long safeResourceCount = resourceCount == null ? 0L : resourceCount;
-        long safeFavoriteCount = favoriteCount == null ? 0L : favoriteCount;
+        long safeFavoriteCount = interactionRepository.countFavoritedPublishedNotesByOwner(ownerKey);
         long recentResourceCount = countResourcesCreatedWithin(ownerKey, RECENT_RESOURCE_WINDOW);
         long publishedResourceCount = countResourcesByStatus(ownerKey, PUBLISHED_STATUS);
         long draftNoteCount = countNotesByStatus(ownerKey, DRAFT_STATUS);
@@ -84,6 +80,10 @@ public class MeService {
             draftNoteCount,
             generatedResumeCount
         );
+    }
+
+    public UserProfileDto updateProfile(String ownerKey, String displayName, String bio) {
+        return userProfileRepository.updateProfile(ownerKey, displayName, bio);
     }
 
     public PageResponse<ResourceDto> myResources(String ownerKey, String status, String visibility, int page, int pageSize) {
@@ -111,8 +111,16 @@ public class MeService {
         return interactionRepository.listFavoriteResources(ownerKey, page, pageSize);
     }
 
+    public PageResponse<RelatedNoteDto> myFavoriteNotes(String ownerKey, int page, int pageSize) {
+        return interactionRepository.listFavoriteNotes(ownerKey, page, pageSize);
+    }
+
     public PageResponse<NoteDto> myNotes(String ownerKey, String status, int page, int pageSize) {
         return noteRepository.listByOwner(ownerKey, status, page, pageSize);
+    }
+
+    public PageResponse<RelatedNoteDto> myNoteHistory(String ownerKey, int page, int pageSize) {
+        return noteRepository.listViewHistory(ownerKey, page, pageSize);
     }
 
     public PageResponse<ResumeDto> myResumes(

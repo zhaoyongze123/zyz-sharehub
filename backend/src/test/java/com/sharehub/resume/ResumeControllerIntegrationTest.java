@@ -12,11 +12,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -588,7 +590,7 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
-    void shouldReturnResumeErrorCodesForMissingResumeAndFile() throws Exception {
+    void shouldRejectDeletingReferencedResumeFileInRealDatabase() throws Exception {
         mockMvc.perform(get("/api/resumes/999999")
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound())
@@ -606,18 +608,20 @@ class ResumeControllerIntegrationTest {
         Map<?, ?> payload = objectMapper.readValue(response, Map.class);
         Map<?, ?> data = (Map<?, ?>) payload.get("data");
         Long id = Long.valueOf(String.valueOf(data.get("id")));
-        String fileId = String.valueOf(data.get("fileId"));
+        UUID fileId = UUID.fromString(String.valueOf(data.get("fileId")));
 
-        jdbcTemplate.update("DELETE FROM files WHERE id = ?", UUID.fromString(fileId));
+        assertThatThrownBy(() -> jdbcTemplate.update("DELETE FROM files WHERE id = ?", fileId))
+            .isInstanceOf(DataIntegrityViolationException.class);
 
         mockMvc.perform(get("/api/resumes/" + id + "/download")
                 .header(USER_KEY_HEADER, DEFAULT_USER))
-            .andExpect(status().isNotFound())
-            .andExpect(content().string(""));
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.APPLICATION_PDF_VALUE))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"resume-classic.pdf\""));
     }
 
     @Test
-    void shouldKeepResumeRecordAccessibleWhenUnderlyingFileMissing() throws Exception {
+    void shouldKeepResumeRecordAccessibleWhenReferencedFileDeletionIsRejected() throws Exception {
         String response = mockMvc.perform(post("/api/resumes/generate")
                 .header(USER_KEY_HEADER, DEFAULT_USER)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -631,8 +635,10 @@ class ResumeControllerIntegrationTest {
         Map<?, ?> data = (Map<?, ?>) payload.get("data");
         Long id = Long.valueOf(String.valueOf(data.get("id")));
         String fileId = String.valueOf(data.get("fileId"));
+        UUID fileUuid = UUID.fromString(fileId);
 
-        jdbcTemplate.update("DELETE FROM files WHERE id = ?", UUID.fromString(fileId));
+        assertThatThrownBy(() -> jdbcTemplate.update("DELETE FROM files WHERE id = ?", fileUuid))
+            .isInstanceOf(DataIntegrityViolationException.class);
 
         mockMvc.perform(get("/api/resumes/" + id)
                 .header(USER_KEY_HEADER, DEFAULT_USER))
@@ -641,10 +647,10 @@ class ResumeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.templateKey").value("classic"))
             .andExpect(jsonPath("$.data.fileId").value(fileId))
             .andExpect(jsonPath("$.data.fileUrl").value("/api/resumes/" + id + "/download"))
-            .andExpect(jsonPath("$.data.fileName").value(org.hamcrest.Matchers.nullValue()))
-            .andExpect(jsonPath("$.data.fileSize").value(org.hamcrest.Matchers.nullValue()))
-            .andExpect(jsonPath("$.data.fileCreatedAt").value(org.hamcrest.Matchers.nullValue()))
-            .andExpect(jsonPath("$.data.fileUpdatedAt").value(org.hamcrest.Matchers.nullValue()));
+            .andExpect(jsonPath("$.data.fileName").value("resume-classic.pdf"))
+            .andExpect(jsonPath("$.data.fileSize").isNumber())
+            .andExpect(jsonPath("$.data.fileCreatedAt").exists())
+            .andExpect(jsonPath("$.data.fileUpdatedAt").exists());
 
         mockMvc.perform(get("/api/resumes")
                 .header(USER_KEY_HEADER, DEFAULT_USER))
@@ -652,10 +658,10 @@ class ResumeControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].id").value(id.intValue()))
             .andExpect(jsonPath("$.data.items[0].fileId").value(fileId))
-            .andExpect(jsonPath("$.data.items[0].fileName").value(org.hamcrest.Matchers.nullValue()))
-            .andExpect(jsonPath("$.data.items[0].fileSize").value(org.hamcrest.Matchers.nullValue()))
-            .andExpect(jsonPath("$.data.items[0].fileCreatedAt").value(org.hamcrest.Matchers.nullValue()))
-            .andExpect(jsonPath("$.data.items[0].fileUpdatedAt").value(org.hamcrest.Matchers.nullValue()));
+            .andExpect(jsonPath("$.data.items[0].fileName").value("resume-classic.pdf"))
+            .andExpect(jsonPath("$.data.items[0].fileSize").isNumber())
+            .andExpect(jsonPath("$.data.items[0].fileCreatedAt").exists())
+            .andExpect(jsonPath("$.data.items[0].fileUpdatedAt").exists());
     }
 
     @Test

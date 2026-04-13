@@ -17,24 +17,23 @@ interface AuthMeResponse {
     name?: string | null
     avatarUrl?: string | null
     status?: string
+    isAdmin?: boolean
   }
 }
 
-function getSavedRole(): UserProfile['role'] {
-  return window.localStorage.getItem('sharebase.role') === 'admin' ? 'admin' : 'user'
-}
+const DEV_MODE_KEY = 'ShareHub.devMode'
 
 function buildDevHeaders() {
-  const savedRole = window.localStorage.getItem('sharebase.role')
-  const savedNickname = window.localStorage.getItem('sharebase.nickname')
+  const devMode = window.localStorage.getItem(DEV_MODE_KEY)
+  const savedNickname = window.localStorage.getItem('ShareHub.nickname')
   const headers: Record<string, string> = {}
 
-  if (savedRole === 'admin') {
-    headers['X-Admin-Token'] = window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token'
+  if (devMode === 'admin') {
+    headers['X-Admin-Token'] = window.localStorage.getItem('ShareHub.adminToken') || 'dev-admin-token'
   }
 
-  if (savedRole === 'user' || savedRole === 'admin') {
-    headers['X-User-Key'] = window.localStorage.getItem('sharebase.userKey') || savedNickname || 'frontend-local-user'
+  if (devMode === 'user' || devMode === 'admin') {
+    headers['X-User-Key'] = window.localStorage.getItem('ShareHub.userKey') || savedNickname || 'frontend-local-user'
   }
 
   return headers
@@ -58,17 +57,17 @@ export const useAuthStore = defineStore('auth', {
 
       if (response.data?.success && currentUser?.login) {
         const nickname = currentUser.name?.trim() || currentUser.login
-        const role = getSavedRole()
+        const role: UserProfile['role'] = currentUser.isAdmin ? 'admin' : 'user'
         this.profile = {
           id: currentUser.id ?? 0,
           nickname,
           role,
-          headline: window.localStorage.getItem('sharebase.headline') || 'ShareHub 用户',
+          headline: window.localStorage.getItem('ShareHub.headline') || 'ShareHub 用户',
           avatarUrl: currentUser.avatarUrl || undefined
         }
-        window.localStorage.setItem('sharebase.nickname', nickname)
-        window.localStorage.setItem('sharebase.userKey', currentUser.login)
-        window.localStorage.setItem('sharebase.role', role)
+        window.localStorage.setItem('ShareHub.nickname', nickname)
+        window.localStorage.setItem('ShareHub.userKey', currentUser.login)
+        window.localStorage.removeItem(DEV_MODE_KEY)
         return this.profile
       }
 
@@ -91,12 +90,12 @@ export const useAuthStore = defineStore('auth', {
     loginAs(role: 'user' | 'admin') {
       const nickname = role === 'admin' ? 'Admin Zoe' : 'Alex Chen'
       const headline = role === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者'
-      window.localStorage.setItem('sharebase.role', role)
-      window.localStorage.setItem('sharebase.nickname', nickname)
-      window.localStorage.setItem('sharebase.headline', headline)
-      window.localStorage.setItem('sharebase.userKey', nickname)
+      window.localStorage.setItem(DEV_MODE_KEY, role)
+      window.localStorage.setItem('ShareHub.nickname', nickname)
+      window.localStorage.setItem('ShareHub.headline', headline)
+      window.localStorage.setItem('ShareHub.userKey', nickname)
       if (role === 'admin') {
-        window.localStorage.setItem('sharebase.adminToken', window.localStorage.getItem('sharebase.adminToken') || 'dev-admin-token')
+        window.localStorage.setItem('ShareHub.adminToken', window.localStorage.getItem('ShareHub.adminToken') || 'dev-admin-token')
       }
       this.profile = {
         id: 1,
@@ -110,19 +109,19 @@ export const useAuthStore = defineStore('auth', {
       if (this.profile) {
         Object.assign(this.profile, data)
         if (data.nickname) {
-          window.localStorage.setItem('sharebase.nickname', data.nickname)
+          window.localStorage.setItem('ShareHub.nickname', data.nickname)
         }
         if (data.headline) {
-          window.localStorage.setItem('sharebase.headline', data.headline)
+          window.localStorage.setItem('ShareHub.headline', data.headline)
         }
       }
     },
     logout() {
-      window.localStorage.removeItem('sharebase.role')
-      window.localStorage.removeItem('sharebase.nickname')
-      window.localStorage.removeItem('sharebase.headline')
-      window.localStorage.removeItem('sharebase.userKey')
-      window.localStorage.removeItem('sharebase.adminToken')
+      window.localStorage.removeItem(DEV_MODE_KEY)
+      window.localStorage.removeItem('ShareHub.nickname')
+      window.localStorage.removeItem('ShareHub.headline')
+      window.localStorage.removeItem('ShareHub.userKey')
+      window.localStorage.removeItem('ShareHub.adminToken')
       this.profile = null
       this.initialized = true
     }

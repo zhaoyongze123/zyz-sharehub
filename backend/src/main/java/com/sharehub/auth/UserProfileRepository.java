@@ -28,6 +28,9 @@ public class UserProfileRepository {
     public UserProfileDto upsert(String login, String name, UUID avatarFileId) {
         Optional<UserProfileDto> existing = findOptional(login);
         if (existing.isPresent()) {
+            String existingName = nullable(existing.get().name());
+            String requestedName = nullable(name);
+            String effectiveName = existingName != null ? existingName : requestedName;
             UUID effectiveAvatarFileId = avatarFileId != null ? avatarFileId : existing.get().avatarFileId();
             jdbcTemplate.update(
                 """
@@ -35,7 +38,7 @@ public class UserProfileRepository {
                     SET name = ?, avatar_file_id = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE login = ?
                     """,
-                nullable(name),
+                effectiveName,
                 effectiveAvatarFileId,
                 login
             );
@@ -64,10 +67,27 @@ public class UserProfileRepository {
             keyHolder.getKey().longValue(),
             login,
             nullable(name),
+            null,
             avatarFileId,
             avatarFileId == null ? null : "/api/files/" + avatarFileId,
-            "ACTIVE"
+            "ACTIVE",
+            false
         );
+    }
+
+    public UserProfileDto updateProfile(String login, String name, String bio) {
+        ensureExists(login);
+        jdbcTemplate.update(
+            """
+                UPDATE users
+                SET name = ?, bio = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE login = ?
+                """,
+            nullable(name),
+            nullable(bio),
+            login
+        );
+        return findByLogin(login);
     }
 
     public UserProfileDto updateAvatar(String login, UUID avatarFileId) {
@@ -107,7 +127,7 @@ public class UserProfileRepository {
         int offset = (safePage - 1) * safePageSize;
         List<UserProfileDto> items = jdbcTemplate.query(
             """
-                SELECT id, login, name, avatar_file_id, status
+                SELECT id, login, name, bio, avatar_file_id, status
                 FROM users
                 ORDER BY id DESC
                 LIMIT ? OFFSET ?
@@ -129,7 +149,7 @@ public class UserProfileRepository {
     private Optional<UserProfileDto> findOptional(String login) {
         List<UserProfileDto> results = jdbcTemplate.query(
             """
-                SELECT id, login, name, avatar_file_id, status
+                SELECT id, login, name, bio, avatar_file_id, status
                 FROM users
             WHERE login = ?
             """,
@@ -152,9 +172,11 @@ public class UserProfileRepository {
             resultSet.getLong("id"),
             resultSet.getString("login"),
             resultSet.getString("name"),
+            resultSet.getString("bio"),
             avatarFileId,
             avatarFileId == null ? null : "/api/files/" + avatarFileId,
-            resultSet.getString("status")
+            resultSet.getString("status"),
+            false
         );
     }
 
@@ -165,7 +187,7 @@ public class UserProfileRepository {
     private Optional<UserProfileDto> findOptionalById(Long id) {
         List<UserProfileDto> results = jdbcTemplate.query(
             """
-                SELECT id, login, name, avatar_file_id, status
+                SELECT id, login, name, bio, avatar_file_id, status
                 FROM users
                 WHERE id = ?
                 """,

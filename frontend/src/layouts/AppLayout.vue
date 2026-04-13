@@ -3,7 +3,7 @@
     <header class="workspace-header">
       <div class="workspace-header__inner">
         <div>
-          <RouterLink class="brand" to="/">ShareBase</RouterLink>
+          <RouterLink class="brand" to="/">ShareHub</RouterLink>
           <p>创作工作台</p>
         </div>
         <nav class="workspace-nav">

@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -30,6 +31,12 @@ public class AdminTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
         throws ServletException, IOException {
         if (!isAdminPath(request)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        Authentication existingAuthentication = SecurityContextHolder.getContext().getAuthentication();
+        if (hasAdminRole(existingAuthentication)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -75,5 +82,15 @@ public class AdminTokenFilter extends OncePerRequestFilter {
         response.getWriter().write(
             "{\"success\":false,\"code\":\"" + message + "\",\"data\":null,\"message\":\"" + message + "\"}"
         );
+    }
+
+    private boolean hasAdminRole(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities()
+            .stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch("ROLE_ADMIN"::equals);
     }
 }

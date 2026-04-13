@@ -1,7 +1,7 @@
 <template>
   <div class="admin-shell">
     <aside class="admin-sidebar">
-      <RouterLink class="brand" to="/admin">ShareBase Admin</RouterLink>
+      <RouterLink class="brand" to="/admin">ShareHub Admin</RouterLink>
       <nav class="admin-nav">
         <RouterLink to="/admin">概览</RouterLink>
         <RouterLink to="/admin/reviews">内容审核</RouterLink>

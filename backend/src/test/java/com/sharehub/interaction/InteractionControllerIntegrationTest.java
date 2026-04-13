@@ -49,6 +49,7 @@ public class InteractionControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM comments");
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM likes");
+        jdbcTemplate.update("DELETE FROM note_view_history");
         jdbcTemplate.update("DELETE FROM users");
     }
 
@@ -56,20 +57,25 @@ public class InteractionControllerIntegrationTest {
     void commentReplyFavoriteLikeReportPersisted() throws Exception {
         long resourceId = createResource("互动资源");
         var commentPayload = mapper.writeValueAsString(Map.of("content", "hello"));
-        mvc.perform(post("/api/resources/" + resourceId + "/comments")
+        String commentResponse = mvc.perform(post("/api/resources/" + resourceId + "/comments")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(commentPayload))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.resourceId").value(resourceId));
+            .andExpect(jsonPath("$.data.resourceId").value(resourceId))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long commentId = Long.parseLong(String.valueOf(((Map<?, ?>) mapper.readValue(commentResponse, Map.class).get("data")).get("id")));
 
         var replyPayload = mapper.writeValueAsString(Map.of("content", "reply"));
-        mvc.perform(post("/api/comments/1/reply")
+        mvc.perform(post("/api/comments/" + commentId + "/reply")
                         .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(replyPayload))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.parentId").value(1))
+                .andExpect(jsonPath("$.data.parentId").value(commentId))
                 .andExpect(jsonPath("$.data.resourceId").value(resourceId));
 
         mvc.perform(post("/api/resources/" + resourceId + "/favorite")
@@ -139,7 +145,9 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.favorites").value(0))
             .andExpect(jsonPath("$.data.likes").value(0));
 
-        mvc.perform(adminPost("/api/admin/comments/2/hide"))
+        long replyId = commentId + 1;
+
+        mvc.perform(adminPost("/api/admin/comments/" + replyId + "/hide"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("HIDDEN"));
 
@@ -152,7 +160,7 @@ public class InteractionControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.comments").value(1));
 
-        mvc.perform(adminPost("/api/admin/comments/2/restore"))
+        mvc.perform(adminPost("/api/admin/comments/" + replyId + "/restore"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("VISIBLE"));
 
@@ -360,6 +368,96 @@ public class InteractionControllerIntegrationTest {
             .andExpect(jsonPath("$.data.reason").value("note spam"));
     }
 
+    @Test
+    void noteFavoriteAndLikeShouldPersisted() throws Exception {
+        long noteId = createNote("互动笔记");
+
+        mvc.perform(post("/api/notes/" + noteId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.noteId").value(noteId))
+            .andExpect(jsonPath("$.data.favorites").value(1));
+
+        mvc.perform(post("/api/notes/" + noteId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(1));
+
+        mvc.perform(post("/api/notes/" + noteId + "/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.noteId").value(noteId))
+            .andExpect(jsonPath("$.data.likes").value(1));
+
+        mvc.perform(get("/api/notes/" + noteId + "/interactions")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.noteId").value(noteId))
+            .andExpect(jsonPath("$.data.favorites").value(1))
+            .andExpect(jsonPath("$.data.likes").value(1))
+            .andExpect(jsonPath("$.data.reports").value(0));
+
+        mvc.perform(delete("/api/notes/" + noteId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.favorites").value(0));
+
+        mvc.perform(delete("/api/notes/" + noteId + "/like")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.likes").value(0));
+    }
+
+    @Test
+    void noteInteractionsShouldRespectAccessibility() throws Exception {
+        long privateNoteId = createNote("私有互动笔记");
+        long publicNoteId = createPublishedPublicNote("公开互动笔记");
+
+        mvc.perform(get("/api/notes/" + privateNoteId + "/interactions"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+
+        mvc.perform(get("/api/notes/" + privateNoteId + "/interactions")
+                .header(RequestAccessService.USER_KEY_HEADER, "other-reader"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+
+        mvc.perform(get("/api/notes/" + privateNoteId + "/interactions")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.noteId").value(privateNoteId));
+
+        mvc.perform(get("/api/notes/" + publicNoteId + "/interactions"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.noteId").value(publicNoteId));
+    }
+
+    @Test
+    void noteWriteInteractionsShouldRejectInaccessibleNote() throws Exception {
+        long privateNoteId = createNote("不可见笔记");
+
+        mvc.perform(post("/api/notes/" + privateNoteId + "/favorite")
+                .header(RequestAccessService.USER_KEY_HEADER, "other-reader"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+
+        mvc.perform(post("/api/notes/" + privateNoteId + "/like")
+                .header(RequestAccessService.USER_KEY_HEADER, "other-reader"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+
+        mvc.perform(post("/api/reports")
+                .header(RequestAccessService.USER_KEY_HEADER, "other-reader")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of(
+                    "targetType", "NOTE",
+                    "noteId", String.valueOf(privateNoteId),
+                    "reason", "inaccessible"
+                ))))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder adminPost(String uri) {
         return post(uri).header(AdminTokenFilter.HEADER, AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
@@ -398,8 +496,8 @@ public class InteractionControllerIntegrationTest {
             title,
             "# " + title,
             USER_KEY,
-            "PUBLIC",
-            "PUBLISHED"
+            "PRIVATE",
+            "DRAFT"
         );
         Long id = jdbcTemplate.queryForObject(
             "SELECT MAX(id) FROM notes WHERE owner_key = ? AND title = ?",
@@ -412,4 +510,29 @@ public class InteractionControllerIntegrationTest {
         }
         return id;
     }
+
+    private long createPublishedPublicNote(String title) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO notes (title, content_md, owner_key, visibility, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            title,
+            "# " + title,
+            USER_KEY,
+            "PUBLIC",
+            "PUBLISHED"
+        );
+        Long id = jdbcTemplate.queryForObject(
+            "SELECT MAX(id) FROM notes WHERE owner_key = ? AND title = ?",
+            Long.class,
+            USER_KEY,
+            title
+        );
+        if (id == null) {
+            throw new IllegalStateException("FAILED_TO_CREATE_PUBLIC_NOTE");
+        }
+        return id;
+    }
+
 }

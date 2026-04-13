@@ -20,7 +20,7 @@ type ThemeMode = '跟随系统' | '浅色模式' | '深色模式'
 export const useAppStore = defineStore('app', {
   state: () => ({
     globalLoading: false,
-    theme: (window.localStorage.getItem('sharebase.theme') as ThemeMode) || '跟随系统',
+    theme: (window.localStorage.getItem('ShareHub.theme') as ThemeMode) || '跟随系统',
     toasts: [] as ToastPayload[],
     dialog: {
       visible: false,
@@ -40,7 +40,7 @@ export const useAppStore = defineStore('app', {
     },
     setTheme(newTheme: ThemeMode) {
       this.theme = newTheme
-      window.localStorage.setItem('sharebase.theme', newTheme)
+      window.localStorage.setItem('ShareHub.theme', newTheme)
       this.applyTheme(newTheme)
     },
     applyTheme(theme: ThemeMode) {

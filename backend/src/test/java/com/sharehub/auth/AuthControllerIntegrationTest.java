@@ -6,6 +6,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -37,6 +40,9 @@ class AuthControllerIntegrationTest {
     @Autowired
     private UserProfileRepository userProfileRepository;
 
+    @Autowired
+    private AdminWhitelistRepository adminWhitelistRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
@@ -47,7 +53,8 @@ class AuthControllerIntegrationTest {
             .andExpect(jsonPath("$.code").value("OK"))
             .andExpect(jsonPath("$.message").value("OK"))
             .andExpect(jsonPath("$.data.login").value(USER_KEY))
-            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.isAdmin").value(false));
     }
 
     @Test
@@ -197,6 +204,37 @@ class AuthControllerIntegrationTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("USER_BANNED"))
             .andExpect(jsonPath("$.message").value("USER_BANNED"));
+    }
+
+    @Test
+    void shouldReturnIsAdminWhenAdminTokenIsValid() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .header("X-Admin-Token", "dev-admin-token"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value(USER_KEY))
+            .andExpect(jsonPath("$.data.isAdmin").value(true));
+    }
+
+    @Test
+    void shouldGrantAdminForWhitelistedGithubLogin() throws Exception {
+        adminWhitelistRepository.grantSuperAdmin("whitelisted-admin", "test");
+        DefaultOAuth2User principal = new DefaultOAuth2User(
+            java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN")),
+            java.util.Map.of("login", "whitelisted-admin", "name", "Whitelisted Admin"),
+            "login"
+        );
+        OAuth2AuthenticationToken authentication = new OAuth2AuthenticationToken(
+            principal,
+            principal.getAuthorities(),
+            "github"
+        );
+
+        mockMvc.perform(get("/api/auth/me")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication(authentication)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.login").value("whitelisted-admin"))
+            .andExpect(jsonPath("$.data.isAdmin").value(true));
     }
 
     @Test

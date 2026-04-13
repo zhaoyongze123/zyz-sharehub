@@ -41,6 +41,7 @@ public class RoadmapControllerIT {
 
   @BeforeEach
   void cleanup() throws Exception {
+    jdbcTemplate.update("DELETE FROM resumes");
     jdbcTemplate.update("DELETE FROM files");
     jdbcTemplate.update("DELETE FROM roadmap_progress");
     jdbcTemplate.update("DELETE FROM roadmap_nodes");

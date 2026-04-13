@@ -3,6 +3,7 @@ package com.sharehub.interaction;
 import com.sharehub.admin.AdminAuditLogDto;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
+import com.sharehub.note.RelatedNoteDto;
 import com.sharehub.note.NoteRepository;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resource.ResourceRepository;
@@ -116,6 +117,39 @@ public class InteractionRepository {
         return (int) count("SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL", resourceId);
     }
 
+    public int addNoteFavorite(Long noteId, String userKey) {
+        requireAccessibleNote(noteId, userKey);
+        Integer exists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM favorites WHERE note_id = ? AND resource_id IS NULL AND user_key = ?",
+            Integer.class,
+            noteId,
+            userKey
+        );
+        if (exists == null || exists == 0) {
+            jdbcTemplate.update(
+                "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP)",
+                noteId,
+                userKey
+            );
+        }
+        Integer total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM favorites WHERE note_id = ? AND resource_id IS NULL",
+            Integer.class,
+            noteId
+        );
+        return total == null ? 0 : total;
+    }
+
+    public int removeNoteFavorite(Long noteId, String userKey) {
+        requireAccessibleNote(noteId, userKey);
+        jdbcTemplate.update(
+            "DELETE FROM favorites WHERE note_id = ? AND resource_id IS NULL AND user_key = ?",
+            noteId,
+            userKey
+        );
+        return (int) countByNote("SELECT COUNT(*) FROM favorites WHERE note_id = ? AND resource_id IS NULL", noteId);
+    }
+
     public List<CommentNodeDto> listCommentTreeByResource(Long resourceId) {
         List<CommentRecord> records = jdbcTemplate.query(
             """
@@ -176,6 +210,16 @@ public class InteractionRepository {
         return result;
     }
 
+    public NoteInteractionSummaryDto summarizeNote(Long noteId, String viewerKey) {
+        requireAccessibleNote(noteId, viewerKey);
+        return new NoteInteractionSummaryDto(
+            noteId,
+            countByNote("SELECT COUNT(*) FROM favorites WHERE note_id = ? AND resource_id IS NULL", noteId),
+            countByNote("SELECT COUNT(*) FROM likes WHERE note_id = ? AND resource_id IS NULL", noteId),
+            countByNote("SELECT COUNT(*) FROM reports WHERE target_type = 'NOTE' AND target_id = ?", noteId)
+        );
+    }
+
     public CommentRecord hideComment(Long commentId) {
         return updateCommentStatus(commentId, STATUS_HIDDEN);
     }
@@ -233,6 +277,95 @@ public class InteractionRepository {
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
+    public PageResponse<RelatedNoteDto> listFavoriteNotes(String userKey, int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, pageSize);
+        Long total = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM favorites f
+                JOIN notes n ON n.id = f.note_id
+                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL
+                """,
+            Long.class,
+            userKey
+        );
+        int offset = (safePage - 1) * safePageSize;
+        List<RelatedNoteDto> items = jdbcTemplate.query(
+            """
+                SELECT
+                  n.id,
+                  n.title,
+                  n.content_md,
+                  n.owner_key,
+                  COALESCE(u.name, n.owner_key) AS owner_name,
+                  CASE
+                    WHEN u.avatar_file_id IS NULL THEN NULL
+                    ELSE '/api/files/' || u.avatar_file_id::text
+                  END AS owner_avatar_url,
+                  n.status,
+                  n.category,
+                  f.created_at,
+                  COUNT(all_f.id) AS favorite_count
+                FROM favorites f
+                JOIN notes n ON n.id = f.note_id
+                LEFT JOIN users u ON u.login = n.owner_key
+                LEFT JOIN favorites all_f ON all_f.note_id = n.id AND all_f.resource_id IS NULL
+                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL
+                GROUP BY
+                  n.id,
+                  n.title,
+                  n.content_md,
+                  n.owner_key,
+                  COALESCE(u.name, n.owner_key),
+                  CASE
+                    WHEN u.avatar_file_id IS NULL THEN NULL
+                    ELSE '/api/files/' || u.avatar_file_id::text
+                  END,
+                  n.status,
+                  n.category,
+                  f.created_at
+                ORDER BY f.created_at DESC, n.id DESC
+                LIMIT ? OFFSET ?
+                """,
+            (resultSet, rowNum) -> new RelatedNoteDto(
+                resultSet.getLong("id"),
+                resultSet.getString("title"),
+                extractNoteSummary(resultSet.getString("content_md")),
+                resultSet.getTimestamp("created_at") == null ? null : resultSet.getTimestamp("created_at").toInstant(),
+                resultSet.getString("status"),
+                resultSet.getString("category"),
+                resultSet.getString("category") == null ? List.of() : List.of(resultSet.getString("category")),
+                resultSet.getString("owner_key"),
+                resultSet.getString("owner_name"),
+                resultSet.getString("owner_avatar_url"),
+                resultSet.getLong("favorite_count"),
+                true
+            ),
+            userKey,
+            safePageSize,
+            offset
+        );
+        return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
+    }
+
+    public long countFavoritedPublishedNotesByOwner(String ownerKey) {
+        Long total = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM favorites f
+                JOIN notes n ON n.id = f.note_id
+                WHERE n.owner_key = ?
+                  AND n.status = 'PUBLISHED'
+                  AND f.note_id IS NOT NULL
+                  AND f.resource_id IS NULL
+                """,
+            Long.class,
+            ownerKey
+        );
+        return total == null ? 0L : total;
+    }
+
     public int addLike(Long resourceId, String userKey) {
         requireResource(resourceId);
         Integer exists = jdbcTemplate.queryForObject(
@@ -266,13 +399,46 @@ public class InteractionRepository {
         return (int) count("SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL", resourceId);
     }
 
+    public int addNoteLike(Long noteId, String userKey) {
+        requireAccessibleNote(noteId, userKey);
+        Integer exists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM likes WHERE note_id = ? AND resource_id IS NULL AND user_key = ?",
+            Integer.class,
+            noteId,
+            userKey
+        );
+        if (exists == null || exists == 0) {
+            jdbcTemplate.update(
+                "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP)",
+                noteId,
+                userKey
+            );
+        }
+        Integer total = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM likes WHERE note_id = ? AND resource_id IS NULL",
+            Integer.class,
+            noteId
+        );
+        return total == null ? 0 : total;
+    }
+
+    public int removeNoteLike(Long noteId, String userKey) {
+        requireAccessibleNote(noteId, userKey);
+        jdbcTemplate.update(
+            "DELETE FROM likes WHERE note_id = ? AND resource_id IS NULL AND user_key = ?",
+            noteId,
+            userKey
+        );
+        return (int) countByNote("SELECT COUNT(*) FROM likes WHERE note_id = ? AND resource_id IS NULL", noteId);
+    }
+
     public ReportRecord saveReport(Long resourceId, String reason, String reporter) {
         requireResource(resourceId);
         return insertReport("RESOURCE", resourceId, reason, reporter);
     }
 
     public ReportRecord saveNoteReport(Long noteId, String reason, String reporter) {
-        requireNote(noteId);
+        requireAccessibleNote(noteId, reporter);
         return insertReport("NOTE", noteId, reason, reporter);
     }
 
@@ -483,8 +649,28 @@ public class InteractionRepository {
         return Arrays.asList(tags.split(","));
     }
 
+    private String extractNoteSummary(String contentMd) {
+        if (contentMd == null || contentMd.isBlank()) {
+            return "暂无摘要";
+        }
+        for (String line : contentMd.split("\\R")) {
+            String normalized = line.trim();
+            if (normalized.isEmpty() || normalized.startsWith("#")) {
+                continue;
+            }
+            return normalized.length() > 96 ? normalized.substring(0, 96) + "..." : normalized;
+        }
+        String fallback = contentMd.replaceAll("\\s+", " ").trim();
+        return fallback.length() > 96 ? fallback.substring(0, 96) + "..." : fallback;
+    }
+
     private long count(String sql, Long resourceId) {
         Long value = jdbcTemplate.queryForObject(sql, Long.class, resourceId);
+        return value == null ? 0L : value;
+    }
+
+    private long countByNote(String sql, Long noteId) {
+        Long value = jdbcTemplate.queryForObject(sql, Long.class, noteId);
         return value == null ? 0L : value;
     }
 
@@ -498,6 +684,13 @@ public class InteractionRepository {
         if (noteId == null || !noteRepository.existsById(noteId)) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
+    }
+
+    private void requireAccessibleNote(Long noteId, String viewerKey) {
+        if (noteId == null) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
+        }
+        noteRepository.findAccessible(noteId, viewerKey);
     }
 
     private void bindLong(PreparedStatement statement, int index, Long value) throws SQLException {

@@ -20,7 +20,6 @@
         <div class="hero-main">
           <p class="hero-kicker">个人帐户</p>
           <h1>个人资料</h1>
-          <p class="hero-desc">当前页面已切到真实 `/api/me` 聚合数据，展示账号身份与工作台统计。</p>
           <div class="identity-row">
             <div class="avatar" data-testid="profile-avatar">
               <img v-if="dashboard.profile.avatarUrl" :src="dashboard.profile.avatarUrl" alt="avatar" />
@@ -37,11 +36,18 @@
           </div>
         </div>
         <div class="hero-actions">
+          <RouterLink
+            v-if="authStore.isAdmin"
+            class="admin-entry"
+            to="/admin"
+            data-testid="profile-admin-entry"
+          >
+            进入管理后台
+          </RouterLink>
           <div class="hero-upload-card">
             <p class="upload-title">头像上传</p>
             <BaseUploader
               ref="avatarUploaderRef"
-              hint="选择图片后立即走 `/api/auth/avatar` 真上传，并刷新个人中心头像。"
               :file="selectedAvatarFile"
               accept="image/*"
               :disabled="avatarUploading"
@@ -59,9 +65,52 @@
           >
             {{ avatarUploading ? '头像上传中...' : '通过真实接口上传头像' }}
           </button>
-          <button class="btn-outline" type="button" disabled>资料编辑待接写接口</button>
+          <button
+            class="btn-outline"
+            type="button"
+            :disabled="profileSaving"
+            data-testid="profile-edit-toggle"
+            @click="editing = !editing"
+          >
+            {{ editing ? '收起资料编辑' : '编辑个人资料' }}
+          </button>
         </div>
       </header>
+
+      <section v-if="editing" class="profile-editor panel" data-testid="profile-editor">
+        <div class="panel-heading">
+          <h2>编辑个人资料</h2>
+          <p>支持保存昵称和个人简介。</p>
+        </div>
+        <div class="editor-grid">
+          <BaseInput
+            v-model="profileForm.displayName"
+            label="昵称"
+            maxlength="32"
+            placeholder="输入你的显示昵称"
+          />
+          <BaseTextarea
+            v-model="profileForm.bio"
+            label="个人简介"
+            maxlength="200"
+            placeholder="输入一句简短的个人介绍"
+          />
+        </div>
+        <div class="editor-actions">
+          <button class="btn-outline" type="button" :disabled="profileSaving" @click="resetProfileForm">
+            重置
+          </button>
+          <button
+            class="btn-primary"
+            type="button"
+            :disabled="profileSaving || !canSaveProfile"
+            data-testid="profile-save"
+            @click="saveProfile"
+          >
+            {{ profileSaving ? '保存中...' : '保存个人资料' }}
+          </button>
+        </div>
+      </section>
 
       <section class="stat-grid" data-testid="profile-stat-grid">
         <article
@@ -80,7 +129,6 @@
         <article class="panel">
           <div class="panel-heading">
             <h2>我的资料</h2>
-            <p>最近 5 条资料工作台记录，来自 `/api/me/resources`。</p>
           </div>
           <ul v-if="dashboard.recentResources.length" class="item-list">
             <li v-for="item in dashboard.recentResources" :key="item.id" class="item-row">
@@ -97,7 +145,6 @@
         <article class="panel">
           <div class="panel-heading">
             <h2>我的笔记</h2>
-            <p>最近 5 条笔记工作台记录，来自 `/api/me/notes`。</p>
           </div>
           <ul v-if="dashboard.recentNotes.length" class="item-list">
             <li v-for="item in dashboard.recentNotes" :key="item.id" class="item-row">
@@ -113,7 +160,6 @@
         <article class="panel panel-wide">
           <div class="panel-heading">
             <h2>我的简历</h2>
-            <p>最近 5 条简历记录，来自 `/api/me/resumes`。</p>
           </div>
           <ul v-if="dashboard.recentResumes.length" class="item-list">
             <li v-for="item in dashboard.recentResumes" :key="item.id" class="item-row">
@@ -126,18 +172,6 @@
           </ul>
           <BaseEmpty v-else title="暂无简历" description="当前账号还没有已生成简历。" />
         </article>
-
-        <article class="panel">
-          <div class="panel-heading">
-            <h2>当前边界</h2>
-            <p>本轮只收口读路径，避免继续保留“模拟保存成功”。</p>
-          </div>
-          <ul class="status-list">
-            <li>已接真实接口：`/api/me`、`/api/me/resources`、`/api/me/notes`、`/api/me/resumes`</li>
-            <li>已移除页面内个人资料模拟保存动作，改为只读展示</li>
-            <li>头像上传、昵称简介写回仍待对应后端写接口，本页保持禁用提示</li>
-          </ul>
-        </article>
       </section>
     </div>
   </div>
@@ -147,9 +181,11 @@
 import { computed, onMounted, ref } from 'vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
+import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseUploader from '@/components/base/BaseUploader.vue'
-import { fetchMeDashboard, type MeDashboardData, uploadMyAvatar } from '@/api/me'
+import { fetchMeDashboard, type MeDashboardData, updateMyProfile, uploadMyAvatar } from '@/api/me'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
@@ -159,13 +195,31 @@ const dashboard = ref<MeDashboardData | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
 const avatarUploading = ref(false)
+const profileSaving = ref(false)
+const editing = ref(false)
 const selectedAvatarFile = ref<File | null>(null)
 const avatarUploaderRef = ref<InstanceType<typeof BaseUploader> | null>(null)
+const profileForm = ref({
+  displayName: '',
+  bio: ''
+})
 
 const status = computed(() => {
   if (loading.value) return 'loading'
   if (loadError.value || !dashboard.value) return 'error'
   return 'ready'
+})
+
+const canSaveProfile = computed(() => {
+  if (!dashboard.value) {
+    return false
+  }
+  const normalizedName = profileForm.value.displayName.trim()
+  const normalizedBio = profileForm.value.bio.trim()
+  return normalizedName.length > 0 && (
+    normalizedName !== dashboard.value.profile.displayName ||
+    normalizedBio !== dashboard.value.profile.bio
+  )
 })
 
 const statCards = computed(() => {
@@ -196,10 +250,20 @@ const statCards = computed(() => {
       key: 'favorites-roadmaps',
       label: '收藏与路线',
       value: `${dashboard.value.stats.favorites} / ${dashboard.value.stats.roadmaps}`,
-      description: '左侧为收藏数，右侧为路线数'
+      description: '左侧为已发布笔记被收藏数，右侧为路线数'
     }
   ]
 })
+
+function syncProfileForm() {
+  if (!dashboard.value) {
+    return
+  }
+  profileForm.value = {
+    displayName: dashboard.value.profile.displayName,
+    bio: dashboard.value.profile.bio
+  }
+}
 
 async function loadDashboard() {
   loading.value = true
@@ -209,14 +273,20 @@ async function loadDashboard() {
     dashboard.value = await fetchMeDashboard()
     authStore.updateProfile({
       nickname: dashboard.value.profile.displayName,
+      headline: dashboard.value.profile.bio || 'ShareHub 用户',
       avatarUrl: dashboard.value.profile.avatarUrl
     })
+    syncProfileForm()
   } catch {
     dashboard.value = null
     loadError.value = true
   } finally {
     loading.value = false
   }
+}
+
+function resetProfileForm() {
+  syncProfileForm()
 }
 
 async function handleAvatarSelected(file: File | null) {
@@ -239,6 +309,31 @@ async function handleAvatarSelected(file: File | null) {
   } finally {
     avatarUploading.value = false
     selectedAvatarFile.value = null
+  }
+}
+
+async function saveProfile() {
+  const displayName = profileForm.value.displayName.trim()
+  const bio = profileForm.value.bio.trim()
+
+  if (!displayName) {
+    appStore.showToast('保存失败', '昵称不能为空', 'error')
+    return
+  }
+
+  profileSaving.value = true
+
+  try {
+    await updateMyProfile({ displayName, bio })
+    await loadDashboard()
+    authStore.updateProfile({
+      nickname: displayName,
+      headline: bio || 'ShareHub 用户'
+    })
+    editing.value = false
+    appStore.showToast('资料已保存', '个人资料已更新', 'success')
+  } finally {
+    profileSaving.value = false
   }
 }
 
@@ -296,13 +391,6 @@ onMounted(() => {
   font-size: 36px;
 }
 
-.hero-desc {
-  margin: 12px 0 0;
-  max-width: 42rem;
-  color: rgba(255, 255, 255, 0.82);
-  line-height: 1.6;
-}
-
 .identity-row {
   display: flex;
   align-items: center;
@@ -349,6 +437,28 @@ onMounted(() => {
   gap: 12px;
 }
 
+.admin-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.admin-entry:hover {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.profile-editor {
+  padding: 24px;
+}
+
 .btn-outline {
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.08);
@@ -360,6 +470,19 @@ onMounted(() => {
 .btn-outline:disabled {
   cursor: not-allowed;
   opacity: 0.78;
+}
+
+.btn-primary {
+  border: none;
+  background: #2563eb;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 10px;
+}
+
+.btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .stat-grid {
@@ -381,11 +504,10 @@ onMounted(() => {
 }
 
 .stat-label,
-.item-meta,
-.panel-heading p,
-.stat-desc,
-.item-time,
-.status-list {
+  .item-meta,
+  .panel-heading p,
+  .stat-desc,
+  .item-time {
   color: #6b7280;
 }
 
@@ -416,6 +538,19 @@ onMounted(() => {
   padding: 24px;
 }
 
+.editor-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
 .panel-wide {
   grid-column: 1 / -1;
 }
@@ -429,8 +564,7 @@ onMounted(() => {
   margin: 8px 0 0;
 }
 
-.item-list,
-.status-list {
+.item-list {
   margin: 18px 0 0;
   padding: 0;
   list-style: none;
@@ -465,12 +599,6 @@ onMounted(() => {
 
 .item-time {
   flex-shrink: 0;
-}
-
-.status-list {
-  display: grid;
-  gap: 10px;
-  line-height: 1.6;
 }
 
 @media (max-width: 960px) {

@@ -7,7 +7,9 @@ import com.sharehub.files.StoredFileDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import com.sharehub.config.AdminTokenFilter;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,15 +26,18 @@ public class AuthController {
     private final FileStorageService fileStorageService;
     private final UserProfileRepository userProfileRepository;
     private final RequestAccessService requestAccessService;
+    private final String expectedAdminToken;
 
     public AuthController(
         FileStorageService fileStorageService,
         UserProfileRepository userProfileRepository,
-        RequestAccessService requestAccessService
+        RequestAccessService requestAccessService,
+        Environment environment
     ) {
         this.fileStorageService = fileStorageService;
         this.userProfileRepository = userProfileRepository;
         this.requestAccessService = requestAccessService;
+        this.expectedAdminToken = environment.getProperty("sharehub.admin.token", AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
     }
 
     @GetMapping("/github/login")
@@ -54,7 +60,17 @@ public class AuthController {
         String name = resolveName(authentication, login);
         UserProfileDto profile = userProfileRepository.upsert(login, name, null);
         userProfileRepository.ensureActive(login);
-        return ApiResponse.ok(profile);
+        UserProfileDto response = new UserProfileDto(
+            profile.id(),
+            profile.login(),
+            profile.name(),
+            profile.bio(),
+            profile.avatarFileId(),
+            profile.avatarUrl(),
+            profile.status(),
+            hasAdminRole(authentication, request)
+        );
+        return ApiResponse.ok(response);
     }
 
     @PostMapping("/logout")
@@ -84,6 +100,20 @@ public class AuthController {
             }
         }
         return fallback;
+    }
+
+    private boolean hasAdminRole(Authentication authentication, HttpServletRequest request) {
+        if (authentication != null && authentication.getAuthorities()
+            .stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch("ROLE_ADMIN"::equals)) {
+            return true;
+        }
+        if (request == null || expectedAdminToken == null || expectedAdminToken.isBlank()) {
+            return false;
+        }
+        String headerValue = request.getHeader(AdminTokenFilter.HEADER);
+        return headerValue != null && expectedAdminToken.equals(headerValue);
     }
 
 }

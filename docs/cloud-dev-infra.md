@@ -2,13 +2,14 @@
 
 ## 目标
 
-这套配置只服务于“本地启动后端，连接云服务器中间件和数据库”：
+这套配置只服务于“本地启动后端，连接开发专用 PostgreSQL / Redis，并联通开发 OAuth”：
 
-- 不影响现网 `sharehub-mysql`
+- 不影响现网 `sharehub-postgres`
 - 不影响现网 `sharehub-redis`
 - 不影响现网 `sharehub-backend`
 - PostgreSQL 与 Redis 仅绑定服务器 `127.0.0.1`
 - 本地通过 SSH 隧道访问
+- GitHub OAuth 使用独立的 `sharehub-dev` OAuth App
 
 ## 当前云服务器开发资源
 
@@ -94,6 +95,23 @@ REDIS_PASSWORD=请填写开发 Redis 密码
 
 如果你更习惯直接覆盖 Spring Boot 标准配置，也可以显式传入 `SPRING_DATASOURCE_*` / `SPRING_DATA_REDIS_*`，但夜间联调默认建议使用上面的 `POSTGRES_*` / `REDIS_*` 组合，和仓库配置保持一致。
 
+## 开发 OAuth
+
+本地开发 OAuth App 固定为：
+
+- App 名称：`sharehub-dev`
+- Homepage URL：`http://127.0.0.1:14173`
+- Authorization callback URL：`http://127.0.0.1:18080/login/oauth2/code/github`
+
+本地开发文件 `backend/.env.cloud-dev.local` 需额外提供：
+
+```bash
+GITHUB_OAUTH_ENABLED=true
+GITHUB_CLIENT_ID=你的 sharehub-dev Client ID
+GITHUB_CLIENT_SECRET=你的 sharehub-dev Client Secret
+GITHUB_REDIRECT_URI=http://127.0.0.1:18080/login/oauth2/code/github
+```
+
 ## 验证命令
 
 PostgreSQL：
@@ -121,4 +139,4 @@ redis-cli -h 127.0.0.1 -p 56379 -a '请填写开发 Redis 密码' ping
 
 - 当前 SSH 免密登录尚未稳定验证，现阶段脚本默认使用 `sshpass + 密码`
 - 仓库中不保存任何真实密码，需要本地环境变量注入
-- 当前项目现网仍在使用 MySQL，开发用 PostgreSQL 是并行独立环境
+- 当前项目开发链路固定使用 PostgreSQL，且与生产 / staging 完全隔离

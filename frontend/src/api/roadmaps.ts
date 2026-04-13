@@ -93,6 +93,8 @@ interface RoadmapDetailData {
   progress: Record<string, unknown> | null
 }
 
+const ROADMAP_PROGRESS_STORAGE_PREFIX = 'ShareHub.roadmapProgress.'
+
 function inferCategory(dto: RoadmapDto) {
   const text = `${dto.title} ${dto.description ?? ''}`.toLowerCase()
   if (text.includes('backend') || text.includes('java') || text.includes('spring')) return '后端'
@@ -177,6 +179,79 @@ export async function fetchRoadmapDetail(id: string | number): Promise<RoadmapDe
     timeline,
     relatedResources
   }
+}
+
+function getRoadmapProgressStorageKey(roadmapId: string | number) {
+  return `${ROADMAP_PROGRESS_STORAGE_PREFIX}${roadmapId}`
+}
+
+function normalizeVisitedNodeIds(nodeIds: number[], validNodeIds: number[]) {
+  const validIdSet = new Set(validNodeIds)
+  return [...new Set(nodeIds.filter((nodeId) => Number.isFinite(nodeId) && validIdSet.has(nodeId)))]
+}
+
+export function getVisitedRoadmapNodeIds(roadmapId: string | number, validNodeIds: number[]) {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(getRoadmapProgressStorageKey(roadmapId))
+    if (!rawValue) {
+      return []
+    }
+
+    const parsedValue = JSON.parse(rawValue)
+    if (!Array.isArray(parsedValue)) {
+      return []
+    }
+
+    const normalizedNodeIds = normalizeVisitedNodeIds(
+      parsedValue.map((item) => Number(item)),
+      validNodeIds
+    )
+
+    if (normalizedNodeIds.length !== parsedValue.length) {
+      window.localStorage.setItem(
+        getRoadmapProgressStorageKey(roadmapId),
+        JSON.stringify(normalizedNodeIds)
+      )
+    }
+
+    return normalizedNodeIds
+  } catch {
+    return []
+  }
+}
+
+export function markRoadmapNodeVisited(
+  roadmapId: string | number,
+  nodeId: number,
+  validNodeIds: number[]
+) {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  const normalizedNodeIds = normalizeVisitedNodeIds(
+    [...getVisitedRoadmapNodeIds(roadmapId, validNodeIds), nodeId],
+    validNodeIds
+  )
+
+  window.localStorage.setItem(
+    getRoadmapProgressStorageKey(roadmapId),
+    JSON.stringify(normalizedNodeIds)
+  )
+
+  return normalizedNodeIds
+}
+
+export function calculateRoadmapProgressPercent(totalNodeCount: number, visitedNodeCount: number) {
+  if (!totalNodeCount) {
+    return 0
+  }
+
+  return Math.round((visitedNodeCount / totalNodeCount) * 100)
 }
 
 export async function createRoadmap(payload: CreateRoadmapPayload) {

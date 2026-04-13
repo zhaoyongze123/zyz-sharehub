@@ -180,6 +180,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/me/favorite-notes:
+    get:
+      summary: 获取我的收藏笔记列表
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedNotePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/me/notes:
     get:
       summary: 获取我的笔记列表
@@ -208,6 +244,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NotePageResponse'
+        '401':
+          description: 未登录（错误码 `NOT_LOGGED_IN`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 用户被封禁（错误码 `USER_BANNED`）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/note-history:
+    get:
+      summary: 获取我的笔记浏览历史
+      description: 当前实现按请求用户返回数据，联调可通过 `X-User-Key` 指定用户；首次访问会自动为当前用户补建默认档案；`page`、`pageSize` 传入小于 1 的值时都会按 `1` 兜底；未带身份时返回 `401 NOT_LOGGED_IN`，用户被封禁时返回 `403 USER_BANNED`
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedNotePageResponse'
         '401':
           description: 未登录（错误码 `NOT_LOGGED_IN`）
           content:
@@ -1699,10 +1771,60 @@ components:
               type: integer
             pageSize:
               type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NoteDto'
+        message:
+          type: string
+    RelatedNoteDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        summary:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        ownerKey:
+          type: string
+          nullable: true
+        favorites:
+          type: integer
+          format: int64
+        favorited:
+          type: boolean
+    RelatedNotePageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            page:
+              type: integer
+            pageSize:
+              type: integer
             items:
               type: array
               items:
-                $ref: '#/components/schemas/NoteDto'
+                $ref: '#/components/schemas/RelatedNoteDto'
         message:
           type: string
     DeleteResponse:

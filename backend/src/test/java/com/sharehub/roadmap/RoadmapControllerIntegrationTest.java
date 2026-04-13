@@ -45,6 +45,7 @@ class RoadmapControllerIntegrationTest {
 
     @BeforeEach
     void cleanUp() {
+        jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");

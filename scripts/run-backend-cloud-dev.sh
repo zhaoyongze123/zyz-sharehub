@@ -17,8 +17,14 @@ if [[ -d "/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/H
 fi
 
 SPRING_PORT="${SERVER_PORT:-8080}"
+SPRING_PROFILES="cloud-dev"
+
+if [[ -n "${GITHUB_CLIENT_ID:-}" && -n "${GITHUB_CLIENT_SECRET:-}" ]]; then
+  export GITHUB_OAUTH_ENABLED="${GITHUB_OAUTH_ENABLED:-true}"
+  SPRING_PROFILES="cloud-dev,oauth"
+fi
 
 cd "${PROJECT_ROOT}/backend"
 mvn spring-boot:run \
-  -Dspring-boot.run.profiles=cloud-dev \
+  -Dspring-boot.run.profiles="${SPRING_PROFILES}" \
   -Dspring-boot.run.arguments="--server.port=${SPRING_PORT}"

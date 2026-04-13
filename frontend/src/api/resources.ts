@@ -13,6 +13,8 @@ export interface ResourceItem {
   likes: number
   favorites: number
   downloadCount: number
+  objectKey: string
+  previewUrl: string
 }
 
 interface ResourceDto {
@@ -37,6 +39,12 @@ interface ResourcePageData {
   total: number
   page: number
   pageSize: number
+}
+
+interface InteractionMutationData {
+  resourceId: number
+  likes?: number
+  favorites?: number
 }
 
 export interface ResourceListQuery {
@@ -82,7 +90,9 @@ function normalizeResource(dto: ResourceDto): ResourceItem {
     tags: Array.isArray(dto.tags) ? dto.tags.filter((tag) => Boolean(tag?.trim())) : [],
     likes: dto.likes ?? 0,
     favorites: dto.favorites ?? 0,
-    downloadCount: dto.downloadCount ?? 0
+    downloadCount: dto.downloadCount ?? 0,
+    objectKey: dto.objectKey?.trim() || '',
+    previewUrl: dto.objectKey?.trim() ? `/api/files/${dto.objectKey.trim()}` : ''
   }
 }
 
@@ -140,5 +150,15 @@ export async function uploadResourceAttachment(id: string | number, file: File) 
 
 export async function publishResource(id: string | number) {
   const response = await apiClient.post<ApiResponse<ResourceDto>>(`/resources/${id}/publish`)
+  return response.data.data
+}
+
+export async function likeResource(id: string | number) {
+  const response = await apiClient.post<ApiResponse<InteractionMutationData>>(`/resources/${id}/like`)
+  return response.data.data
+}
+
+export async function favoriteResource(id: string | number) {
+  const response = await apiClient.post<ApiResponse<InteractionMutationData>>(`/resources/${id}/favorite`)
   return response.data.data
 }

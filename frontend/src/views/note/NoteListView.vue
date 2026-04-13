@@ -140,6 +140,7 @@
           <div class="topic-main">
             <div class="title-with-link">
                <h3 class="topic-title" @click="readTopic(topic)">{{ topic.title }}</h3>
+               <span v-if="topic.category" class="title-category" :class="topic.categoryColor">{{ topic.category }}</span>
                <div class="i-carbon-launch external-icon" v-if="topic.hasLink" title="包含外部链接" @click.stop="openExternal('https://github.com/github/copilot-chat')"></div>
             </div>
             <p class="topic-excerpt" v-if="topic.excerpt">{{ topic.excerpt }}</p>
@@ -233,7 +234,17 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchNotes, createNote, type NoteDTO } from '@/api/notes'
+import {
+  createNote,
+  favoriteNote,
+  fetchCommunityNotes,
+  fetchMyFavoriteNotes,
+  fetchMyNoteHistory,
+  fetchNotes,
+  unfavoriteNote,
+  type NoteDTO,
+  type RelatedNoteItem
+} from '@/api/notes'
 import { useAppStore } from '@/stores/app'
 
 const router = useRouter()
@@ -251,9 +262,10 @@ const pageSize = ref(10)
 const total = ref(0)
 
 const notes = ref<NoteDTO[]>([])
+const favoriteNotes = ref<RelatedNoteItem[]>([])
+const historyNotes = ref<RelatedNoteItem[]>([])
+const favoriteNoteIds = ref<number[]>([])
 const tagInput = ref('')
-
-const currentUser = { name: '当前用户', avatar: 'https://avatars.githubusercontent.com/u/99?v=4' }
 
 const newDraft = reactive({
   title: '',
@@ -302,20 +314,21 @@ const renderedMarkdown = computed(() => {
 
 function mapNoteToTopic(note: NoteDTO) {
   const status = note.status || 'DRAFT'
+  const category = note.category?.trim() || ''
   return {
     id: note.id,
     title: note.title || '未命名笔记',
     excerpt: note.contentMd?.slice(0, 120) || '',
-    category: status,
-    categoryColor: status === 'PUBLISHED' ? 'bg-teal' : 'bg-gray',
+    category,
+    categoryColor: resolveCategoryColor(category),
     hasLink: false,
-    tags: [] as Array<{ label: string; icon?: string }>,
+    tags: category ? [{ label: category }] : ([] as Array<{ label: string; icon?: string }>),
     author: {
-      name: currentUser.name,
-      avatar: currentUser.avatar
+      name: note.ownerName?.trim() || note.ownerKey || '未知作者',
+      avatar: note.ownerAvatarUrl || ''
     },
-    likes: 0,
-    isBookmarked: false,
+    likes: favoriteNoteIds.value.includes(note.id) ? 1 : 0,
+    isBookmarked: favoriteNoteIds.value.includes(note.id),
     hasRead: false,
     isMine: true,
     time: '',
@@ -323,19 +336,46 @@ function mapNoteToTopic(note: NoteDTO) {
   }
 }
 
-const displayedTopics = computed(() => {
-  let list = notes.value.map(mapNoteToTopic)
+function mapRelatedNoteToTopic(note: RelatedNoteItem, options: { hasRead?: boolean; isMine?: boolean } = {}) {
+  const status = note.status || 'DRAFT'
+  const category = note.category?.trim() || ''
+  return {
+    id: note.id,
+    title: note.title || '未命名笔记',
+    excerpt: note.summary || '',
+    category,
+    categoryColor: resolveCategoryColor(category),
+    hasLink: false,
+    tags: (note.tags || []).map((tag) => ({ label: tag, icon: undefined as string | undefined })),
+    author: {
+      name: note.ownerName?.trim() || note.ownerKey || '未知作者',
+      avatar: note.ownerAvatarUrl || ''
+    },
+    likes: note.favorites ?? 0,
+    isBookmarked: note.favorited ?? false,
+    hasRead: options.hasRead ?? false,
+    isMine: options.isMine ?? false,
+    time: note.updatedAt || '未知时间',
+    isFeatured: status === 'PUBLISHED'
+  }
+}
 
-  if (currentNav.value === 'my-shares') {
-    list = list.filter((t) => t.isMine)
-  } else if (currentNav.value === 'bookmarks') {
-    list = list.filter((t) => t.isBookmarked)
+const displayedTopics = computed(() => {
+  let list
+
+  if (currentNav.value === 'bookmarks') {
+    list = favoriteNotes.value.map((note) => mapRelatedNoteToTopic(note))
   } else if (currentNav.value === 'history') {
-    list = list.filter((t) => t.hasRead)
+    list = historyNotes.value.map((note) => mapRelatedNoteToTopic(note, { hasRead: true }))
+  } else {
+    list = notes.value.map(mapNoteToTopic)
+    if (currentNav.value === 'my-shares') {
+      list = list.filter((t) => t.isMine)
+    }
   }
 
   if (activeCategory.value) {
-    list = list.filter((t) => t.tags?.some((tag: any) => tag.label === activeCategory.value))
+    list = list.filter((t) => t.category === activeCategory.value)
   }
 
   if (activeTab.value === 'featured') {
@@ -347,16 +387,58 @@ const displayedTopics = computed(() => {
   return list
 })
 
+async function syncFavoriteIds() {
+  try {
+    const data = await fetchMyFavoriteNotes({ page: 1, pageSize: 1000 })
+    favoriteNoteIds.value = (data.list || []).map((item) => item.id)
+  } catch {
+    favoriteNoteIds.value = []
+  }
+}
+
 async function fetchList() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const data = await fetchNotes({
-      page: pageNum.value,
-      pageSize: pageSize.value,
-      status: activeTab.value === 'featured' ? 'PUBLISHED' : undefined
-    })
+    await syncFavoriteIds()
+
+    if (currentNav.value === 'bookmarks') {
+      const data = await fetchMyFavoriteNotes({
+        page: pageNum.value,
+        pageSize: pageSize.value
+      })
+      favoriteNotes.value = data.list || []
+      historyNotes.value = []
+      notes.value = []
+      total.value = data.total ?? favoriteNotes.value.length
+      return
+    }
+
+    if (currentNav.value === 'history') {
+      const data = await fetchMyNoteHistory({
+        page: pageNum.value,
+        pageSize: pageSize.value
+      })
+      historyNotes.value = data.list || []
+      favoriteNotes.value = []
+      notes.value = []
+      total.value = data.total ?? historyNotes.value.length
+      return
+    }
+
+    const data = currentNav.value === 'topics'
+      ? await fetchCommunityNotes({
+          page: pageNum.value,
+          pageSize: pageSize.value
+        })
+      : await fetchNotes({
+          page: pageNum.value,
+          pageSize: pageSize.value,
+          status: activeTab.value === 'featured' ? 'PUBLISHED' : undefined
+        })
     notes.value = data.list || []
+    favoriteNotes.value = []
+    historyNotes.value = []
     total.value = data.total ?? notes.value.length
   } catch (e: any) {
     errorMessage.value = e?.response?.data?.msg || '笔记列表获取失败'
@@ -367,7 +449,7 @@ async function fetchList() {
 
 onMounted(fetchList)
 
-watch(activeTab, () => {
+watch([activeTab, currentNav], () => {
   void fetchList()
 })
 
@@ -380,9 +462,44 @@ function toggleCategory(name: string) {
   activeCategory.value = activeCategory.value === name ? '' : name
 }
 
-function toggleBookmark(topic: any) {
-  topic.isBookmarked = !topic.isBookmarked
-  topic.likes += topic.isBookmarked ? 1 : -1
+function resolveCategoryColor(category: string) {
+  return categories.find((item) => item.name === category)?.color || 'bg-gray'
+}
+
+function updateRelatedCollection(list: RelatedNoteItem[], noteId: number, favorited: boolean, favorites: number) {
+  const target = list.find((item) => item.id === noteId)
+  if (!target) {
+    return
+  }
+  target.favorited = favorited
+  target.favorites = favorites
+}
+
+async function toggleBookmark(topic: any) {
+  if (!topic?.id) {
+    return
+  }
+  const noteId = Number(topic.id)
+  const favorited = Boolean(topic.isBookmarked)
+  const result = favorited ? await unfavoriteNote(noteId) : await favoriteNote(noteId)
+  const nextFavorited = !favorited
+  const nextFavorites = result.favorites ?? topic.likes ?? 0
+
+  if (nextFavorited) {
+    if (!favoriteNoteIds.value.includes(noteId)) {
+      favoriteNoteIds.value = [...favoriteNoteIds.value, noteId]
+    }
+  } else {
+    favoriteNoteIds.value = favoriteNoteIds.value.filter((id) => id !== noteId)
+  }
+
+  updateRelatedCollection(favoriteNotes.value, noteId, nextFavorited, nextFavorites)
+  updateRelatedCollection(historyNotes.value, noteId, nextFavorited, nextFavorites)
+
+  if (!nextFavorited && currentNav.value === 'bookmarks') {
+    favoriteNotes.value = favoriteNotes.value.filter((item) => item.id !== noteId)
+    total.value = Math.max(0, total.value - 1)
+  }
 }
 
 function readTopic(topic: any) {
@@ -411,7 +528,8 @@ async function submitPublish() {
       title: newDraft.title,
       contentMd: newDraft.content,
       status: 'PUBLISHED',
-      visibility: null
+      visibility: 'PUBLIC',
+      category: newDraft.category
     })
     await fetchList()
     appStore.showToast('发布成功', '笔记已保存到云端')
@@ -507,12 +625,19 @@ async function submitPublish() {
 .list-divider { height: 2px; background: #e5e7eb; margin: 16px 0; border-radius: 2px; }
 .topic-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .topic-title-wrapper { display: flex; align-items: center; gap: 6px; }
-.title-with-link { display: flex; align-items: center; gap: 8px; }
+.title-with-link { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .external-icon { font-size: 14px; color: #9ca3af; cursor: pointer; transition: color 0.15s; }
 .external-icon:hover { color: #2563eb; }
 .pin-icon { color: #6b7280; font-size: 14px; transform: rotate(45deg); padding-top: 4px; }
 .topic-title { font-size: 16px; font-weight: 500; color: #111827; margin: 0; cursor: pointer; line-height: 1.4; transition: color 0.15s; }
 .topic-title:hover { color: #2563eb; text-decoration: underline; }
+.title-category { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; line-height: 1.4; color: #111827; background: #f3f4f6; font-weight: 600; }
+.title-category.bg-blue { background: #dbeafe; color: #1d4ed8; }
+.title-category.bg-red { background: #fee2e2; color: #b91c1c; }
+.title-category.bg-green { background: #dcfce7; color: #15803d; }
+.title-category.bg-teal { background: #ccfbf1; color: #0f766e; }
+.title-category.bg-yellow { background: #fef3c7; color: #b45309; }
+.title-category.bg-gray { background: #f3f4f6; color: #4b5563; }
 .topic-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .meta-tag { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4b5563; transition: color 0.15s; }
 .meta-tag:hover { color: #111827; }

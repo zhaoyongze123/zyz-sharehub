@@ -20,6 +20,14 @@ export default defineConfig({
         target: apiProxyTarget,
         changeOrigin: true
       },
+      '/oauth2': {
+        target: apiProxyTarget,
+        changeOrigin: true
+      },
+      '/login/oauth2': {
+        target: apiProxyTarget,
+        changeOrigin: true
+      },
       '/actuator': {
         target: apiProxyTarget,
         changeOrigin: true

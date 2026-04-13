@@ -6,7 +6,7 @@
   </div>
 
   <nav class="navbar" id="navbar">
-    <div class="brand">ShareBase</div>
+    <div class="brand">ShareHub</div>
     <div class="nav-links">
       <a href="#focus">聚焦</a>
       <a href="#features">能力</a>
@@ -122,7 +122,7 @@
 
   <footer class="container page-home">
      <div class="footer">
-        <div>© 2026 ShareBase. 保留所有权利。</div>
+        <div>© 2026 ShareHub. 保留所有权利。</div>
         <div class="footer-links"><a href="#">隐私政策</a><a href="#">使用条款</a></div>
      </div>
   </footer>
@@ -144,7 +144,7 @@ let mainTitles = [
   "联结前沿开发者"
 ];
 
-const INTRO_KEY = "sharebase.introPlayed";
+const INTRO_KEY = "ShareHub.introPlayed";
 
 function setIntroPlayed() {
   try {
@@ -207,7 +207,7 @@ function playIntro(refs: any) {
   const phrases = [
     "正在连接你的 AI 工作流...",
     "加载 Agent / MCP / RAG 知识图谱...",
-    "欢迎来到 ShareBase。"
+    "欢迎来到 ShareHub。"
   ];
 
   let phraseIndex = 0;

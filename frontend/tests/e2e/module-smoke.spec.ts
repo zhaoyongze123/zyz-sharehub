@@ -10,12 +10,12 @@ const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
 async function loginAs(page: Page, role: 'user' | 'admin') {
   await page.addInitScript(({ selectedRole, adminTokenValue }) => {
-    window.localStorage.setItem('sharebase.role', selectedRole)
-    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
-    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
-    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
+    window.localStorage.setItem('ShareHub.devMode', selectedRole)
+    window.localStorage.setItem('ShareHub.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
+    window.localStorage.setItem('ShareHub.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
+    window.localStorage.setItem('ShareHub.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
+      window.localStorage.setItem('ShareHub.adminToken', adminTokenValue)
     }
   }, { selectedRole: role, adminTokenValue: adminToken })
 }
@@ -101,6 +101,39 @@ test('登录回调页通过 auth/me 恢复真实身份', async ({ page }) => {
   expect(authMeBody.data?.login).toBeTruthy()
   await expect(page).toHaveURL(/\/me$/)
   await expect(page.getByText(`@${authMeBody.data.login}`)).toBeVisible()
+})
+
+test('个人中心仅管理员显示管理后台入口', async ({ page }) => {
+  test.skip(!shouldRun('profile'))
+
+  await loginAs(page, 'admin')
+  const adminAuthResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
+  await page.goto('/me')
+  const adminAuthResponse = await adminAuthResponsePromise
+  expect(adminAuthResponse.ok()).toBeTruthy()
+
+  await expect(page).toHaveURL(/\/me$/)
+  await expect(page.getByTestId('profile-admin-entry')).toBeVisible()
+  await expect(page.getByTestId('profile-admin-entry')).toHaveAttribute('href', '/admin')
+
+  await page.context().clearCookies()
+  await page.evaluate(() => {
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+  })
+
+  await loginAs(page, 'user')
+  const userAuthResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/auth/me') && response.request().method() === 'GET'
+  )
+  await page.goto('/me')
+  const userAuthResponse = await userAuthResponsePromise
+  expect(userAuthResponse.ok()).toBeTruthy()
+
+  await expect(page).toHaveURL(/\/me$/)
+  await expect(page.getByTestId('profile-admin-entry')).toHaveCount(0)
 })
 
 test('资源模块 smoke', async ({ page }) => {
@@ -248,7 +281,6 @@ test('路线发布真实写入 smoke', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/publish/roadmap')
   await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
-  await expect(page.getByText('当前真实接口仅写入节点标题、描述、顺序，附件单独上传。')).toBeVisible()
 
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过 smoke 用例验证路线创建与节点追加真实写入。')

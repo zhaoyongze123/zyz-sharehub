@@ -6,11 +6,14 @@ import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import com.sharehub.note.NoteDto;
+import com.sharehub.note.RelatedNoteDto;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resume.ResumeDto;
 import com.sharehub.roadmap.RoadmapWorkbenchDto;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +39,17 @@ public class MeController {
     @GetMapping
     public ApiResponse<MeDto> getMe(Authentication authentication, HttpServletRequest request) {
         String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(meService.aggregate(ownerKey));
+    }
+
+    @PutMapping("/profile")
+    public ApiResponse<MeDto> updateProfile(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestBody UpdateMeProfileRequest body
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        meService.updateProfile(ownerKey, body.displayName(), body.bio());
         return ApiResponse.ok(meService.aggregate(ownerKey));
     }
 
@@ -75,6 +89,17 @@ public class MeController {
         return ApiResponse.ok(meService.myFavorites(ownerKey, page, pageSize));
     }
 
+    @GetMapping("/favorite-notes")
+    public ApiResponse<PageResponse<RelatedNoteDto>> myFavoriteNotes(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int pageSize
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(meService.myFavoriteNotes(ownerKey, page, pageSize));
+    }
+
     @GetMapping("/notes")
     public ApiResponse<PageResponse<NoteDto>> myNotes(
         Authentication authentication,
@@ -85,6 +110,17 @@ public class MeController {
     ) {
         String ownerKey = requireActiveUser(authentication, request);
         return ApiResponse.ok(meService.myNotes(ownerKey, status, page, pageSize));
+    }
+
+    @GetMapping("/note-history")
+    public ApiResponse<PageResponse<RelatedNoteDto>> myNoteHistory(
+        Authentication authentication,
+        HttpServletRequest request,
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int pageSize
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        return ApiResponse.ok(meService.myNoteHistory(ownerKey, page, pageSize));
     }
 
     @GetMapping("/resumes")
@@ -103,7 +139,7 @@ public class MeController {
 
     private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
         String ownerKey = requestAccessService.requireUser(authentication, request);
-        userProfileRepository.upsert(ownerKey, ownerKey, null);
+        userProfileRepository.upsert(ownerKey, null, null);
         userProfileRepository.ensureActive(ownerKey);
         return ownerKey;
     }

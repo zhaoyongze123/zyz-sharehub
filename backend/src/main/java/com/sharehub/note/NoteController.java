@@ -4,6 +4,7 @@ import com.sharehub.auth.RequestAccessService;
 import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.ApiResponse;
 import com.sharehub.common.PageResponse;
+import java.util.List;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -34,7 +35,17 @@ public class NoteController {
         @Valid @RequestBody NoteDto req
     ) {
         String ownerKey = requireActiveUser(authentication, request);
-        NoteDto toSave = new NoteDto(null, req.title(), req.contentMd(), req.visibility(), req.status());
+        NoteDto toSave = new NoteDto(
+            null,
+            req.title(),
+            req.contentMd(),
+            req.visibility(),
+            req.status(),
+            req.category(),
+            null,
+            null,
+            null
+        );
         NoteDto saved = repository.save(ownerKey, toSave);
         return ApiResponse.ok(saved);
     }
@@ -50,6 +61,14 @@ public class NoteController {
         return ApiResponse.ok(repository.listByOwner(ownerKey, status, page, pageSize));
     }
 
+    @GetMapping("/community")
+    public ApiResponse<PageResponse<NoteDto>> community(
+        @RequestParam(defaultValue = "1") int page,
+        @RequestParam(defaultValue = "10") int pageSize
+    ) {
+        return ApiResponse.ok(repository.listPublished(page, pageSize));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<NoteDto> detail(
         Authentication authentication,
@@ -63,7 +82,27 @@ public class NoteController {
                 return login;
             })
             .orElse(null);
-        return ApiResponse.ok(repository.findAccessible(id, ownerKey));
+        NoteDto note = repository.findAccessible(id, ownerKey);
+        if (ownerKey != null) {
+            repository.recordView(id, ownerKey);
+        }
+        return ApiResponse.ok(note);
+    }
+
+    @GetMapping("/{id}/related")
+    public ApiResponse<List<RelatedNoteDto>> related(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requestAccessService.resolveUser(authentication, request)
+            .map((login) -> {
+                userProfileRepository.upsert(login, login, null);
+                userProfileRepository.ensureActive(login);
+                return login;
+            })
+            .orElse(null);
+        return ApiResponse.ok(repository.findRelated(id, ownerKey));
     }
 
     @PutMapping("/{id}")

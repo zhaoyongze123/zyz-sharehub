@@ -6,12 +6,12 @@ const adminToken = process.env.PLAYWRIGHT_ADMIN_TOKEN || 'dev-admin-token'
 
 async function loginAs(page: Page, role: 'user' | 'admin') {
   await page.addInitScript(({ selectedRole, adminTokenValue }) => {
-    window.localStorage.setItem('sharebase.role', selectedRole)
-    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
-    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
-    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
+    window.localStorage.setItem('ShareHub.role', selectedRole)
+    window.localStorage.setItem('ShareHub.nickname', selectedRole === 'admin' ? 'Admin Zoe' : 'Alex Chen')
+    window.localStorage.setItem('ShareHub.headline', selectedRole === 'admin' ? '治理中台负责人' : 'Agent / RAG 工程实践者')
+    window.localStorage.setItem('ShareHub.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
+      window.localStorage.setItem('ShareHub.adminToken', adminTokenValue)
     }
   }, { selectedRole: role, adminTokenValue: adminToken })
 }
@@ -275,7 +275,6 @@ test('发布页走查', async ({ page, request }) => {
 
   const roadmapTitle = `Walkthrough Roadmap ${Date.now()}`
   await page.goto('/publish/roadmap')
-  await expect(page.getByText('当前真实接口仅写入节点标题、描述、顺序，附件单独上传。')).toBeVisible()
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过全站走查验证路线创建与节点追加闭环。')
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建主体')

@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.nullValue;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -41,13 +42,14 @@ public class NoteControllerIntegrationTest {
 
     @org.junit.jupiter.api.BeforeEach
     void cleanUp() {
+        jdbcTemplate.update("DELETE FROM note_view_history");
         jdbcTemplate.update("DELETE FROM notes");
         jdbcTemplate.update("DELETE FROM users");
     }
 
     @Test
     void createListDetailUpdateDelete() throws Exception {
-        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT");
+        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", null, null, null);
         String body = mapper.writeValueAsString(payload);
 
         String response = mvc.perform(post("/api/notes")
@@ -77,7 +79,7 @@ public class NoteControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("Test"));
 
-        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED");
+        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", null, null, null);
         mvc.perform(put("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -163,7 +165,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void shouldRestrictNotesToOwner() throws Exception {
-        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT");
+        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", null, null, null);
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -202,6 +204,47 @@ public class NoteControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldListCommunityPublishedNotesWithCategory() throws Exception {
+        createPublishedNote(USER_KEY, "社区公开-Agent", "# 社区公开-Agent\n\n验证公开列表");
+        jdbcTemplate.update(
+            """
+                UPDATE notes
+                SET category = 'AI 应用与 Agent'
+                WHERE owner_key = ? AND title = ?
+                """,
+            USER_KEY,
+            "社区公开-Agent"
+        );
+        createPublishedNote(OTHER_USER_KEY, "社区公开-提示词", "# 社区公开-提示词\n\n验证跨用户公开列表");
+        jdbcTemplate.update(
+            """
+                UPDATE notes
+                SET category = '提示词工程'
+                WHERE owner_key = ? AND title = ?
+                """,
+            OTHER_USER_KEY,
+            "社区公开-提示词"
+        );
+        jdbcTemplate.update(
+            """
+                INSERT INTO notes (title, content_md, owner_key, visibility, status, category, created_at, updated_at)
+                VALUES ('社区草稿', '# 社区草稿', ?, 'PRIVATE', 'DRAFT', '学术与论文', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            OTHER_USER_KEY
+        );
+
+        mvc.perform(get("/api/notes/community")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(2))
+            .andExpect(jsonPath("$.data.items[0].title").value("社区公开-提示词"))
+            .andExpect(jsonPath("$.data.items[0].category").value("提示词工程"))
+            .andExpect(jsonPath("$.data.items[1].title").value("社区公开-Agent"))
+            .andExpect(jsonPath("$.data.items[1].category").value("AI 应用与 Agent"));
     }
 
     @Test
@@ -591,5 +634,43 @@ public class NoteControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+    }
+
+    @Test
+    void shouldReturnRelatedAccessibleNotes() throws Exception {
+        long sourceId = createPublishedNote(USER_KEY, "Spring Agent 实战", "# Spring Agent 实战\n\n共享 MCP 调度与审计链路");
+        createPublishedNote(USER_KEY, "Spring Agent 清单", "# Spring Agent 清单\n\n共享 MCP 编排");
+        createPublishedNote(USER_KEY, "Redis 缓存", "# Redis 缓存\n\n与当前主题无关");
+        createPublishedNote(OTHER_USER_KEY, "Spring Agent 对照", "# Spring Agent 对照\n\n共享 MCP 调度");
+
+        mvc.perform(get("/api/notes/" + sourceId + "/related")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.length()").value(greaterThanOrEqualTo(2)))
+            .andExpect(jsonPath("$.data[0].id").isNumber())
+            .andExpect(jsonPath("$.data[0].title").exists())
+            .andExpect(jsonPath("$.data[0].summary").exists());
+    }
+
+    private long createPublishedNote(String ownerKey, String title, String contentMd) {
+        jdbcTemplate.update(
+            """
+                INSERT INTO notes (title, content_md, owner_key, visibility, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'PUBLIC', 'PUBLISHED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+            title,
+            contentMd,
+            ownerKey
+        );
+        Long id = jdbcTemplate.queryForObject(
+            "SELECT MAX(id) FROM notes WHERE owner_key = ? AND title = ?",
+            Long.class,
+            ownerKey,
+            title
+        );
+        if (id == null) {
+            throw new IllegalStateException("FAILED_TO_CREATE_PUBLISHED_NOTE");
+        }
+        return id;
     }
 }

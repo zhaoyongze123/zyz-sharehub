@@ -151,12 +151,12 @@ async function createPublicRoadmap(
 
 async function loginAs(page: Parameters<typeof test>[0]['page'], role: 'user' | 'admin') {
   await page.addInitScript(({ selectedRole, adminTokenValue }) => {
-    window.localStorage.setItem('sharebase.role', selectedRole)
-    window.localStorage.setItem('sharebase.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
-    window.localStorage.setItem('sharebase.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
-    window.localStorage.setItem('sharebase.userKey', 'playwright-user')
+    window.localStorage.setItem('ShareHub.role', selectedRole)
+    window.localStorage.setItem('ShareHub.nickname', selectedRole === 'admin' ? 'Playwright Admin' : 'Playwright User')
+    window.localStorage.setItem('ShareHub.headline', selectedRole === 'admin' ? 'E2E admin' : 'E2E user')
+    window.localStorage.setItem('ShareHub.userKey', 'playwright-user')
     if (selectedRole === 'admin') {
-      window.localStorage.setItem('sharebase.adminToken', adminTokenValue)
+      window.localStorage.setItem('ShareHub.adminToken', adminTokenValue)
     }
   }, { selectedRole: role, adminTokenValue: adminToken })
 }
@@ -332,10 +332,10 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   await loginAs(page, 'user')
   await page.goto('/publish/roadmap')
   await expect(page.locator('main').getByRole('heading', { name: '创建路线' })).toBeVisible()
-  await expect(page.getByText('当前真实接口仅写入节点标题、描述、顺序，附件单独上传。')).toBeVisible()
 
   await page.getByTestId('publish-roadmap-title').fill(roadmapTitle)
   await page.getByTestId('publish-roadmap-summary').fill('通过页面完成真实路线创建和节点追加闭环。')
+  await page.getByTestId('publish-roadmap-remove-node-2').click()
   await page.getByTestId('publish-roadmap-node-title-0').fill('阶段 1：创建')
   await page.getByTestId('publish-roadmap-node-description-0').fill('阶段 1 描述')
   await page.getByTestId('publish-roadmap-node-attachment-0').setInputFiles({
@@ -345,8 +345,6 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   })
   await page.getByTestId('publish-roadmap-node-title-1').fill('阶段 2：节点落库')
   await page.getByTestId('publish-roadmap-node-description-1').fill('阶段 2 描述')
-  await page.getByTestId('publish-roadmap-node-title-2').fill('阶段 3：发布验收')
-  await page.getByTestId('publish-roadmap-node-description-2').fill('阶段 3 描述')
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps') &&
@@ -357,7 +355,7 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
     response.url().includes('/api/roadmaps/') &&
     response.url().includes('/nodes') &&
     response.request().method() === 'POST'
-  , 3)
+  , 2)
   const attachmentResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/roadmaps/') &&
     response.url().includes('/attachments') &&
@@ -372,7 +370,7 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   const createdId = createBody.data.id as number
 
   const nodeResponses = await nodeResponsesPromise
-  expect(nodeResponses).toHaveLength(3)
+  expect(nodeResponses).toHaveLength(2)
   for (const nodeResponse of nodeResponses) {
     expect(nodeResponse.url()).toContain(`/api/roadmaps/${createdId}/nodes`)
     expect(nodeResponse.ok()).toBeTruthy()
@@ -381,13 +379,12 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   expect(attachmentResponse.ok()).toBeTruthy()
 
   await expect(page.getByTestId('publish-roadmap-result')).toContainText(`路线 ID：${createdId}`)
-  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：3')
+  await expect(page.getByTestId('publish-roadmap-result')).toContainText('节点数：2')
   await page.getByRole('link', { name: '查看详情页' }).click()
   await expect(page).toHaveURL(new RegExp(`/roadmaps/${createdId}$`))
   await expect(page.getByRole('heading', { name: roadmapTitle })).toBeVisible()
   await expect(page.getByText('阶段 1：创建')).toBeVisible()
   await expect(page.getByText('阶段 2：节点落库')).toBeVisible()
-  await expect(page.getByText('阶段 3：发布验收')).toBeVisible()
   await expect(page.getByText('阶段 1 描述')).toBeVisible()
 
   const detailResponse = await request.get(`${apiBaseUrl}/api/roadmaps/${createdId}`, {
@@ -398,7 +395,7 @@ test('publish-roadmap 页面真写入联调', async ({ page, request }) => {
   expect(detailBody.data.roadmap.id).toBe(createdId)
   expect(detailBody.data.roadmap.title).toBe(roadmapTitle)
   expect(detailBody.data.roadmap.status).toBe('PUBLISHED')
-  expect(detailBody.data.nodes).toHaveLength(3)
+  expect(detailBody.data.nodes).toHaveLength(2)
   expect(detailBody.data.nodes[0].description).toBe('阶段 1 描述')
   expect(detailBody.data.nodes[0].attachments).toHaveLength(1)
 })

@@ -15,7 +15,7 @@
       <HeroBanner kicker="资料详情" :title="resource.title" :description="resource.summary">
         <template #actions>
           <BaseButton @click="downloadResource">下载资源</BaseButton>
-          <BaseButton variant="secondary" @click="favoriteResource">收藏</BaseButton>
+          <BaseButton variant="secondary" @click="handleFavoriteResource">收藏</BaseButton>
         </template>
       </HeroBanner>
 
@@ -35,7 +35,7 @@
         </div>
       </div>
 
-      <InteractionBar :likes="likes" :favorites="favorites" @like="likeResource" @favorite="favoriteResource" @report="reportVisible = true" />
+      <InteractionBar :likes="likes" :favorites="favorites" @like="handleLikeResource" @favorite="handleFavoriteResource" @report="reportVisible = true" />
 
       <div class="glass-panel panel">
         <div class="section-heading">
@@ -57,8 +57,44 @@
     </section>
 
     <aside class="detail-side">
-      <BaseEmpty title="预览与下载" description="当前为静态预览占位，联调后可接后端预览与文件下载流。" />
-      <BaseEmpty title="状态覆盖" description="若访问不存在的资料，请直接改 URL 为不存在 id，会显示 404 态。" />
+      <section class="glass-panel panel preview-panel">
+        <div class="section-heading">
+          <h2>附件预览</h2>
+          <p>已接后端资料附件，支持 PDF 页面内预览与文档下载。</p>
+        </div>
+
+        <div v-if="previewLoading" class="preview-loading">
+          <BaseSkeleton height="24rem" />
+        </div>
+
+        <div v-else-if="previewMode === 'pdf' && pdfPreviewUrl" class="preview-frame-wrap">
+          <iframe :src="pdfPreviewUrl" title="PDF 资料预览" class="preview-frame" />
+        </div>
+
+        <div v-else-if="previewMode === 'office' && officePreviewUrl" class="preview-frame-wrap">
+          <iframe :src="officePreviewUrl" title="Office 文档预览" class="preview-frame" />
+        </div>
+
+        <BaseEmpty
+          v-else-if="previewMode === 'empty'"
+          title="暂无附件"
+          description="当前资料还没有上传可预览的附件。"
+        />
+
+        <BaseEmpty
+          v-else-if="previewMode === 'unsupported'"
+          title="暂不支持在线预览"
+          :description="`当前文件类型为 ${resource.fileType}，请直接下载查看。`"
+        />
+
+        <BaseErrorState
+          v-else
+          title="附件预览失败"
+          :description="previewErrorMessage || '当前预览链路加载失败，请直接下载文件查看。'"
+        />
+
+        <BaseButton :disabled="!resource.previewUrl" @click="downloadResource">下载资源</BaseButton>
+      </section>
     </aside>
 
     <ReportDialog
@@ -83,11 +119,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { createReport } from '@/api/reports'
-import { fetchRelatedResources, fetchResourceDetail, type ResourceItem } from '@/api/resources'
+import {
+  favoriteResource,
+  fetchRelatedResources,
+  fetchResourceDetail,
+  likeResource,
+  type ResourceItem
+} from '@/api/resources'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
 import BaseErrorState from '@/components/base/BaseErrorState.vue'
@@ -114,6 +156,11 @@ const resource = ref<ResourceItem | null>(null)
 const relatedResources = ref<ResourceItem[]>([])
 const likes = ref(0)
 const favorites = ref(0)
+const previewLoading = ref(false)
+const previewMode = ref<'pdf' | 'office' | 'unsupported' | 'empty' | 'error'>('empty')
+const pdfPreviewUrl = ref('')
+const officePreviewUrl = ref('')
+const previewErrorMessage = ref('')
 
 const resourceComments = [
   { author: 'Mina', createdAt: '2 小时前', content: '资源详情已切到真实接口后，这里继续补评论真数据会更顺。' },
@@ -125,6 +172,7 @@ async function loadResource() {
   notFound.value = false
   resource.value = null
   relatedResources.value = []
+  resetPreviewState()
 
   try {
     const detail = await fetchResourceDetail(String(route.params.id))
@@ -132,6 +180,7 @@ async function loadResource() {
     likes.value = detail.likes
     favorites.value = detail.favorites
     relatedResources.value = await fetchRelatedResources(detail.id)
+    await loadPreview(detail)
   } catch (error) {
     const status = axios.isAxiosError(error) ? (error.response?.status ?? 0) : 0
     if ([404, 410].includes(status)) {
@@ -142,18 +191,87 @@ async function loadResource() {
   }
 }
 
-function likeResource() {
-  likes.value += 1
+async function handleLikeResource() {
+  if (!resource.value) {
+    return
+  }
+  const result = await likeResource(resource.value.id)
+  likes.value = result.likes ?? likes.value
+  if (resource.value) {
+    resource.value.likes = likes.value
+  }
   appStore.showToast('已点赞', '这个资料已加入你的正反馈记录')
 }
 
-function favoriteResource() {
-  favorites.value += 1
+async function handleFavoriteResource() {
+  if (!resource.value) {
+    return
+  }
+  const result = await favoriteResource(resource.value.id)
+  favorites.value = result.favorites ?? favorites.value
+  if (resource.value) {
+    resource.value.favorites = favorites.value
+  }
   appStore.showToast('已收藏', '稍后可在个人中心里查看')
 }
 
 function downloadResource() {
-  appStore.showToast('下载任务已启动', '联调后这里会接真实下载流')
+  if (!resource.value?.previewUrl) {
+    appStore.showToast('暂无可下载附件', '当前资料还没有上传附件', 'error')
+    return
+  }
+  window.open(resource.value.previewUrl, '_blank', 'noopener')
+}
+
+function getFileExtension(fileType: string) {
+  return fileType.trim().toLowerCase().replace(/^\./, '')
+}
+
+function resetPreviewState() {
+  previewLoading.value = false
+  previewMode.value = 'empty'
+  previewErrorMessage.value = ''
+  officePreviewUrl.value = ''
+  if (pdfPreviewUrl.value) {
+    URL.revokeObjectURL(pdfPreviewUrl.value)
+    pdfPreviewUrl.value = ''
+  }
+}
+
+async function loadPreview(detail: ResourceItem) {
+  if (!detail.previewUrl) {
+    previewMode.value = 'empty'
+    return
+  }
+
+  const extension = getFileExtension(detail.fileType)
+
+  if (extension === 'pdf') {
+    previewLoading.value = true
+    try {
+      const response = await axios.get(detail.previewUrl, {
+        responseType: 'blob'
+      })
+      pdfPreviewUrl.value = URL.createObjectURL(response.data as Blob)
+      previewMode.value = 'pdf'
+    } catch (error) {
+      previewMode.value = 'error'
+      previewErrorMessage.value = axios.isAxiosError(error)
+        ? `PDF 预览加载失败（HTTP ${error.response?.status ?? 'UNKNOWN'}）`
+        : 'PDF 预览加载失败'
+    } finally {
+      previewLoading.value = false
+    }
+    return
+  }
+
+  if (extension === 'doc' || extension === 'docx') {
+    officePreviewUrl.value = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(new URL(detail.previewUrl, window.location.origin).toString())}`
+    previewMode.value = 'office'
+    return
+  }
+
+  previewMode.value = 'unsupported'
 }
 
 function closeReportDialog() {
@@ -206,6 +324,10 @@ watch(() => route.params.id, () => {
 onMounted(() => {
   void loadResource()
 })
+
+onBeforeUnmount(() => {
+  resetPreviewState()
+})
 </script>
 
 <style scoped lang="scss">
@@ -221,8 +343,25 @@ onMounted(() => {
   gap: var(--space-5);
 }
 
+.preview-panel {
+  align-content: start;
+}
+
 .panel {
   padding: var(--space-6);
+}
+
+.preview-loading,
+.preview-frame-wrap {
+  min-height: 24rem;
+}
+
+.preview-frame {
+  width: 100%;
+  min-height: 24rem;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .tag-row,

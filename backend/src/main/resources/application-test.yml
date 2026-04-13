@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:sharehub;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:55432}/${POSTGRES_DB:sharehub_dev}
+    driver-class-name: org.postgresql.Driver
+    username: ${POSTGRES_USER:sharehub_dev}
+    password: ${POSTGRES_PASSWORD:sharehub_dev_local_pg}
   jpa:
     hibernate:
       ddl-auto: none
@@ -15,6 +15,9 @@ spring:
       schema-locations: classpath:schema-test.sql
   data:
     redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:56379}
+      password: ${REDIS_PASSWORD:}
       repositories:
         enabled: false
 

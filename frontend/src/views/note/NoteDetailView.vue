@@ -14,25 +14,19 @@
     <section class="detail-main" data-testid="note-detail-main">
       <HeroBanner kicker="笔记详情" :title="note.title" :description="noteSummary">
         <template #actions>
-          <BaseButton disabled>收藏待接后端</BaseButton>
+          <BaseButton @click="handleFavoriteNote">收藏</BaseButton>
           <BaseButton variant="secondary" @click="reportVisible = true">举报</BaseButton>
         </template>
       </HeroBanner>
 
       <InteractionBar
-        :likes="0"
-        :favorites="0"
-        disable-like
-        disable-favorite
-        like-label="点赞待接后端"
-        favorite-label="收藏待接后端"
+        :likes="likes"
+        :favorites="favorites"
+        :disable-like="interactionSubmitting"
+        :disable-favorite="interactionSubmitting"
         @report="reportVisible = true"
-      />
-
-      <BaseEmpty
-        title="互动说明"
-        description="当前批次仅收口真实详情读取与举报闭环，点赞和收藏按钮已禁用，待后端提供对应接口后再开放。"
-        data-testid="note-detail-interaction-hint"
+        @like="handleLikeNote"
+        @favorite="handleFavoriteNote"
       />
 
       <article class="glass-panel markdown-panel" data-testid="note-detail-content" v-html="renderedHtml"></article>
@@ -40,16 +34,11 @@
       <div class="glass-panel panel" data-testid="note-detail-related">
         <div class="section-heading">
           <h2>相关推荐</h2>
-          <p>当前接口尚未返回相关推荐，后续可继续补齐关联笔记能力。</p>
         </div>
         <div v-if="relatedNotes.length" class="related-grid">
           <NoteCard v-for="item in relatedNotes" :key="item.id" :item="item" />
         </div>
-        <BaseEmpty
-          v-else
-          title="暂无相关推荐"
-          description="当前仅收口真实详情读取；关联笔记待后端提供独立查询接口后继续补齐。"
-        />
+        <BaseEmpty v-else title="暂无相关推荐" description="" />
       </div>
     </section>
 
@@ -82,7 +71,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
-import { fetchNoteDetail, type NoteDTO } from '@/api/notes'
+import {
+  favoriteNote,
+  fetchNoteDetail,
+  fetchNoteInteractions,
+  fetchRelatedNotes,
+  likeNote,
+  type NoteDTO,
+  type RelatedNoteItem
+} from '@/api/notes'
 import { createReport } from '@/api/reports'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseEmpty from '@/components/base/BaseEmpty.vue'
@@ -102,10 +99,14 @@ const appStore = useAppStore()
 const reportVisible = ref(false)
 const reportReason = ref('')
 const reporting = ref(false)
+const interactionSubmitting = ref(false)
 const reportErrorMessage = ref('')
 const loading = ref(true)
 const notFound = ref(false)
 const note = ref<NoteDTO | null>(null)
+const likes = ref(0)
+const favorites = ref(0)
+const relatedNotes = ref<RelatedNoteItem[]>([])
 
 const noteSummary = computed(() => extractSummary(note.value?.contentMd || ''))
 const noteOutline = computed(() => extractOutline(note.value?.contentMd || ''))
@@ -115,9 +116,6 @@ const noteStatusDescription = computed(() => {
   const visibility = note.value.visibility?.trim() || '仅自己可见'
   return `当前状态 ${status}，可见性 ${visibility}`
 })
-const relatedNotes = computed<
-  Array<{ id: number, title: string, summary: string, updatedAt: string, status: string, tags: string[] }>
->(() => [])
 const renderedHtml = computed(() => {
   if (!note.value) return ''
   return note.value.contentMd
@@ -136,9 +134,27 @@ async function loadNote() {
   loading.value = true
   notFound.value = false
   note.value = null
+  relatedNotes.value = []
+  likes.value = 0
+  favorites.value = 0
 
   try {
-    note.value = await fetchNoteDetail(Number(route.params.id))
+    const noteId = Number(route.params.id)
+    const [detail, interactions] = await Promise.all([
+      fetchNoteDetail(noteId),
+      fetchNoteInteractions(noteId)
+    ])
+    note.value = detail
+    likes.value = interactions.likes
+    favorites.value = interactions.favorites
+    try {
+      relatedNotes.value = await fetchRelatedNotes(noteId)
+    } catch (error) {
+      relatedNotes.value = []
+      if (!axios.isAxiosError(error) || error.response?.status !== 404) {
+        appStore.showToast('相关推荐加载失败', '已降级为空列表，不影响笔记详情查看', 'error')
+      }
+    }
   } catch (error) {
     const status = axios.isAxiosError(error) ? (error.response?.status ?? 0) : 0
     if (status === 404) {
@@ -146,6 +162,34 @@ async function loadNote() {
     }
   } finally {
     loading.value = false
+  }
+}
+
+async function handleLikeNote() {
+  if (!note.value || interactionSubmitting.value) {
+    return
+  }
+  interactionSubmitting.value = true
+  try {
+    const result = await likeNote(note.value.id)
+    likes.value = result.likes ?? likes.value
+    appStore.showToast('已点赞', '这篇笔记已加入你的正反馈记录')
+  } finally {
+    interactionSubmitting.value = false
+  }
+}
+
+async function handleFavoriteNote() {
+  if (!note.value || interactionSubmitting.value) {
+    return
+  }
+  interactionSubmitting.value = true
+  try {
+    const result = await favoriteNote(note.value.id)
+    favorites.value = result.favorites ?? favorites.value
+    appStore.showToast('已收藏', '稍后可在个人中心里查看这篇笔记')
+  } finally {
+    interactionSubmitting.value = false
   }
 }
 

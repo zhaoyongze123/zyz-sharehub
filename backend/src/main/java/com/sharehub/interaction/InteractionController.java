@@ -101,9 +101,69 @@ public class InteractionController {
         return ApiResponse.ok(Map.of("resourceId", id, "likes", total));
     }
 
+    @PostMapping("/notes/{id}/favorite")
+    public ApiResponse<Map<String, Object>> favoriteNote(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.addNoteFavorite(id, userKey);
+        return ApiResponse.ok(Map.of("noteId", id, "favorites", total));
+    }
+
+    @DeleteMapping("/notes/{id}/favorite")
+    public ApiResponse<Map<String, Object>> unfavoriteNote(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.removeNoteFavorite(id, userKey);
+        return ApiResponse.ok(Map.of("noteId", id, "favorites", total));
+    }
+
+    @PostMapping("/notes/{id}/like")
+    public ApiResponse<Map<String, Object>> likeNote(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.addNoteLike(id, userKey);
+        return ApiResponse.ok(Map.of("noteId", id, "likes", total));
+    }
+
+    @DeleteMapping("/notes/{id}/like")
+    public ApiResponse<Map<String, Object>> unlikeNote(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String userKey = requireActiveUser(authentication, request);
+        int total = repository.removeNoteLike(id, userKey);
+        return ApiResponse.ok(Map.of("noteId", id, "likes", total));
+    }
+
     @GetMapping("/resources/{id}/interactions")
     public ApiResponse<InteractionSummaryDto> interactions(@PathVariable Long id) {
         return ApiResponse.ok(repository.summarizeResource(id));
+    }
+
+    @GetMapping("/notes/{id}/interactions")
+    public ApiResponse<NoteInteractionSummaryDto> noteInteractions(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String viewerKey = requestAccessService.resolveUser(authentication, request)
+            .map((login) -> {
+                userProfileRepository.upsert(login, login, null);
+                userProfileRepository.ensureActive(login);
+                return login;
+            })
+            .orElse(null);
+        return ApiResponse.ok(repository.summarizeNote(id, viewerKey));
     }
 
     @PostMapping("/reports")

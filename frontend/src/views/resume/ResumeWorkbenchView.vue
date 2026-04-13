@@ -272,7 +272,7 @@
       </div>
       <div v-if="!serverWorkbenchCollapsed" class="space-y-3">
         <div v-if="resumeServerItems.length === 0" class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-          暂无服务端记录，点击“生成简历”体验真实链路。
+          暂无记录。
         </div>
         <div class="space-y-4" data-testid="resume-server-list">
           <article
