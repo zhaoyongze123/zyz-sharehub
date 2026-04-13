@@ -7,6 +7,7 @@ import com.sharehub.note.RelatedNoteDto;
 import com.sharehub.note.NoteRepository;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resource.ResourceRepository;
+import com.sharehub.tag.TagAssignmentRepository;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -29,15 +30,18 @@ public class InteractionRepository {
     private final JdbcTemplate jdbcTemplate;
     private final ResourceRepository resourceRepository;
     private final NoteRepository noteRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
 
     public InteractionRepository(
         JdbcTemplate jdbcTemplate,
         ResourceRepository resourceRepository,
-        NoteRepository noteRepository
+        NoteRepository noteRepository,
+        TagAssignmentRepository tagAssignmentRepository
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.resourceRepository = resourceRepository;
         this.noteRepository = noteRepository;
+        this.tagAssignmentRepository = tagAssignmentRepository;
     }
 
     private static final String STATUS_VISIBLE = "VISIBLE";
@@ -346,6 +350,12 @@ public class InteractionRepository {
             safePageSize,
             offset
         );
+        Map<Long, List<String>> tagsByNoteId = tagAssignmentRepository.findNoteTagsByNoteIds(
+            items.stream().map(RelatedNoteDto::id).toList()
+        );
+        items = items.stream()
+            .map(item -> item.withTags(tagsByNoteId.getOrDefault(item.id(), List.of())))
+            .toList();
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 

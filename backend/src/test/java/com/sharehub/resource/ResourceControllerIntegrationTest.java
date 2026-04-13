@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -54,6 +55,8 @@ class ResourceControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM comments");
         jdbcTemplate.update("DELETE FROM reports");
+        jdbcTemplate.update("DELETE FROM resource_tags");
+        jdbcTemplate.update("DELETE FROM tags");
         jdbcTemplate.update("DELETE FROM resources");
         jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
@@ -69,11 +72,18 @@ class ResourceControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("Spring 实战"))
             .andExpect(jsonPath("$.data.category").value("PDF"))
+            .andExpect(jsonPath("$.data.tags", containsInAnyOrder("spring", "java")))
             .andExpect(jsonPath("$.data.status").value("DRAFT"))
             .andExpect(jsonPath("$.data.visibility").value("PUBLIC"))
             .andExpect(jsonPath("$.data.likes").value(0))
             .andExpect(jsonPath("$.data.favorites").value(0))
             .andExpect(jsonPath("$.data.downloadCount").value(0));
+
+        Integer relationCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM resource_tags",
+            Integer.class
+        );
+        org.assertj.core.api.Assertions.assertThat(relationCount).isEqualTo(2);
     }
 
     @Test
@@ -87,6 +97,7 @@ class ResourceControllerIntegrationTest {
         likeResource(publishedSpring);
         likeResource(publishedSpring);
         favoriteResource(publishedSpring);
+        jdbcTemplate.update("UPDATE resources SET tags = NULL WHERE id = ?", publishedSpring);
 
         mockMvc.perform(get("/api/resources"))
             .andExpect(status().isOk())
@@ -199,6 +210,7 @@ class ResourceControllerIntegrationTest {
         mockMvc.perform(get("/api/resources/{id}", resourceId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("新标题"))
+            .andExpect(jsonPath("$.data.tags", containsInAnyOrder("spring", "guide")))
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
     }
 

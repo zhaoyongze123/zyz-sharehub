@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -43,6 +44,8 @@ public class NoteControllerIntegrationTest {
     @org.junit.jupiter.api.BeforeEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM note_view_history");
+        jdbcTemplate.update("DELETE FROM note_tags");
+        jdbcTemplate.update("DELETE FROM tags");
         jdbcTemplate.update("DELETE FROM notes");
         jdbcTemplate.update("DELETE FROM admin_whitelist");
         jdbcTemplate.update("DELETE FROM users");
@@ -50,7 +53,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void createListDetailUpdateDelete() throws Exception {
-        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", null, null, null, null, null, false, false);
+        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", java.util.List.of("spring", "agent"), null, null, null, null, null, false, false);
         String body = mapper.writeValueAsString(payload);
 
         String response = mvc.perform(post("/api/notes")
@@ -78,15 +81,17 @@ public class NoteControllerIntegrationTest {
         mvc.perform(get("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.title").value("Test"));
+            .andExpect(jsonPath("$.data.title").value("Test"))
+            .andExpect(jsonPath("$.data.tags", containsInAnyOrder("spring", "agent")));
 
-        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", null, null, null, null, null, false, false);
+        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", java.util.List.of("prompt", "workflow"), null, null, null, null, null, false, false);
         mvc.perform(put("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(payload)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+            .andExpect(jsonPath("$.data.tags", containsInAnyOrder("prompt", "workflow")));
 
         mvc.perform(delete("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
@@ -166,7 +171,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void shouldRestrictNotesToOwner() throws Exception {
-        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", null, null, null, null, null, false, false);
+        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", java.util.List.of(), null, null, null, null, null, false, false);
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -240,7 +245,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void shouldListCommunityPublishedNotesWithCategory() throws Exception {
-        createPublishedNote(USER_KEY, "社区公开-Agent", "# 社区公开-Agent\n\n验证公开列表");
+        long firstId = createPublishedNote(USER_KEY, "社区公开-Agent", "# 社区公开-Agent\n\n验证公开列表");
         jdbcTemplate.update(
             """
                 UPDATE notes
@@ -250,7 +255,19 @@ public class NoteControllerIntegrationTest {
             USER_KEY,
             "社区公开-Agent"
         );
-        createPublishedNote(OTHER_USER_KEY, "社区公开-提示词", "# 社区公开-提示词\n\n验证跨用户公开列表");
+        jdbcTemplate.update(
+            """
+                INSERT INTO tags (name, slug, type, status, created_at, updated_at)
+                VALUES ('agent', 'agent', 'CONTENT', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+        jdbcTemplate.update(
+            """
+                INSERT INTO note_tags (note_id, tag_id, created_at)
+                SELECT ?, id, CURRENT_TIMESTAMP FROM tags WHERE slug = 'agent'
+                """,
+            firstId
+        );
+        long secondId = createPublishedNote(OTHER_USER_KEY, "社区公开-提示词", "# 社区公开-提示词\n\n验证跨用户公开列表");
         jdbcTemplate.update(
             """
                 UPDATE notes
@@ -259,6 +276,18 @@ public class NoteControllerIntegrationTest {
                 """,
             OTHER_USER_KEY,
             "社区公开-提示词"
+        );
+        jdbcTemplate.update(
+            """
+                INSERT INTO tags (name, slug, type, status, created_at, updated_at)
+                VALUES ('prompt', 'prompt', 'CONTENT', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """);
+        jdbcTemplate.update(
+            """
+                INSERT INTO note_tags (note_id, tag_id, created_at)
+                SELECT ?, id, CURRENT_TIMESTAMP FROM tags WHERE slug = 'prompt'
+                """,
+            secondId
         );
         jdbcTemplate.update(
             """
@@ -275,8 +304,43 @@ public class NoteControllerIntegrationTest {
             .andExpect(jsonPath("$.data.total").value(2))
             .andExpect(jsonPath("$.data.items[0].title").value("社区公开-提示词"))
             .andExpect(jsonPath("$.data.items[0].category").value("提示词工程"))
+            .andExpect(jsonPath("$.data.items[0].tags", containsInAnyOrder("prompt")))
             .andExpect(jsonPath("$.data.items[1].title").value("社区公开-Agent"))
-            .andExpect(jsonPath("$.data.items[1].category").value("AI 应用与 Agent"));
+            .andExpect(jsonPath("$.data.items[1].category").value("AI 应用与 Agent"))
+            .andExpect(jsonPath("$.data.items[1].tags", containsInAnyOrder("agent")));
+    }
+
+    @Test
+    void shouldPersistAndReturnNoteTagsFromStandardTables() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Tag Note","contentMd":"# content","visibility":"PUBLIC","status":"PUBLISHED","tags":["java","spring","java"]}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.tags.length()").value(2))
+            .andExpect(jsonPath("$.data.tags[0]").value("java"))
+            .andExpect(jsonPath("$.data.tags[1]").value("spring"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long id = Long.valueOf(((Map<?, ?>) ((Map<?, ?>) mapper.readValue(response, Map.class)).get("data")).get("id").toString());
+
+        Integer noteTagCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM note_tags WHERE note_id = ?",
+            Integer.class,
+            id
+        );
+        org.assertj.core.api.Assertions.assertThat(noteTagCount).isEqualTo(2);
+
+        mvc.perform(get("/api/notes/community")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].id").value(id))
+            .andExpect(jsonPath("$.data.items[0].tags", containsInAnyOrder("java", "spring")));
     }
 
     @Test

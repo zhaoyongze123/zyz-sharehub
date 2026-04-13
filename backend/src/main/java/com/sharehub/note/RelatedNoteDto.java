@@ -17,4 +17,20 @@ public record RelatedNoteDto(
     long favorites,
     boolean favorited
 ) {
+    public RelatedNoteDto withTags(List<String> nextTags) {
+        return new RelatedNoteDto(
+            id,
+            title,
+            summary,
+            updatedAt,
+            status,
+            category,
+            nextTags,
+            ownerKey,
+            ownerName,
+            ownerAvatarUrl,
+            favorites,
+            favorited
+        );
+    }
 }

@@ -11,6 +11,7 @@ import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
 import com.sharehub.interaction.InteractionRepository;
 import com.sharehub.interaction.InteractionSummaryDto;
+import com.sharehub.tag.TagAssignmentRepository;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
@@ -51,19 +52,22 @@ public class ResourceController {
     private final InteractionRepository interactionRepository;
     private final UserProfileRepository userProfileRepository;
     private final RequestAccessService requestAccessService;
+    private final TagAssignmentRepository tagAssignmentRepository;
 
     public ResourceController(
         ResourceRepository repository,
         FileStorageService fileStorageService,
         InteractionRepository interactionRepository,
         UserProfileRepository userProfileRepository,
-        RequestAccessService requestAccessService
+        RequestAccessService requestAccessService,
+        TagAssignmentRepository tagAssignmentRepository
     ) {
         this.repository = repository;
         this.fileStorageService = fileStorageService;
         this.interactionRepository = interactionRepository;
         this.userProfileRepository = userProfileRepository;
         this.requestAccessService = requestAccessService;
+        this.tagAssignmentRepository = tagAssignmentRepository;
     }
 
     @PostMapping
@@ -73,17 +77,20 @@ public class ResourceController {
         @Valid @RequestBody ResourceDto req
     ) {
         String ownerKey = requireActiveUser(authentication, request);
+        List<String> normalizedTags = tagAssignmentRepository.normalizeTags(req.tags());
         ResourceEntity entity = new ResourceEntity();
         entity.setTitle(req.title());
         entity.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
         entity.setSummary(req.summary());
-        entity.setTags(req.tags());
+        entity.setTags(normalizedTags);
         entity.setExternalUrl(req.externalUrl());
         entity.setObjectKey(req.objectKey());
         entity.setOwnerKey(ownerKey);
         entity.setVisibility(req.visibility());
         entity.setStatus("DRAFT");
-        return ApiResponse.ok(enrichResource(repository.save(entity)));
+        ResourceEntity saved = repository.save(entity);
+        tagAssignmentRepository.syncResourceTags(saved.getId(), normalizedTags);
+        return ApiResponse.ok(enrichResource(saved));
     }
 
     @GetMapping
@@ -104,16 +111,31 @@ public class ResourceController {
         String normalizedCategory = blankIfNull(normalize(category));
         String normalizedTag = blankIfNull(normalize(tag));
         String normalizedVisibility = blankIfNull(normalize(visibility));
+        Set<Long> filteredResourceIds = normalizedTag.isBlank()
+            ? null
+            : tagAssignmentRepository.findResourceIdsByTag(normalizedTag);
+
+        if (filteredResourceIds != null && filteredResourceIds.isEmpty()) {
+            return ApiResponse.ok(PageResponse.of(List.of(), safePage, safeSize, 0L));
+        }
 
         if ("hot".equalsIgnoreCase(sortBy)) {
-            Page<ResourceEntity> allCandidates = repository.findVisibleByFiltersOrderByUpdatedAtDesc(
-                statuses,
-                normalizedKeyword,
-                normalizedCategory,
-                normalizedTag,
-                normalizedVisibility,
-                PageRequest.of(0, Integer.MAX_VALUE, Sort.by(Sort.Direction.DESC, "updatedAt"))
-            );
+            Page<ResourceEntity> allCandidates = filteredResourceIds == null
+                ? repository.findVisibleByFiltersOrderByUpdatedAtDesc(
+                    statuses,
+                    normalizedKeyword,
+                    normalizedCategory,
+                    normalizedVisibility,
+                    PageRequest.of(0, Integer.MAX_VALUE, Sort.by(Sort.Direction.DESC, "updatedAt"))
+                )
+                : repository.findVisibleByFiltersAndIdsOrderByUpdatedAtDesc(
+                    filteredResourceIds,
+                    statuses,
+                    normalizedKeyword,
+                    normalizedCategory,
+                    normalizedVisibility,
+                    PageRequest.of(0, Integer.MAX_VALUE, Sort.by(Sort.Direction.DESC, "updatedAt"))
+                );
             List<ResourceDto> sorted = enrichResources(allCandidates.getContent()).stream()
                 .sorted(
                     Comparator.comparingLong(ResourceDto::likes).reversed()
@@ -127,15 +149,25 @@ public class ResourceController {
         }
 
         PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
-        Page<ResourceEntity> result = repository.findVisibleByFiltersOrderByUpdatedAtDesc(
-            statuses,
-            normalizedKeyword,
-            normalizedCategory,
-            normalizedTag,
-            normalizedVisibility,
-            pageable
-        );
-        long total = repository.countByVisibleFilters(statuses, normalizedKeyword, normalizedCategory, normalizedTag, normalizedVisibility);
+        Page<ResourceEntity> result = filteredResourceIds == null
+            ? repository.findVisibleByFiltersOrderByUpdatedAtDesc(
+                statuses,
+                normalizedKeyword,
+                normalizedCategory,
+                normalizedVisibility,
+                pageable
+            )
+            : repository.findVisibleByFiltersAndIdsOrderByUpdatedAtDesc(
+                filteredResourceIds,
+                statuses,
+                normalizedKeyword,
+                normalizedCategory,
+                normalizedVisibility,
+                pageable
+            );
+        long total = filteredResourceIds == null
+            ? repository.countByVisibleFilters(statuses, normalizedKeyword, normalizedCategory, normalizedVisibility)
+            : repository.countByVisibleFiltersAndIds(filteredResourceIds, statuses, normalizedKeyword, normalizedCategory, normalizedVisibility);
         return ApiResponse.ok(PageResponse.of(enrichResources(result.getContent()), safePage, safeSize, total));
     }
 
@@ -162,7 +194,8 @@ public class ResourceController {
     public ApiResponse<List<ResourceDto>> related(@PathVariable Long id) {
         ResourceEntity source = repository.findById(id)
             .orElseThrow(() -> new NotFoundException("RESOURCE_NOT_FOUND"));
-        Set<String> sourceTags = source.getTags().stream()
+        Set<String> sourceTags = tagAssignmentRepository.findResourceTagsByResourceIds(List.of(id))
+            .getOrDefault(id, source.getTags()).stream()
             .map(String::trim)
             .filter(tag -> !tag.isEmpty())
             .map(String::toLowerCase)
@@ -187,15 +220,18 @@ public class ResourceController {
     ) {
         String ownerKey = requireActiveUser(authentication, request);
         ResourceEntity existing = requireOwnedResource(id, ownerKey);
+        List<String> normalizedTags = tagAssignmentRepository.normalizeTags(req.tags());
         existing.setTitle(req.title());
         existing.setType(req.category() == null || req.category().isBlank() ? req.type() : req.category());
         existing.setSummary(req.summary());
-        existing.setTags(req.tags());
+        existing.setTags(normalizedTags);
         existing.setExternalUrl(req.externalUrl());
         existing.setObjectKey(req.objectKey());
         existing.setVisibility(req.visibility());
         existing.setStatus(req.status() == null ? existing.getStatus() : req.status());
-        return ApiResponse.ok(enrichResource(repository.save(existing)));
+        ResourceEntity saved = repository.save(existing);
+        tagAssignmentRepository.syncResourceTags(saved.getId(), normalizedTags);
+        return ApiResponse.ok(enrichResource(saved));
     }
 
     @DeleteMapping("/{id}")
@@ -234,26 +270,48 @@ public class ResourceController {
     }
 
     private List<ResourceDto> enrichResources(List<ResourceEntity> resources) {
+        Map<Long, List<String>> tagsByResourceId = tagAssignmentRepository.findResourceTagsByResourceIds(
+            resources.stream().map(ResourceEntity::getId).collect(Collectors.toSet())
+        );
         Map<Long, InteractionSummaryDto> summaries = interactionRepository.summarizeResources(
             resources.stream().map(ResourceEntity::getId).collect(Collectors.toSet())
         );
         return resources.stream()
-            .map(resource -> toDto(resource, summaries.get(resource.getId())))
+            .map(resource -> toDto(resource, summaries.get(resource.getId()), tagsByResourceId.get(resource.getId())))
             .toList();
     }
 
     private ResourceDto enrichResource(ResourceEntity resource) {
-        return toDto(resource, interactionRepository.summarizeResource(resource.getId()));
+        List<String> tags = tagAssignmentRepository.findResourceTagsByResourceIds(List.of(resource.getId()))
+            .getOrDefault(resource.getId(), resource.getTags());
+        return toDto(resource, interactionRepository.summarizeResource(resource.getId()), tags);
     }
 
-    private ResourceDto toDto(ResourceEntity resource, InteractionSummaryDto summary) {
+    private ResourceDto toDto(ResourceEntity resource, InteractionSummaryDto summary, List<String> tags) {
         Optional<UserProfileDto> profile = userProfileRepository.findOptionalByLogin(resource.getOwnerKey());
         String author = profile.map(item -> item.name() == null || item.name().isBlank() ? item.login() : item.name())
             .orElse(resource.getOwnerKey());
         long likes = summary == null ? 0L : summary.likes();
         long favorites = summary == null ? 0L : summary.favorites();
         long downloadCount = resource.getObjectKey() == null || resource.getObjectKey().isBlank() ? 0L : 1L;
-        return resource.toDto(author, likes, favorites, downloadCount);
+        List<String> effectiveTags = tags == null ? resource.getTags() : tags;
+        return new ResourceDto(
+            resource.getId(),
+            resource.getTitle(),
+            resource.getType(),
+            resource.getType(),
+            resource.getSummary(),
+            effectiveTags,
+            resource.getExternalUrl(),
+            resource.getObjectKey(),
+            resource.getVisibility(),
+            resource.getStatus(),
+            resource.getUpdatedAt(),
+            author,
+            likes,
+            favorites,
+            downloadCount
+        );
     }
 
     private boolean isRelated(ResourceEntity source, Set<String> sourceTags, ResourceDto item) {

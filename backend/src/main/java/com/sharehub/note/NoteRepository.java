@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -19,6 +20,7 @@ import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import com.sharehub.tag.TagAssignmentRepository;
 
 @Repository
 public class NoteRepository {
@@ -26,9 +28,11 @@ public class NoteRepository {
     private static final Pattern TOKEN_SPLIT = Pattern.compile("[\\s,.;:!?()\\[\\]{}，。；：！？、/\\\\|\\-]+");
 
     private final JdbcTemplate jdbcTemplate;
+    private final TagAssignmentRepository tagAssignmentRepository;
 
-    public NoteRepository(JdbcTemplate jdbcTemplate) {
+    public NoteRepository(JdbcTemplate jdbcTemplate, TagAssignmentRepository tagAssignmentRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.tagAssignmentRepository = tagAssignmentRepository;
     }
 
     public NoteDto save(String ownerKey, NoteDto note) {
@@ -65,7 +69,9 @@ public class NoteRepository {
             },
             keyHolder
         );
-        return findOwned(keyHolder.getKey().longValue(), ownerKey);
+        Long noteId = keyHolder.getKey().longValue();
+        tagAssignmentRepository.syncNoteTags(noteId, note.tags());
+        return findOwned(noteId, ownerKey);
     }
 
     public PageResponse<NoteDto> list(String ownerKey, int page, int pageSize) {
@@ -85,7 +91,7 @@ public class NoteRepository {
         );
 
         int offset = (safePage - 1) * safePageSize;
-        List<NoteDto> items = jdbcTemplate.query(
+        List<NoteDto> items = attachTagsToNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -127,7 +133,7 @@ public class NoteRepository {
             ),
             safePageSize,
             offset
-        );
+        ));
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
@@ -179,7 +185,7 @@ public class NoteRepository {
         listArgs.add(safePageSize);
         listArgs.add(offset);
 
-        List<NoteDto> items = jdbcTemplate.query(
+        List<NoteDto> items = attachTagsToNotes(jdbcTemplate.query(
             listSql.toString(),
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),
@@ -197,7 +203,7 @@ public class NoteRepository {
                 resultSet.getBoolean("is_pinned")
             ),
             listArgs.toArray()
-        );
+        ));
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
@@ -240,6 +246,7 @@ public class NoteRepository {
             id,
             ownerKey
         );
+        tagAssignmentRepository.syncNoteTags(id, note.tags());
         return findOwned(id, ownerKey);
     }
 
@@ -309,7 +316,7 @@ public class NoteRepository {
         );
 
         Set<String> sourceTokens = extractTokens(source.title() + "\n" + source.contentMd());
-        return candidates.stream()
+        List<RelatedNoteDto> related = candidates.stream()
             .sorted(
                 Comparator.comparingInt((NoteCandidate candidate) -> relatedScore(source, sourceTokens, candidate)).reversed()
                     .thenComparing(NoteCandidate::updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -318,6 +325,7 @@ public class NoteRepository {
             .limit(4)
             .map(this::toRelatedDto)
             .toList();
+        return attachTagsToRelatedNotes(related);
     }
 
     public void recordView(Long id, String viewerKey) {
@@ -359,7 +367,7 @@ public class NoteRepository {
             viewerKey
         );
         int offset = (safePage - 1) * safePageSize;
-        List<RelatedNoteDto> items = jdbcTemplate.query(
+        List<RelatedNoteDto> items = attachTagsToRelatedNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -418,12 +426,12 @@ public class NoteRepository {
             viewerKey,
             safePageSize,
             offset
-        );
+        ));
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
     private Optional<NoteDto> findOptional(Long id, String ownerKey) {
-        List<NoteDto> results = jdbcTemplate.query(
+        List<NoteDto> results = attachTagsToNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -463,12 +471,12 @@ public class NoteRepository {
             ),
             id,
             ownerKey
-        );
+        ));
         return results.stream().findFirst();
     }
 
     private Optional<NoteDto> findPublicPublished(Long id) {
-        List<NoteDto> results = jdbcTemplate.query(
+        List<NoteDto> results = attachTagsToNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -507,7 +515,7 @@ public class NoteRepository {
                 resultSet.getBoolean("is_pinned")
             ),
             id
-        );
+        ));
         return results.stream().findFirst();
     }
 
@@ -533,6 +541,7 @@ public class NoteRepository {
             visibility,
             status,
             category,
+            List.of(),
             ownerKey,
             ownerName,
             ownerAvatarUrl,
@@ -571,7 +580,7 @@ public class NoteRepository {
             candidate.updatedAt(),
             candidate.status(),
             candidate.category(),
-            candidate.category() == null ? List.of() : List.of(candidate.category()),
+            List.of(),
             candidate.ownerKey(),
             candidate.ownerName(),
             candidate.ownerAvatarUrl(),
@@ -600,13 +609,31 @@ public class NoteRepository {
             activityAt == null ? null : activityAt.toInstant(),
             status,
             category,
-            category == null ? List.of() : List.of(category),
+            List.of(),
             ownerKey,
             ownerName,
             ownerAvatarUrl,
             favorites,
             favorited
         );
+    }
+
+    private List<NoteDto> attachTagsToNotes(List<NoteDto> notes) {
+        Map<Long, List<String>> tagsByNoteId = tagAssignmentRepository.findNoteTagsByNoteIds(
+            notes.stream().map(NoteDto::id).toList()
+        );
+        return notes.stream()
+            .map(note -> note.withTags(tagsByNoteId.getOrDefault(note.id(), List.<String>of())))
+            .toList();
+    }
+
+    private List<RelatedNoteDto> attachTagsToRelatedNotes(List<RelatedNoteDto> notes) {
+        Map<Long, List<String>> tagsByNoteId = tagAssignmentRepository.findNoteTagsByNoteIds(
+            notes.stream().map(RelatedNoteDto::id).toList()
+        );
+        return notes.stream()
+            .map(note -> note.withTags(tagsByNoteId.getOrDefault(note.id(), List.<String>of())))
+            .toList();
     }
 
     private int relatedScore(NoteDto source, Set<String> sourceTokens, NoteCandidate candidate) {

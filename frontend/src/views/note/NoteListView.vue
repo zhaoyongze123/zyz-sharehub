@@ -544,6 +544,7 @@ async function submitPublish() {
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
       category: newDraft.category.trim() ? newDraft.category.trim() : null,
+      tags: newDraft.tags.map((tag) => tag.trim()).filter(Boolean),
       isPinned: authStore.isAdmin ? newDraft.isPinned : false
     })
     await fetchList()

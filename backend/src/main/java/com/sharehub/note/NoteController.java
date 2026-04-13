@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import com.sharehub.config.AdminTokenFilter;
+import com.sharehub.tag.TagAssignmentRepository;
 
 @RestController
 @RequestMapping("/api/notes")
@@ -23,19 +24,22 @@ public class NoteController {
     private final UserProfileRepository userProfileRepository;
     private final AdminWhitelistRepository adminWhitelistRepository;
     private final String expectedAdminToken;
+    private final TagAssignmentRepository tagAssignmentRepository;
 
     public NoteController(
         NoteRepository repository,
         RequestAccessService requestAccessService,
         UserProfileRepository userProfileRepository,
         AdminWhitelistRepository adminWhitelistRepository,
-        Environment environment
+        Environment environment,
+        TagAssignmentRepository tagAssignmentRepository
     ) {
         this.repository = repository;
         this.requestAccessService = requestAccessService;
         this.userProfileRepository = userProfileRepository;
         this.adminWhitelistRepository = adminWhitelistRepository;
         this.expectedAdminToken = environment.getProperty("sharehub.admin.token", AdminTokenFilter.DEFAULT_ADMIN_TOKEN);
+        this.tagAssignmentRepository = tagAssignmentRepository;
     }
 
     @PostMapping
@@ -53,6 +57,7 @@ public class NoteController {
             req.visibility(),
             req.status(),
             req.category(),
+            tagAssignmentRepository.normalizeTags(req.tags()),
             null,
             null,
             null,
@@ -168,6 +173,7 @@ public class NoteController {
             req.visibility(),
             req.status(),
             req.category(),
+            tagAssignmentRepository.normalizeTags(req.tags()),
             req.ownerKey(),
             req.ownerName(),
             req.ownerAvatarUrl(),

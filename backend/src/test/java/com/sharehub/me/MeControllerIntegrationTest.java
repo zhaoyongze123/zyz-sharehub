@@ -44,6 +44,9 @@ class MeControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM note_view_history");
+        jdbcTemplate.update("DELETE FROM note_tags");
+        jdbcTemplate.update("DELETE FROM resource_tags");
+        jdbcTemplate.update("DELETE FROM tags");
         jdbcTemplate.update("DELETE FROM roadmap_node_progress");
         jdbcTemplate.update("DELETE FROM roadmap_enrollments");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
