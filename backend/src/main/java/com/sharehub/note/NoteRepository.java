@@ -94,6 +94,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.created_at,
+                  n.updated_at,
                   n.is_official,
                   n.is_pinned,
                   n.owner_key,
@@ -118,6 +120,8 @@ public class NoteRepository {
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
                 resultSet.getString("owner_avatar_url"),
+                toInstant(resultSet.getTimestamp("created_at")),
+                toInstant(resultSet.getTimestamp("updated_at")),
                 resultSet.getBoolean("is_official"),
                 resultSet.getBoolean("is_pinned")
             ),
@@ -150,6 +154,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.created_at,
+                  n.updated_at,
                   n.is_official,
                   n.is_pinned,
                   n.owner_key,
@@ -185,6 +191,8 @@ public class NoteRepository {
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
                 resultSet.getString("owner_avatar_url"),
+                toInstant(resultSet.getTimestamp("created_at")),
+                toInstant(resultSet.getTimestamp("updated_at")),
                 resultSet.getBoolean("is_official"),
                 resultSet.getBoolean("is_pinned")
             ),
@@ -237,6 +245,13 @@ public class NoteRepository {
 
     public void deleteOwned(Long id, String ownerKey) {
         int affected = jdbcTemplate.update("DELETE FROM notes WHERE id = ? AND owner_key = ?", id, ownerKey);
+        if (affected == 0) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
+        }
+    }
+
+    public void deleteById(Long id) {
+        int affected = jdbcTemplate.update("DELETE FROM notes WHERE id = ?", id);
         if (affected == 0) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
@@ -417,6 +432,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.created_at,
+                  n.updated_at,
                   n.is_official,
                   n.is_pinned,
                   n.owner_key,
@@ -439,6 +456,8 @@ public class NoteRepository {
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
                 resultSet.getString("owner_avatar_url"),
+                toInstant(resultSet.getTimestamp("created_at")),
+                toInstant(resultSet.getTimestamp("updated_at")),
                 resultSet.getBoolean("is_official"),
                 resultSet.getBoolean("is_pinned")
             ),
@@ -458,6 +477,8 @@ public class NoteRepository {
                   n.visibility,
                   n.status,
                   n.category,
+                  n.created_at,
+                  n.updated_at,
                   n.is_official,
                   n.is_pinned,
                   n.owner_key,
@@ -480,6 +501,8 @@ public class NoteRepository {
                 resultSet.getString("owner_key"),
                 resultSet.getString("owner_name"),
                 resultSet.getString("owner_avatar_url"),
+                toInstant(resultSet.getTimestamp("created_at")),
+                toInstant(resultSet.getTimestamp("updated_at")),
                 resultSet.getBoolean("is_official"),
                 resultSet.getBoolean("is_pinned")
             ),
@@ -498,6 +521,8 @@ public class NoteRepository {
         String ownerKey,
         String ownerName,
         String ownerAvatarUrl,
+        Instant createdAt,
+        Instant updatedAt,
         boolean isOfficial,
         boolean isPinned
     ) {
@@ -511,9 +536,15 @@ public class NoteRepository {
             ownerKey,
             ownerName,
             ownerAvatarUrl,
+            createdAt,
+            updatedAt,
             isOfficial,
             isPinned
         );
+    }
+
+    private Instant toInstant(Timestamp timestamp) {
+        return timestamp == null ? null : timestamp.toInstant();
     }
 
     private NoteCandidate mapCandidate(ResultSet resultSet) throws SQLException {

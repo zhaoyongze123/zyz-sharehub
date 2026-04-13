@@ -56,6 +56,8 @@ public class NoteController {
             null,
             null,
             null,
+            null,
+            null,
             isAdmin,
             isAdmin && req.isPinned()
         );
@@ -137,7 +139,11 @@ public class NoteController {
         @PathVariable Long id
     ) {
         String ownerKey = requireActiveUser(authentication, request);
-        repository.deleteOwned(id, ownerKey);
+        if (hasAdminPermission(authentication, request, ownerKey)) {
+            repository.deleteById(id);
+        } else {
+            repository.deleteOwned(id, ownerKey);
+        }
         return ApiResponse.ok("DELETED");
     }
 
@@ -165,6 +171,8 @@ public class NoteController {
             req.ownerKey(),
             req.ownerName(),
             req.ownerAvatarUrl(),
+            req.createdAt(),
+            req.updatedAt(),
             isAdmin,
             isAdmin && req.isPinned()
         );

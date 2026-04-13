@@ -1,6 +1,7 @@
 package com.sharehub.note;
 
 import jakarta.validation.constraints.NotBlank;
+import java.time.Instant;
 
 public record NoteDto(
     Long id,
@@ -12,6 +13,8 @@ public record NoteDto(
     String ownerKey,
     String ownerName,
     String ownerAvatarUrl,
+    Instant createdAt,
+    Instant updatedAt,
     boolean isOfficial,
     boolean isPinned
 ) {}

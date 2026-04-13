@@ -44,12 +44,13 @@ public class NoteControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM note_view_history");
         jdbcTemplate.update("DELETE FROM notes");
+        jdbcTemplate.update("DELETE FROM admin_whitelist");
         jdbcTemplate.update("DELETE FROM users");
     }
 
     @Test
     void createListDetailUpdateDelete() throws Exception {
-        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", null, null, null, false, false);
+        NoteDto payload = new NoteDto(null, "Test", "# content", "PUBLIC", "DRAFT", "AI 应用与 Agent", null, null, null, null, null, false, false);
         String body = mapper.writeValueAsString(payload);
 
         String response = mvc.perform(post("/api/notes")
@@ -79,7 +80,7 @@ public class NoteControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("Test"));
 
-        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", null, null, null, false, false);
+        payload = new NoteDto(id, "Updated", "# new", "PUBLIC", "PUBLISHED", "提示词工程", null, null, null, null, null, false, false);
         mvc.perform(put("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -165,7 +166,7 @@ public class NoteControllerIntegrationTest {
 
     @Test
     void shouldRestrictNotesToOwner() throws Exception {
-        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", null, null, null, false, false);
+        NoteDto payload = new NoteDto(null, "Owner Note", "# content", "PUBLIC", "DRAFT", "学术与论文", null, null, null, null, null, false, false);
         String response = mvc.perform(post("/api/notes")
                 .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -202,6 +203,37 @@ public class NoteControllerIntegrationTest {
 
         mvc.perform(delete("/api/notes/" + id)
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldAllowAdminToDeleteOtherUsersNote() throws Exception {
+        String response = mvc.perform(post("/api/notes")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"Owner Note","contentMd":"# content","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long id = Long.valueOf(((Map<?, ?>) ((Map<?, ?>) mapper.readValue(response, Map.class)).get("data")).get("id").toString());
+
+        jdbcTemplate.update(
+            "INSERT INTO admin_whitelist (github_login, role, created_by, created_at, updated_at) VALUES (?, 'ADMIN', 'test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            OTHER_USER_KEY
+        );
+
+        mvc.perform(delete("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").value("DELETED"));
+
+        mvc.perform(get("/api/notes/" + id)
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOTE_NOT_FOUND"));
     }

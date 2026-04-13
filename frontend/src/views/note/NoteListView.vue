@@ -1,6 +1,5 @@
 <template>
   <div class="forum-container">
-    <!-- Forum Left Sidebar -->
     <aside class="forum-sidebar">
       <nav class="forum-nav-group">
         <button class="forum-nav-item" :class="{ active: currentNav === 'topics' }" @click="switchNav('topics')">
@@ -28,11 +27,14 @@
           <div class="i-carbon-chevron-down chevron" :style="{ transform: toggleCategories ? 'rotate(180deg)' : '' }"></div>
         </div>
         <div v-show="toggleCategories">
-          <button v-for="cat in categories" :key="cat.name" 
-                  class="forum-nav-item" 
-                  :class="{ active: activeCategory === cat.name }" 
-                  @click="toggleCategory(cat.name)">
-            <span class="color-dot" :class="cat.color"></span> <span>{{ cat.name }}</span>
+          <button
+            v-for="cat in categories"
+            :key="cat.name"
+            class="forum-nav-item"
+            :class="{ active: activeCategory === cat.name }"
+            @click="toggleCategory(cat.name)">
+            <span class="color-dot" :class="cat.color"></span>
+            <span>{{ cat.name }}</span>
           </button>
         </div>
       </div>
@@ -68,23 +70,22 @@
       </div>
     </aside>
 
-    <!-- Forum Main Content -->
     <main class="forum-main">
       <div class="forum-intro-banner" v-if="currentNav === 'topics'">
-        专注 AI 技术分享，打造极客知识库！<strong>涵盖大模型前沿、Agent 开发与提示词工程</strong>，欢迎分享优质资源。<a href="#" @click.prevent="readTopic(null)" class="banner-link">《AI 社区指南》</a>
+        专注 AI 技术分享，打造极客知识库。管理员发布的公告支持全领域透出与置顶，普通用户只展示自己的真实内容链路。
       </div>
       <div class="forum-intro-banner" v-else-if="currentNav === 'my-shares'">
-        这里展示了您在社区发布的所有干货内容，感谢您的持续开源与奉献！
+        这里展示你发布过的全部社区帖子，可直接进入详情或删除自己的内容。
       </div>
       <div class="forum-intro-banner" v-else-if="currentNav === 'bookmarks'">
-        您收藏的优质 AI 资源都在这里啦，方便随时查阅与复习。
+        你收藏的优质 AI 资源都在这里，方便随时回看。
       </div>
 
       <div class="forum-toolbar">
         <div class="toolbar-tabs">
           <div class="dropdown-wrapper">
             <button class="filter-dropdown" @click="showDropdown = !showDropdown">
-              {{ activeCategory || '全部领域' }} 
+              {{ activeCategory || '全部领域' }}
               <div class="i-carbon-chevron-down icon-xs"></div>
             </button>
             <div class="dropdown-menu" v-if="showDropdown">
@@ -94,15 +95,19 @@
               </div>
             </div>
           </div>
-          
-          <button v-for="tab in filterTabs" :key="tab.label" 
-                  class="tab-link" 
-                  :class="{ active: activeTab === tab.id }" 
-                  @click="activeTab = tab.id">
+
+          <button
+            v-for="tab in filterTabs"
+            :key="tab.label"
+            class="tab-link"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id">
             {{ tab.label }}
           </button>
         </div>
       </div>
+
+      <div v-if="errorMessage" class="error-banner">{{ errorMessage }}</div>
 
       <div class="topic-list-header">
         <div class="header-col title-col">AI 分享内容</div>
@@ -115,14 +120,12 @@
           class="topic-row"
           v-for="topic in displayedTopics"
           :key="topic.id"
-          :class="{ 'has-read': topic.hasRead, pinned: topic.isPinned }"
-        >
+          :class="{ 'has-read': topic.hasRead, pinned: topic.isPinned }">
           <div class="topic-main">
             <div class="title-with-link">
-               <div v-if="topic.isPinned" class="i-carbon-pin pin-icon"></div>
-               <h3 class="topic-title" @click="readTopic(topic)">{{ topic.title }}</h3>
-               <span v-if="topic.category" class="title-category" :class="topic.categoryColor">{{ topic.category }}</span>
-               <div class="i-carbon-launch external-icon" v-if="topic.hasLink" title="包含外部链接" @click.stop="openExternal('https://github.com/github/copilot-chat')"></div>
+              <div v-if="topic.isPinned" class="i-carbon-pin pin-icon"></div>
+              <h3 class="topic-title" @click="readTopic(topic)">{{ topic.title }}</h3>
+              <span class="title-category" :class="topic.categoryColor">{{ topic.categoryLabel }}</span>
             </div>
             <p class="topic-excerpt" v-if="topic.excerpt">{{ topic.excerpt }}</p>
             <div class="topic-meta">
@@ -131,50 +134,54 @@
                 平台公告
               </span>
               <span v-if="topic.isOfficial" class="badge blue">官方</span>
-              <span class="meta-tag" @click="toggleCategory(topic.category)" style="cursor:pointer">
-                <span class="dot" :class="topic.categoryColor"></span> 
+              <span v-if="topic.category" class="meta-tag clickable" @click="toggleCategory(topic.category)">
+                <span class="dot" :class="topic.categoryColor"></span>
                 {{ topic.category }}
               </span>
+              <span v-else class="meta-tag subdued">
+                <span class="dot tag-gray"></span>
+                所有领域
+              </span>
               <span class="badge gray" v-for="tag in topic.tags" :key="tag.label">
-                <div :class="tag.icon" class="badge-icon" v-if="tag.icon"></div>
                 {{ tag.label }}
               </span>
-              <button class="likes-btn" :class="{ 'liked': topic.isBookmarked }" @click="toggleBookmark(topic)">
-                <div :class="topic.isBookmarked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" class="icon-xs"></div> 
+              <button class="likes-btn" :class="{ liked: topic.isBookmarked }" @click="toggleBookmark(topic)">
+                <div :class="topic.isBookmarked ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" class="icon-xs"></div>
                 {{ topic.likes }} 收藏
+              </button>
+              <button v-if="topic.canDelete" class="danger-link" @click="handleDeleteTopic(topic)">
+                删除
               </button>
             </div>
           </div>
           <div class="topic-author">
-            <img :src="topic.author.avatar" class="user-avatar" v-if="topic.author.avatar"/>
+            <img :src="topic.author.avatar" class="user-avatar" v-if="topic.author.avatar" />
             <div class="user-avatar author-initial bg-gray" v-else>{{ topic.author.name.charAt(0).toUpperCase() }}</div>
             <span class="author-name">{{ topic.author.name }}</span>
           </div>
           <div class="topic-time">{{ topic.time }}</div>
         </article>
-        
-        <div v-if="displayedTopics.length === 0" class="empty-state">
-           <div class="i-carbon-not-found empty-icon"></div>
-           <p>没有找到符合条件的 AI 分享内容。</p>
+
+        <div v-if="!loading && displayedTopics.length === 0" class="empty-state">
+          <div class="i-carbon-not-found empty-icon"></div>
+          <p>没有找到符合条件的 AI 分享内容。</p>
         </div>
       </div>
     </main>
 
-    <!-- Markdown Editor Publish Modal -->
     <div class="modal-overlay" v-if="showPublishModal" @click.self="showPublishModal = false">
       <div class="publish-editor-modal">
         <div class="modal-header">
           <h3>发布新分享（支持 Markdown）</h3>
           <button class="close-btn" @click="showPublishModal = false"><div class="i-carbon-close"></div></button>
         </div>
-        
-        <!-- Editor Toolbar -->
+
         <div class="editor-toolbar">
-          <input type="text" v-model="newDraft.title" placeholder="给你的分享起个响亮的标题..." class="title-input" />
-          
+          <input v-model="newDraft.title" type="text" placeholder="给你的分享起个响亮的标题..." class="title-input" />
+
           <div class="form-row metadata-row">
             <select v-model="newDraft.category" class="form-select">
-              <option value="" disabled>选择所属领域</option>
+              <option value="">{{ authStore.isAdmin ? '所有领域（管理员可不选）' : '选择所属领域' }}</option>
               <option v-for="cat in categories" :key="cat.name" :value="cat.name">{{ cat.name }}</option>
             </select>
 
@@ -183,7 +190,7 @@
                 {{ tag }}
                 <div class="i-carbon-close tag-close" @click="removeTag(index)"></div>
               </div>
-              <input type="text" v-model="tagInput" class="tag-input-field" placeholder="输入标签按回车添加..." @keydown.enter.prevent="addTag" />
+              <input v-model="tagInput" type="text" class="tag-input-field" placeholder="输入标签按回车添加..." @keydown.enter.prevent="addTag" />
             </div>
 
             <label class="checkbox-label">
@@ -196,37 +203,39 @@
               置顶公告
             </label>
           </div>
+
+          <p v-if="authStore.isAdmin" class="admin-hint">管理员可不选领域，发布后将按“所有领域”展示。</p>
         </div>
 
-        <!-- Editor Body (Split pane) -->
         <div class="editor-panes">
           <div class="pane editor-pane">
-            <textarea v-model="newDraft.content" placeholder="使用 Markdown 记录你的技术思考、分享前沿工具或开源项目... " class="md-textarea"></textarea>
+            <textarea v-model="newDraft.content" placeholder="使用 Markdown 记录你的技术思考、分享前沿工具或开源项目..." class="md-textarea"></textarea>
           </div>
           <div class="pane preview-pane">
             <div class="preview-content markdown-body" v-html="renderedMarkdown || '<p class=\'placeholder-text\'>Markdown 预览区域...</p>'"></div>
           </div>
         </div>
 
-        <!-- Footer -->
         <div class="modal-footer">
           <div class="word-count" v-if="newDraft.content">字数: {{ newDraft.content.length }}</div>
           <div class="footer-actions">
             <button class="btn-cancel" @click="showPublishModal = false">取消</button>
-            <button class="btn-submit" @click="submitPublish" :disabled="!newDraft.title || !newDraft.category || !newDraft.content">确认发布</button>
+            <button class="btn-submit" @click="submitPublish" :disabled="publishDisabled">确认发布</button>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import {
   createNote,
+  deleteNote,
   favoriteNote,
   fetchCommunityNotes,
   fetchMyFavoriteNotes,
@@ -258,6 +267,7 @@ const notes = ref<NoteDTO[]>([])
 const favoriteNotes = ref<RelatedNoteItem[]>([])
 const historyNotes = ref<RelatedNoteItem[]>([])
 const favoriteNoteIds = ref<number[]>([])
+const currentUserKey = computed(() => window.localStorage.getItem('ShareHub.userKey') || '')
 const tagInput = ref('')
 
 const newDraft = reactive({
@@ -283,40 +293,31 @@ const filterTabs = [
   { id: 'popular', label: '最多收藏' }
 ]
 
+const publishDisabled = computed(() => {
+  if (authStore.isAdmin) {
+    return !newDraft.title.trim() || !newDraft.content.trim()
+  }
+  return !newDraft.title.trim() || !newDraft.category.trim() || !newDraft.content.trim()
+})
+
 const renderedMarkdown = computed(() => {
   if (!newDraft.content) return ''
-  let html = newDraft.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>')
-  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>')
-  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>')
-  html = html.replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-  html = html.replace(/\*(.*)\*/gim, '<em>$1</em>')
-  html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
-  html = html.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-  html = html.replace(/^\- (.*$)/gim, '<ul><li>$1</li></ul>')
-  html = html.replace(/<\/ul>\n<ul>/gim, '')
-  html = html
-    .split('\n')
-    .map((line) => {
-      if (line.match(/^(<h|<pre|<ul|<blockquote)/)) return line
-      return line ? `<p>${line}</p>` : ''
-    })
-    .join('')
-  return html
+  return DOMPurify.sanitize(marked(newDraft.content) as string)
 })
 
 function mapNoteToTopic(note: NoteDTO) {
   const status = note.status || 'DRAFT'
   const category = note.category?.trim() || ''
+  const isMine = Boolean(currentUserKey.value) && note.ownerKey === currentUserKey.value
+  const canDelete = isMine || authStore.isAdmin
   return {
     id: note.id,
     title: note.title || '未命名笔记',
     excerpt: note.contentMd?.slice(0, 120) || '',
     category,
+    categoryLabel: category || '所有领域',
     categoryColor: resolveCategoryColor(category),
-    hasLink: false,
-    tags: category ? [{ label: category }] : ([] as Array<{ label: string; icon?: string }>),
+    tags: category ? [{ label: category }] : [{ label: '全站可见' }],
     author: {
       name: note.ownerName?.trim() || note.ownerKey || '未知作者',
       avatar: note.ownerAvatarUrl || ''
@@ -324,8 +325,9 @@ function mapNoteToTopic(note: NoteDTO) {
     likes: favoriteNoteIds.value.includes(note.id) ? 1 : 0,
     isBookmarked: favoriteNoteIds.value.includes(note.id),
     hasRead: false,
-    isMine: true,
-    time: note.isPinned ? '置顶' : '',
+    isMine,
+    canDelete,
+    time: formatNoteTime(note.createdAt || note.updatedAt, note.isPinned),
     isFeatured: status === 'PUBLISHED',
     isOfficial: Boolean(note.isOfficial),
     isPinned: Boolean(note.isPinned)
@@ -335,14 +337,16 @@ function mapNoteToTopic(note: NoteDTO) {
 function mapRelatedNoteToTopic(note: RelatedNoteItem, options: { hasRead?: boolean; isMine?: boolean } = {}) {
   const status = note.status || 'DRAFT'
   const category = note.category?.trim() || ''
+  const isMine = options.isMine ?? (Boolean(currentUserKey.value) && note.ownerKey === currentUserKey.value)
+  const canDelete = currentNav.value === 'my-shares' ? isMine : authStore.isAdmin
   return {
     id: note.id,
     title: note.title || '未命名笔记',
     excerpt: note.summary || '',
     category,
+    categoryLabel: category || '所有领域',
     categoryColor: resolveCategoryColor(category),
-    hasLink: false,
-    tags: (note.tags || []).map((tag) => ({ label: tag, icon: undefined as string | undefined })),
+    tags: (note.tags || []).map((tag) => ({ label: tag })),
     author: {
       name: note.ownerName?.trim() || note.ownerKey || '未知作者',
       avatar: note.ownerAvatarUrl || ''
@@ -350,7 +354,8 @@ function mapRelatedNoteToTopic(note: RelatedNoteItem, options: { hasRead?: boole
     likes: note.favorites ?? 0,
     isBookmarked: note.favorited ?? false,
     hasRead: options.hasRead ?? false,
-    isMine: options.isMine ?? false,
+    isMine,
+    canDelete,
     time: note.updatedAt || '未知时间',
     isFeatured: status === 'PUBLISHED',
     isOfficial: false,
@@ -401,10 +406,7 @@ async function fetchList() {
     await syncFavoriteIds()
 
     if (currentNav.value === 'bookmarks') {
-      const data = await fetchMyFavoriteNotes({
-        page: pageNum.value,
-        pageSize: pageSize.value
-      })
+      const data = await fetchMyFavoriteNotes({ page: pageNum.value, pageSize: pageSize.value })
       favoriteNotes.value = data.list || []
       historyNotes.value = []
       notes.value = []
@@ -413,10 +415,7 @@ async function fetchList() {
     }
 
     if (currentNav.value === 'history') {
-      const data = await fetchMyNoteHistory({
-        page: pageNum.value,
-        pageSize: pageSize.value
-      })
+      const data = await fetchMyNoteHistory({ page: pageNum.value, pageSize: pageSize.value })
       historyNotes.value = data.list || []
       favoriteNotes.value = []
       notes.value = []
@@ -425,15 +424,8 @@ async function fetchList() {
     }
 
     const data = currentNav.value === 'topics'
-      ? await fetchCommunityNotes({
-          page: pageNum.value,
-          pageSize: pageSize.value
-        })
-      : await fetchNotes({
-          page: pageNum.value,
-          pageSize: pageSize.value,
-          status: activeTab.value === 'featured' ? 'PUBLISHED' : undefined
-        })
+      ? await fetchCommunityNotes({ page: pageNum.value, pageSize: pageSize.value })
+      : await fetchNotes({ page: pageNum.value, pageSize: pageSize.value, status: activeTab.value === 'featured' ? 'PUBLISHED' : undefined })
     notes.value = data.list || []
     favoriteNotes.value = []
     historyNotes.value = []
@@ -446,10 +438,7 @@ async function fetchList() {
 }
 
 onMounted(fetchList)
-
-watch([activeTab, currentNav], () => {
-  void fetchList()
-})
+watch([activeTab, currentNav], () => { void fetchList() })
 
 function switchNav(nav: string) {
   currentNav.value = nav
@@ -464,19 +453,33 @@ function resolveCategoryColor(category: string) {
   return categories.find((item) => item.name === category)?.color || 'bg-gray'
 }
 
+function formatNoteTime(value?: string | null, pinned?: boolean) {
+  if (pinned) {
+    return '置顶公告'
+  }
+  if (!value) {
+    return '未知时间'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '未知时间'
+  }
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hour = `${date.getHours()}`.padStart(2, '0')
+  const minute = `${date.getMinutes()}`.padStart(2, '0')
+  return `${month}-${day} ${hour}:${minute}`
+}
+
 function updateRelatedCollection(list: RelatedNoteItem[], noteId: number, favorited: boolean, favorites: number) {
   const target = list.find((item) => item.id === noteId)
-  if (!target) {
-    return
-  }
+  if (!target) return
   target.favorited = favorited
   target.favorites = favorites
 }
 
 async function toggleBookmark(topic: any) {
-  if (!topic?.id) {
-    return
-  }
+  if (!topic?.id) return
   const noteId = Number(topic.id)
   const favorited = Boolean(topic.isBookmarked)
   const result = favorited ? await unfavoriteNote(noteId) : await favoriteNote(noteId)
@@ -497,6 +500,19 @@ async function toggleBookmark(topic: any) {
   if (!nextFavorited && currentNav.value === 'bookmarks') {
     favoriteNotes.value = favoriteNotes.value.filter((item) => item.id !== noteId)
     total.value = Math.max(0, total.value - 1)
+  }
+}
+
+async function handleDeleteTopic(topic: any) {
+  if (!topic?.id) return
+  const confirmed = window.confirm(`确认删除《${topic.title}》？删除后不可恢复。`)
+  if (!confirmed) return
+  try {
+    await deleteNote(Number(topic.id))
+    appStore.showToast('删除成功', '帖子已从社区移除')
+    await fetchList()
+  } catch (e: any) {
+    appStore.showToast('删除失败', e?.response?.data?.msg ?? '请稍后再试', 'error')
   }
 }
 
@@ -523,11 +539,11 @@ function removeTag(index: number) {
 async function submitPublish() {
   try {
     await createNote({
-      title: newDraft.title,
-      contentMd: newDraft.content,
+      title: newDraft.title.trim(),
+      contentMd: newDraft.content.trim(),
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
-      category: newDraft.category,
+      category: newDraft.category.trim() ? newDraft.category.trim() : null,
       isPinned: authStore.isAdmin ? newDraft.isPinned : false
     })
     await fetchList()
@@ -560,7 +576,6 @@ async function submitPublish() {
   background: white;
   position: relative;
 }
-
 .forum-sidebar { width: 220px; background: #ffffff; border-right: 1px solid #f3f4f6; padding: 16px 0; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; overflow-y: auto; }
 .forum-nav-group { display: flex; flex-direction: column; gap: 2px; }
 .group-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px 8px 32px; font-size: 13px; color: #6b7280; cursor: pointer; transition: color 0.15s; }
@@ -579,146 +594,92 @@ async function submitPublish() {
 .bg-teal { background: #14b8a6; }
 .bg-gray { background: #9ca3af; }
 .bg-yellow { background: #f59e0b; }
-
 .ai-hot-header { cursor: default; }
-.ai-hot-header:hover .chevron { color: #6b7280; }
 .ai-hot-title { display: flex; align-items: center; gap: 6px; font-weight: 600; color: #111827; }
 .news-list { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 12px 32px; }
-.news-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #4b5563; text-decoration: none; line-height: 1.4; transition: color 0.15s; }
+.news-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #4b5563; text-decoration: none; line-height: 1.4; }
 .news-bullet { width: 4px; height: 4px; background: #d1d5db; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-.news-item:hover { color: #2563eb; }
-.news-item:hover .news-bullet { background: #2563eb; }
-
 .sidebar-action { margin-top: auto; padding: 16px; }
-.publish-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 6px; background: #2563eb; border: none; color: white; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-.publish-btn:hover { background: #1d4ed8; }
-.publish-btn:active { transform: translateY(1px); }
+.publish-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 6px; background: #2563eb; border: none; color: white; font-size: 14px; font-weight: 500; cursor: pointer; }
 .publish-icon { font-size: 16px; }
-
 .forum-main { flex: 1; padding: 24px; max-width: 1100px; display: flex; flex-direction: column; }
-.forum-intro-banner { background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 4px; color: #1e40af; font-size: 14px; margin-bottom: 20px; transition: all 0.2s; }
-.banner-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+.forum-intro-banner, .error-banner { background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 4px; color: #1e40af; font-size: 14px; margin-bottom: 20px; }
+.error-banner { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
 .forum-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .toolbar-tabs { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .dropdown-wrapper { position: relative; }
-.filter-dropdown { display: flex; align-items: center; gap: 4px; background: white; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #374151; cursor: pointer; transition: border 0.15s; }
-.filter-dropdown:hover { border-color: #9ca3af; }
+.filter-dropdown { display: flex; align-items: center; gap: 4px; background: white; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #374151; cursor: pointer; }
 .dropdown-menu { position: absolute; top: calc(100% + 4px); left: 0; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 4px; z-index: 10; min-width: 120px; }
 .dropdown-item { padding: 8px 12px; font-size: 13px; color: #374151; border-radius: 4px; cursor: pointer; }
-.dropdown-item:hover { background: #f3f4f6; color: #111827; }
+.dropdown-item:hover { background: #f3f4f6; }
 .icon-xs { font-size: 10px; }
-.tab-link { background: transparent; border: none; font-size: 14px; color: #4b5563; cursor: pointer; padding: 6px 0; font-weight: 400; transition: color 0.15s; }
-.tab-link:hover { color: #111827; }
+.tab-link { background: transparent; border: none; font-size: 14px; color: #4b5563; cursor: pointer; padding: 6px 0; }
 .tab-link.active { color: #2563eb; font-weight: 600; border-bottom: 2px solid #2563eb; }
-
 .topic-list-header { display: flex; padding: 8px 16px; font-size: 12px; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
 .header-col { display: flex; align-items: center; }
 .title-col { flex: 1; }
 .author-col { width: 140px; padding-left: 16px; }
 .time-col { width: 100px; text-align: right; justify-content: flex-end; }
-
 .topic-list { flex: 1; display: flex; flex-direction: column; }
-.topic-row { display: flex; align-items: flex-start; padding: 16px; border-bottom: 1px solid #f3f4f6; transition: background 0.15s; }
-.topic-row:hover { background-color: #fafafa; }
-.topic-row.pinned { background-color: #fcfcfd; }
-.topic-row.has-read .topic-title { color: #6b7280; }
-.list-divider { height: 2px; background: #e5e7eb; margin: 16px 0; border-radius: 2px; }
-.topic-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.topic-title-wrapper { display: flex; align-items: center; gap: 6px; }
-.title-with-link { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.external-icon { font-size: 14px; color: #9ca3af; cursor: pointer; transition: color 0.15s; }
-.external-icon:hover { color: #2563eb; }
-.pin-icon { color: #6b7280; font-size: 14px; transform: rotate(45deg); padding-top: 4px; }
-.topic-title { font-size: 16px; font-weight: 500; color: #111827; margin: 0; cursor: pointer; line-height: 1.4; transition: color 0.15s; }
-.topic-title:hover { color: #2563eb; text-decoration: underline; }
-.title-category { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; line-height: 1.4; color: #111827; background: #f3f4f6; font-weight: 600; }
-.title-category.bg-blue { background: #dbeafe; color: #1d4ed8; }
-.title-category.bg-red { background: #fee2e2; color: #b91c1c; }
-.title-category.bg-green { background: #dcfce7; color: #15803d; }
-.title-category.bg-teal { background: #ccfbf1; color: #0f766e; }
-.title-category.bg-yellow { background: #fef3c7; color: #b45309; }
-.title-category.bg-gray { background: #f3f4f6; color: #4b5563; }
-.topic-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.meta-tag { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4b5563; transition: color 0.15s; }
-.meta-tag:hover { color: #111827; }
-.dot { width: 8px; height: 8px; border-radius: 2px; }
-.tag-gray { background: #9ca3af; }
-.badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; display: flex; align-items: center; gap: 4px; }
-.badge.blue { background: #e0f2fe; color: #0284c7; }
-.badge.gray { background: #f3f4f6; color: #4b5563; }
-.badge-icon { font-size: 12px; color: inherit; }
-.likes-btn { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280; background: transparent; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px; margin-left: auto; transition: all 0.2s; }
-.likes-btn:hover { background: #fef3c7; color: #f59e0b; }
-.likes-btn.liked { color: #f59e0b; font-weight: 500; background: #fffbeb; }
-.likes-btn .icon-xs { font-size: 13px; }
-.topic-excerpt { font-size: 14px; color: #4b5563; margin: 4px 0 6px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; }
-
-.topic-author { width: 140px; padding-left: 16px; display: flex; align-items: center; gap: 8px; }
-.user-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #f3f4f6; flex-shrink: 0; object-fit: cover; }
-.author-initial { display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; background: #0284c7; }
-.author-name { font-size: 13px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.topic-time { width: 100px; text-align: right; font-size: 13px; color: #6b7280; display: flex; align-items: center; justify-content: flex-end; }
-.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 64px 0; color: #9ca3af; font-size: 14px; min-height: 300px; }
-.empty-icon { font-size: 32px; color: #d1d5db; }
-
-/* Publish Editor Modal (Split Pane) */
-.modal-overlay { position: absolute; inset: 0; background: rgba(17,24,39,0.6); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 100; animation: fadeIn 0.15s ease-out; }
-.publish-editor-modal { width: 95vw; max-width: 1200px; height: 85vh; background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); display: flex; flex-direction: column; overflow: hidden; animation: slideUp 0.2s ease-out; }
-.modal-header { padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #f9fafb; flex-shrink: 0; }
-.modal-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: #111827; }
-.close-btn { background: transparent; border: none; font-size: 20px; color: #6b7280; cursor: pointer; border-radius: 4px; display: flex; align-items: center; padding: 4px; transition: background 0.15s; }
-.close-btn:hover { background: #e5e7eb; color: #111827; }
-
-.editor-toolbar { padding: 16px 24px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid #e5e7eb; background: #ffffff; flex-shrink: 0; }
-.title-input { width: 100%; border: none; font-size: 20px; font-weight: 600; color: #111827; outline: none; padding: 4px 0; }
-.title-input::placeholder { color: #9ca3af; font-weight: 400; }
-.metadata-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.form-select { border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 12px; font-size: 13px; color: #374151; outline: none; background: white; cursor: pointer; min-width: 150px; }
-
-/* Tags Input */
-.tags-input-wrapper { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 8px; flex: 1; background: white; min-height: 34px; }
-.tag-chip { display: flex; align-items: center; gap: 4px; background: #eff6ff; color: #1d4ed8; font-size: 12px; padding: 2px 8px; border-radius: 12px; font-weight: 500; }
-.tag-close { font-size: 12px; cursor: pointer; color: #60a5fa; transition: color 0.15s; }
-.tag-close:hover { color: #1d4ed8; }
-.tag-input-field { border: none; outline: none; font-size: 13px; color: #374151; min-width: 150px; flex: 1; background: transparent; padding: 2px; }
-
-.checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4b5563; cursor: pointer; user-select: none; }
-
-.editor-panes { display: flex; flex: 1; min-height: 0; overflow: hidden; background: #fdfdfd; }
-.pane { flex: 1; overflow-y: auto; padding: 24px; width: 50%; }
-.editor-pane { border-right: 1px solid #e5e7eb; background: #ffffff; }
-.preview-pane { background: #f9fafb; border-left: 1px solid #e5e7eb; margin-left: -1px; }
-
-.md-textarea { width: 100%; height: 100%; border: none; resize: none; outline: none; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; line-height: 1.6; color: #374151; background: transparent; }
-.md-textarea::placeholder { color: #9ca3af; }
-
-/* Markdown Preview Styles */
-.markdown-body { color: #111827; font-size: 15px; line-height: 1.7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; word-break: break-word; }
-.markdown-body :deep(h1) { font-size: 24px; font-weight: 600; margin: 0 0 16px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
-.markdown-body :deep(h2) { font-size: 20px; font-weight: 600; margin: 24px 0 16px 0; }
-.markdown-body :deep(h3) { font-size: 18px; font-weight: 600; margin: 24px 0 16px 0; }
-.markdown-body :deep(p) { margin: 0 0 16px 0; }
-.markdown-body :deep(blockquote) { border-left: 4px solid #cbd5e1; padding-left: 16px; color: #6b7280; margin: 0 0 16px 0; background: #f3f4f6; border-radius: 0 4px 4px 0; padding: 12px 16px; }
-.markdown-body :deep(pre) { background: #1f2937; color: #f3f4f6; padding: 16px; border-radius: 8px; overflow-x: auto; margin: 0 0 16px 0; font-family: monospace; font-size: 14px; }
-.markdown-body :deep(code) { background: #f1f5f9; color: #ef4444; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; }
-.markdown-body :deep(pre code) { background: transparent; color: inherit; padding: 0; }
-.markdown-body :deep(ul) { margin: 0 0 16px 0; padding-left: 24px; list-style-type: disc; }
-.markdown-body :deep(li) { margin-bottom: 8px; }
-.markdown-body :deep(strong) { font-weight: 600; color: #111827; }
-.placeholder-text { color: #9ca3af; font-style: italic; text-align: center; margin-top: 40px; }
-
-.modal-footer { padding: 16px 24px; background: white; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-.word-count { font-size: 13px; color: #9ca3af; }
-.footer-actions { display: flex; gap: 12px; margin-left: auto; }
-.btn-cancel { padding: 8px 20px; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; font-weight: 500; color: #374151; cursor: pointer; transition: all 0.15s; }
-.btn-cancel:hover { background: #f9fafb; border-color: #9ca3af; }
-.btn-submit { padding: 8px 24px; background: #2563eb; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; color: white; cursor: pointer; transition: background 0.15s; }
-.btn-submit:hover { background: #1d4ed8; }
-.btn-submit:disabled { background: #93c5fd; cursor: not-allowed; }
-
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-
-@media (max-width: 1024px) { .forum-sidebar { display: none; } }
+.topic-row { display: grid; grid-template-columns: minmax(0, 1fr) 140px 100px; gap: 16px; padding: 18px 16px; border-bottom: 1px solid #eef2f7; align-items: start; }
+.topic-row.pinned { background: linear-gradient(90deg, #f8fbff, #ffffff); }
+.topic-main { min-width: 0; }
+.title-with-link { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.topic-title { margin: 0; font-size: 18px; line-height: 1.35; cursor: pointer; color: #0f172a; }
+.topic-title:hover { color: #2563eb; }
+.title-category { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; color: #475569; background: #f1f5f9; }
+.topic-excerpt { margin: 0 0 12px; color: #64748b; line-height: 1.7; }
+.topic-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.meta-tag, .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: #f8fafc; color: #475569; }
+.meta-tag.clickable { cursor: pointer; }
+.meta-tag.subdued { color: #64748b; }
+.badge.blue { background: #dbeafe; color: #1d4ed8; }
+.badge.gray { background: #f1f5f9; color: #475569; }
+.dot { width: 8px; height: 8px; border-radius: 999px; }
+.tag-gray { background: #94a3b8; }
+.likes-btn, .danger-link { border: none; background: transparent; cursor: pointer; font-size: 12px; }
+.likes-btn { display: inline-flex; align-items: center; gap: 6px; color: #475569; }
+.likes-btn.liked { color: #dc2626; }
+.danger-link { color: #dc2626; font-weight: 600; }
+.topic-author { display: flex; align-items: center; gap: 10px; color: #334155; }
+.user-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; }
+.author-initial { color: white; font-size: 12px; }
+.author-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topic-time { text-align: right; color: #64748b; font-size: 13px; }
+.pin-icon { color: #dc2626; }
+.empty-state { padding: 48px 16px; text-align: center; color: #64748b; }
+.empty-icon { font-size: 32px; margin-bottom: 12px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 24px; }
+.publish-editor-modal { width: min(1120px, 100%); background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 80px rgba(15, 23, 42, 0.24); }
+.modal-header, .modal-footer { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; }
+.modal-footer { border-top: 1px solid #e5e7eb; border-bottom: none; }
+.close-btn, .btn-cancel, .btn-submit { border: none; cursor: pointer; }
+.close-btn { background: transparent; }
+.editor-toolbar { padding: 20px 24px 0; }
+.title-input, .form-select, .tag-input-field, .md-textarea { width: 100%; }
+.title-input { border: none; font-size: 22px; font-weight: 700; margin-bottom: 16px; outline: none; }
+.metadata-row { display: grid; grid-template-columns: 240px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+.form-select, .tag-input-field { border: 1px solid #dbe3ee; border-radius: 10px; padding: 10px 12px; }
+.tags-input-wrapper { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border: 1px solid #dbe3ee; border-radius: 10px; padding: 8px 10px; }
+.tag-chip { display: inline-flex; align-items: center; gap: 6px; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 6px 10px; font-size: 12px; }
+.checkbox-label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; }
+.admin-hint { margin: 12px 0 0; color: #1d4ed8; font-size: 12px; }
+.editor-panes { display: grid; grid-template-columns: 1fr 1fr; min-height: 420px; }
+.pane { padding: 24px; }
+.editor-pane { background: #f8fafc; border-right: 1px solid #e5e7eb; }
+.md-textarea { min-height: 372px; resize: none; border: none; background: transparent; outline: none; line-height: 1.8; }
+.preview-content { max-height: 372px; overflow: auto; }
+.word-count { color: #64748b; font-size: 13px; }
+.footer-actions { display: flex; gap: 12px; }
+.btn-cancel { background: #e2e8f0; color: #0f172a; padding: 10px 16px; border-radius: 10px; }
+.btn-submit { background: #2563eb; color: white; padding: 10px 18px; border-radius: 10px; }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 1024px) {
+  .forum-container { flex-direction: column; margin: -16px; }
+  .forum-sidebar { width: auto; border-right: none; border-bottom: 1px solid #e5e7eb; }
+  .topic-row { grid-template-columns: 1fr; }
+  .topic-time { text-align: left; }
+  .metadata-row, .editor-panes { grid-template-columns: 1fr; }
+  .editor-pane { border-right: none; border-bottom: 1px solid #e5e7eb; }
+}
 </style>
