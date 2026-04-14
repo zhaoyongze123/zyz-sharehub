@@ -47,3 +47,4 @@ npm run dev
   - 新创建的资料、路线、笔记、路线报名、路线进度、评论、点赞、收藏、举报会同步写入 `user_id`。
   - 现阶段仍保留原有字符串键读取逻辑，保证兼容窗口。
   - 可使用 `backend/scripts/user_id_audit.sql` 输出各表 `user_id` 覆盖率与孤儿数据统计。
+  - 当历史环境 `users` 表缺失引用 login 时，可使用 `backend/scripts/user_id_reconcile.sql` 先补用户再重跑回填与巡检。
