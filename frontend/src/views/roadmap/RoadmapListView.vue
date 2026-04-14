@@ -1,6 +1,45 @@
 <template>
   <div class="roadmap-paths">
     <header class="paths-hero">
+      <div class="hero-dock" aria-hidden="true">
+        <div
+          class="dock-track dock-track--primary"
+          @mouseleave="clearDockFocus"
+        >
+          <div
+            v-for="(app, index) in dockIconsLoop"
+            :key="`primary-${app.name}-${index}`"
+            class="dock-icon"
+            :style="dockIconStyle(app, 'primary', index)"
+            @mouseenter="setDockFocus('primary', index)"
+          >
+            <span class="dock-icon__halo"></span>
+            <img class="dock-icon__logo" :src="app.src" :alt="`${app.name} 官方 logo`" />
+            <span class="dock-icon__mirror">
+              <img class="dock-icon__logo dock-icon__logo--mirror" :src="app.src" :alt="''" />
+            </span>
+          </div>
+        </div>
+        <div
+          class="dock-track dock-track--secondary"
+          @mouseleave="clearDockFocus"
+        >
+        <div
+          v-for="(app, index) in dockIconsLoop"
+          :key="`secondary-${app.name}-${index}`"
+          class="dock-icon"
+          :style="dockIconStyle(app, 'secondary', index)"
+          @mouseenter="setDockFocus('secondary', index)"
+        >
+            <span class="dock-icon__halo"></span>
+            <img class="dock-icon__logo" :src="app.src" :alt="`${app.name} 官方 logo`" />
+            <span class="dock-icon__mirror">
+              <img class="dock-icon__logo dock-icon__logo--mirror" :src="app.src" :alt="''" />
+            </span>
+          </div>
+        </div>
+        <div class="dock-reflection"></div>
+      </div>
       <div class="hero-content">
         <h1 class="hero-title">学习路线图</h1>
         <p class="hero-desc">精心设计的系统化成长路径，从零到一掌握核心技术栈。</p>
@@ -57,6 +96,19 @@ import BaseErrorState from '@/components/base/BaseErrorState.vue'
 import BaseSkeleton from '@/components/base/BaseSkeleton.vue'
 import RoadmapCard from '@/components/business/RoadmapCard.vue'
 import { fetchRoadmaps, type RoadmapItem } from '@/api/roadmaps'
+import cursorLogo from '@/assets/brand-icons/cursor.svg'
+import figmaLogo from '@/assets/brand-icons/figma.svg'
+import geminiLogo from '@/assets/brand-icons/gemini.svg'
+import githubLogo from '@/assets/brand-icons/github.svg'
+import googleLogo from '@/assets/brand-icons/google.svg'
+import octocatLogo from '@/assets/brand-icons/octocat.svg'
+import chromeLogo from '@/assets/brand-icons/chrome.svg'
+import claudeLogo from '../../../../icon/claude-ai.svg'
+import dockerLogo from '../../../../icon/docker.svg'
+import grokLogo from '../../../../icon/grok.svg'
+import openClawLogo from '../../../../icon/openclaw.svg'
+import openAiLogo from '../../../../icon/openai.svg'
+import vscodeLogo from '../../../../icon/vscode.svg'
 
 const route = useRoute()
 const keyword = ref(String(route.query.keyword || ''))
@@ -64,6 +116,31 @@ const category = ref('全部')
 const roadmaps = ref<RoadmapItem[]>([])
 const loading = ref(true)
 const loadError = ref(false)
+
+interface DockIcon {
+  name: string
+  src: string
+  glow: string
+}
+
+const dockIcons: DockIcon[] = [
+  { name: 'OpenAI', src: openAiLogo, glow: 'rgba(16, 185, 129, 0.22)' },
+  { name: 'Cursor', src: cursorLogo, glow: 'rgba(255, 255, 255, 0.18)' },
+  { name: 'Google', src: googleLogo, glow: 'rgba(59, 130, 246, 0.2)' },
+  { name: 'Gemini', src: geminiLogo, glow: 'rgba(129, 140, 248, 0.3)' },
+  { name: 'Claude', src: claudeLogo, glow: 'rgba(249, 115, 22, 0.24)' },
+  { name: 'Grok', src: grokLogo, glow: 'rgba(99, 102, 241, 0.24)' },
+  { name: 'Figma', src: figmaLogo, glow: 'rgba(244, 114, 182, 0.28)' },
+  { name: 'GitHub', src: githubLogo, glow: 'rgba(148, 163, 184, 0.22)' },
+  { name: 'OpenClaw', src: openClawLogo, glow: 'rgba(34, 197, 94, 0.2)' },
+  { name: 'VS Code', src: vscodeLogo, glow: 'rgba(59, 130, 246, 0.26)' },
+  { name: 'Docker', src: dockerLogo, glow: 'rgba(14, 165, 233, 0.24)' },
+  { name: 'Chrome', src: chromeLogo, glow: 'rgba(250, 204, 21, 0.2)' },
+  { name: 'Octocat', src: octocatLogo, glow: 'rgba(148, 163, 184, 0.24)' }
+]
+
+const dockIconsLoop = [...dockIcons, ...dockIcons]
+const activeDockIcon = ref<{ track: 'primary' | 'secondary'; index: number } | null>(null)
 
 const categoryOptions = [
   { label: '全部路线', value: '全部' },
@@ -107,6 +184,35 @@ watch(() => route.query.keyword, (value) => {
 })
 
 void loadRoadmaps()
+
+function dockIconStyle(app: DockIcon, track: 'primary' | 'secondary', index: number) {
+  const midpoint = (dockIconsLoop.length - 1) / 2
+  const centerDistance = Math.abs(index - midpoint)
+  const centerInfluence = 1 - Math.min(centerDistance / Math.max(midpoint, 1), 1)
+  const baseScale = 0.84 + centerInfluence * 0.28
+  const focus = activeDockIcon.value?.track === track ? Math.abs(activeDockIcon.value.index - index) : Infinity
+  const hoverBoost = focus === 0 ? 0.3 : focus === 1 ? 0.16 : focus === 2 ? 0.07 : 0
+  const lift = focus === 0 ? -16 : focus === 1 ? -10 : focus === 2 ? -5 : -(centerInfluence * 4.5)
+  const depth = focus === 0 ? 26 : focus === 1 ? 22 : 18
+  const zIndex = focus === 0 ? 24 : focus === 1 ? 18 : Math.round(8 + centerInfluence * 8)
+  return {
+    '--dock-glow': app.glow,
+    '--dock-scale': String((baseScale + hoverBoost).toFixed(3)),
+    '--dock-lift': `${lift}px`,
+    '--dock-depth': `${depth + hoverBoost * 32}px`,
+    '--dock-opacity': String((0.78 + centerInfluence * 0.2 + hoverBoost * 0.08).toFixed(3)),
+    '--dock-refract': String((0.08 + centerInfluence * 0.12 + hoverBoost * 0.18).toFixed(3)),
+    zIndex: String(zIndex)
+  }
+}
+
+function setDockFocus(track: 'primary' | 'secondary', index: number) {
+  activeDockIcon.value = { track, index }
+}
+
+function clearDockFocus() {
+  activeDockIcon.value = null
+}
 </script>
 
 <style scoped lang="scss">
@@ -119,29 +225,46 @@ void loadRoadmaps()
 }
 
 .paths-hero {
-  background: white;
-  border-radius: 20px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(125, 211, 252, 0.16), transparent 34%),
+    radial-gradient(circle at 88% 20%, rgba(59, 130, 246, 0.14), transparent 28%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.88));
+  border-radius: 28px;
   padding: 60px 48px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.025);
-  border: 1px solid #f3f4f6;
+  box-shadow:
+    0 20px 55px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   position: relative;
   overflow: hidden;
+  min-height: 330px;
 }
 
 .paths-hero::after {
   content: '';
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 50%;
+  inset: auto 0 0 0;
+  height: 110px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.72));
+  pointer-events: none;
+}
+
+.paths-hero::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -12%;
+  width: 44%;
   height: 100%;
-  background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.05), transparent 70%);
+  background: radial-gradient(circle at center, rgba(37, 99, 235, 0.14), transparent 68%);
+  filter: blur(12px);
   pointer-events: none;
 }
 
 .hero-content {
   position: relative;
   z-index: 1;
+  max-width: 580px;
 }
 
 .hero-title {
@@ -163,6 +286,189 @@ void loadRoadmaps()
 .hero-stats {
   display: flex;
   gap: 48px;
+}
+
+.hero-dock {
+  position: absolute;
+  right: -32px;
+  bottom: 22px;
+  width: min(650px, 62%);
+  display: grid;
+  gap: 14px;
+  z-index: 0;
+  transform: perspective(1200px) rotateX(8deg) rotateY(-7deg);
+  transform-origin: bottom right;
+  opacity: 0.95;
+}
+
+.dock-track {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  width: max-content;
+  padding: 18px 20px;
+  border-radius: 32px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(226, 232, 240, 0.36)),
+    rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -10px 18px rgba(148, 163, 184, 0.12);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+  contain: paint;
+}
+
+.dock-track::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 30px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.04) 42%, rgba(148, 163, 184, 0.12) 70%, rgba(255, 255, 255, 0.18)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 40%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.dock-track::after {
+  content: '';
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: -10px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.32), rgba(255, 255, 255, 0));
+  filter: blur(12px);
+  pointer-events: none;
+}
+
+.dock-track--primary {
+  animation: dock-scroll-left 30s linear infinite;
+}
+
+.dock-track--secondary {
+  margin-left: 48px;
+  animation: dock-scroll-right 36s linear infinite;
+}
+
+.dock-icon {
+  --dock-glow: rgba(148, 163, 184, 0.3);
+  --dock-scale: 1;
+  --dock-lift: -4px;
+  --dock-depth: 18px;
+  --dock-opacity: 1;
+  flex: 0 0 auto;
+  width: 82px;
+  height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 8px 20px;
+  position: relative;
+  overflow: visible;
+  transform: translate3d(0, var(--dock-lift), 0) scale3d(var(--dock-scale), var(--dock-scale), 1);
+  transform-origin: center bottom;
+  transition:
+    transform 150ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 150ms ease;
+  opacity: var(--dock-opacity);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  contain: paint;
+}
+
+.dock-icon::before {
+  content: '';
+  position: absolute;
+  inset: 8px 10px 26px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.18) 38%, rgba(255, 255, 255, 0) 68%);
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+.dock-icon::after {
+  content: '';
+  position: absolute;
+  inset: 14px 14px 28px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, var(--dock-glow), rgba(255, 255, 255, 0) 72%);
+  filter: blur(8px);
+  opacity: calc(0.48 + var(--dock-refract));
+  pointer-events: none;
+}
+
+.dock-icon__halo,
+.dock-icon__mirror,
+.dock-icon__logo {
+  position: relative;
+  z-index: 1;
+}
+
+.dock-icon__halo {
+  position: absolute;
+  inset: 14px 14px 28px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, calc(0.4 + var(--dock-refract))), rgba(255, 255, 255, 0) 52%),
+    linear-gradient(120deg, rgba(255, 255, 255, calc(0.08 + var(--dock-refract))) 0%, rgba(255, 255, 255, 0.02) 42%, rgba(255, 255, 255, calc(0.12 + var(--dock-refract))) 64%, rgba(255, 255, 255, 0) 100%);
+  mix-blend-mode: screen;
+  filter: blur(2.5px);
+  opacity: calc(0.72 + var(--dock-refract));
+}
+
+.dock-icon__logo {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 8px 14px rgba(15, 23, 42, 0.14))
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45));
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.dock-icon__mirror {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  width: 52px;
+  height: 26px;
+  transform: translateX(-50%);
+  overflow: hidden;
+  opacity: calc(0.16 + var(--dock-refract) * 0.6);
+  filter: blur(1.4px);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.1) 56%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.1) 56%, transparent);
+  pointer-events: none;
+}
+
+.dock-icon__logo--mirror {
+  width: 54px;
+  height: 54px;
+  transform: scaleY(-1) translateY(-6px);
+  opacity: 0.72;
+}
+
+.dock-reflection {
+  position: absolute;
+  inset: auto 22px -18px 60px;
+  height: 54px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.32), rgba(255, 255, 255, 0));
+  filter: blur(14px);
+  border-radius: 999px;
+  pointer-events: none;
 }
 
 .stat-item {
@@ -262,6 +568,24 @@ void loadRoadmaps()
   gap: 32px;
 }
 
+@keyframes dock-scroll-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes dock-scroll-right {
+  from {
+    transform: translateX(-28%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Make roadmap cards look more like feature cards in this view */
 :deep(.roadmap-feature-card) {
   height: 100%;
@@ -277,8 +601,58 @@ void loadRoadmaps()
 
 @media (max-width: 768px) {
   .paths-hero {
-    padding: 40px 24px;
+    padding: 38px 24px 132px;
+    min-height: auto;
   }
+
+  .hero-title {
+    font-size: 34px;
+  }
+
+  .hero-desc {
+    font-size: 16px;
+    margin-bottom: 28px;
+  }
+
+  .hero-stats {
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .hero-dock {
+    width: 100%;
+    right: 0;
+    left: 0;
+    bottom: 18px;
+    transform: none;
+    opacity: 0.9;
+  }
+
+  .dock-track {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  .dock-track--secondary {
+    margin-left: 18px;
+  }
+
+  .dock-icon {
+    width: 64px;
+    height: 72px;
+    padding-bottom: 12px;
+  }
+
+  .dock-icon__logo {
+    width: 42px;
+    height: 42px;
+  }
+
+  .dock-icon__mirror {
+    width: 40px;
+    height: 18px;
+  }
+
   .paths-filter {
     flex-direction: column;
     align-items: stretch;
