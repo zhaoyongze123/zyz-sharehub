@@ -120,6 +120,10 @@ public class RoadmapService {
     repository.softDelete(ownerKey, roadmapId, Instant.now());
   }
 
+  public RoadmapDto restore(String ownerKey, Long roadmapId) {
+    return repository.restore(ownerKey, roadmapId);
+  }
+
   private String normalizeStatus(String status) {
     if (status == null) {
       return "PUBLISHED";

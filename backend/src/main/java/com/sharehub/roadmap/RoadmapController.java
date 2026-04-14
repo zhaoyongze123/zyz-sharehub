@@ -146,6 +146,15 @@ public class RoadmapController {
         return ApiResponse.ok("DELETED");
     }
 
+    @PostMapping("/{id}/restore")
+    public ApiResponse<RoadmapDto> restore(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.restore(requireActiveUser(authentication, request), id));
+    }
+
     private String resolveActiveUser(Authentication authentication, HttpServletRequest request) {
         Optional<String> resolvedUser = requestAccessService.resolveUser(authentication, request);
         if (resolvedUser.isEmpty()) {

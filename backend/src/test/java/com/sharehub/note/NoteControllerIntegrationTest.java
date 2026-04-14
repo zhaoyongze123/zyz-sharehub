@@ -107,6 +107,19 @@ public class NoteControllerIntegrationTest {
         );
         org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_at")).isNotNull();
         org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_by")).isEqualTo(USER_KEY);
+
+        mvc.perform(post("/api/notes/" + id + "/restore")
+                .header(RequestAccessService.USER_KEY_HEADER, USER_KEY))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(id))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        Map<String, Object> restoredRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM notes WHERE id = ?",
+            id
+        );
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_at")).isNull();
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_by")).isNull();
     }
 
     @Test

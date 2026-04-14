@@ -300,6 +300,29 @@ public class NoteRepository {
         }
     }
 
+    public NoteDto restoreOwned(Long id, String ownerKey) {
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND owner_key = ? AND deleted_at IS NOT NULL",
+            id,
+            ownerKey
+        );
+        if (affected == 0) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
+        }
+        return findOwned(id, ownerKey);
+    }
+
+    public NoteDto restoreById(Long id) {
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            id
+        );
+        if (affected == 0) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
+        }
+        return findPublicPublished(id).orElseThrow(() -> new NotFoundException("NOTE_NOT_FOUND"));
+    }
+
     public long countByOwner(String ownerKey) {
         Long userId = resolveUserId(ownerKey);
         Long count = jdbcTemplate.queryForObject(

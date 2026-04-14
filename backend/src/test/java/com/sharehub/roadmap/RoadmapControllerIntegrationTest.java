@@ -573,4 +573,37 @@ class RoadmapControllerIntegrationTest {
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
     }
+
+    @Test
+    void shouldRestoreSoftDeletedRoadmap() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"待恢复路线","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(delete("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/restore")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(roadmapId))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        Map<String, Object> restoredRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM roadmaps WHERE id = ?",
+            roadmapId
+        );
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_at")).isNull();
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_by")).isNull();
+    }
 }

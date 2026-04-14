@@ -221,6 +221,13 @@ public class AdminControllerIntegrationTest {
             "VISIBLE",
             jdbcTemplate.queryForObject("SELECT status FROM comments WHERE id = ?", String.class, commentId)
         );
+
+        Map<String, Object> reviewRow = jdbcTemplate.queryForMap(
+            "SELECT reviewed_at, reviewed_by FROM resources WHERE id = ?",
+            resourceId
+        );
+        org.junit.jupiter.api.Assertions.assertNotNull(reviewRow.get("reviewed_at"));
+        org.junit.jupiter.api.Assertions.assertEquals("admin", reviewRow.get("reviewed_by"));
     }
 
     private MockHttpServletRequestBuilder adminGet(String uri) {

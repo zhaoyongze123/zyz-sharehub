@@ -48,3 +48,6 @@ npm run dev
   - 现阶段仍保留原有字符串键读取逻辑，保证兼容窗口。
   - 可使用 `backend/scripts/user_id_audit.sql` 输出各表 `user_id` 覆盖率与孤儿数据统计。
   - 当历史环境 `users` 表缺失引用 login 时，可使用 `backend/scripts/user_id_reconcile.sql` 先补用户再重跑回填与巡检。
+- 已补内容查询索引取证脚本：
+  - `backend/scripts/explain_content_indexes.sql` 会在事务内注入临时样本、执行 `EXPLAIN (ANALYZE, BUFFERS)`、最后自动 `ROLLBACK`。
+  - 该脚本用于复核资料广场、笔记广场、我的路线、举报审核列表等核心查询是否命中预期索引。

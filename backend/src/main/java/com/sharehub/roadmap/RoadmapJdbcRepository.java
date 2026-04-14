@@ -547,6 +547,18 @@ public class RoadmapJdbcRepository {
     }
   }
 
+  public RoadmapDto restore(String ownerKey, Long roadmapId) {
+    Long userId = resolveUserId(ownerKey);
+    int affected =
+        jdbc.update(
+            "UPDATE roadmaps SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND " + ownerMatchClause("roadmaps", userId) + " AND deleted_at IS NOT NULL",
+            concatArgs(new Object[] {roadmapId}, ownerArgs(userId, ownerKey)));
+    if (affected == 0) {
+      throw new NotFoundException("ROADMAP_NOT_FOUND");
+    }
+    return findById(roadmapId).orElseThrow(() -> new NotFoundException("ROADMAP_NOT_FOUND"));
+  }
+
   private void bindLong(PreparedStatement statement, int index, Long value) throws java.sql.SQLException {
     if (value == null) {
       statement.setNull(index, java.sql.Types.BIGINT);

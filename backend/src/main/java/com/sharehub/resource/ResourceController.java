@@ -257,6 +257,26 @@ public class ResourceController {
         return ApiResponse.ok("DELETED");
     }
 
+    @PostMapping("/{id}/restore")
+    public ApiResponse<ResourceDto> restore(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        ResourceEntity entity = repository.findById(id)
+            .orElseThrow(() -> new NotFoundException("RESOURCE_NOT_FOUND"));
+        if (!entity.getOwnerKey().equals(ownerKey)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "RESOURCE_FORBIDDEN");
+        }
+        if (entity.getDeletedAt() == null) {
+            throw new NotFoundException("RESOURCE_NOT_FOUND");
+        }
+        entity.setDeletedAt(null);
+        entity.setDeletedBy(null);
+        return ApiResponse.ok(enrichResource(repository.save(entity)));
+    }
+
     @PostMapping("/{id}/publish")
     public ApiResponse<ResourceDto> publish(
         Authentication authentication,

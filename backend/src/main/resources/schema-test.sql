@@ -348,6 +348,10 @@ CREATE INDEX IF NOT EXISTS idx_roadmaps_owner_status_id_desc
 CREATE INDEX IF NOT EXISTS idx_notes_owner_status_id_desc
   ON notes(owner_key, status, id DESC);
 
+CREATE INDEX IF NOT EXISTS idx_notes_owner_status_active_id_desc
+  ON notes(owner_key, status, id DESC)
+  WHERE deleted_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_notes_visibility_status_pinned_id_desc
   ON notes(visibility, status, is_pinned DESC, id DESC);
 

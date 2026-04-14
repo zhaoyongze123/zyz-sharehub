@@ -152,6 +152,19 @@ public class NoteController {
         return ApiResponse.ok("DELETED");
     }
 
+    @PostMapping("/{id}/restore")
+    public ApiResponse<NoteDto> restore(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String ownerKey = requireActiveUser(authentication, request);
+        NoteDto restored = hasAdminPermission(authentication, request, ownerKey)
+            ? repository.restoreById(id)
+            : repository.restoreOwned(id, ownerKey);
+        return ApiResponse.ok(restored);
+    }
+
     private String requireActiveUser(Authentication authentication, HttpServletRequest request) {
         String login = requestAccessService.requireUser(authentication, request);
         userProfileRepository.upsert(login, login, null);

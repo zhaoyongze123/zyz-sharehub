@@ -312,6 +312,33 @@ class ResourceControllerIntegrationTest {
     }
 
     @Test
+    void shouldRestoreDeletedResource() throws Exception {
+        long resourceId = createResource("待恢复资料", "PDF", "PUBLIC", "java", "恢复");
+        publishResource(resourceId);
+
+        mockMvc.perform(delete("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resources/{id}/restore", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(resourceId))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        Map<String, Object> restoredRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM resources WHERE id = ?",
+            resourceId
+        );
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_at")).isNull();
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_by")).isNull();
+
+        mockMvc.perform(get("/api/resources/{id}", resourceId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(resourceId));
+    }
+
+    @Test
     void shouldUploadAttachmentAndWriteBackObjectKey() throws Exception {
         long resourceId = createResource("附件资源", "PDF", "PUBLIC", "java", "附件");
         MockMultipartFile file = new MockMultipartFile(
