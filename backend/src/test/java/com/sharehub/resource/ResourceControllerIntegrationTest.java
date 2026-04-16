@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -54,6 +55,8 @@ class ResourceControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM favorites");
         jdbcTemplate.update("DELETE FROM comments");
         jdbcTemplate.update("DELETE FROM reports");
+        jdbcTemplate.update("DELETE FROM resource_tags");
+        jdbcTemplate.update("DELETE FROM tags");
         jdbcTemplate.update("DELETE FROM resources");
         jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
@@ -69,11 +72,21 @@ class ResourceControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("Spring 实战"))
             .andExpect(jsonPath("$.data.category").value("PDF"))
+            .andExpect(jsonPath("$.data.tags", containsInAnyOrder("spring", "java")))
             .andExpect(jsonPath("$.data.status").value("DRAFT"))
             .andExpect(jsonPath("$.data.visibility").value("PUBLIC"))
             .andExpect(jsonPath("$.data.likes").value(0))
             .andExpect(jsonPath("$.data.favorites").value(0))
             .andExpect(jsonPath("$.data.downloadCount").value(0));
+
+        Integer relationCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM resource_tags",
+            Integer.class
+        );
+        org.assertj.core.api.Assertions.assertThat(relationCount).isEqualTo(2);
+        Long creatorId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, DEFAULT_USER);
+        Long resourceUserId = jdbcTemplate.queryForObject("SELECT user_id FROM resources WHERE title = ?", Long.class, "Spring 实战");
+        org.assertj.core.api.Assertions.assertThat(resourceUserId).isEqualTo(creatorId);
     }
 
     @Test
@@ -87,6 +100,7 @@ class ResourceControllerIntegrationTest {
         likeResource(publishedSpring);
         likeResource(publishedSpring);
         favoriteResource(publishedSpring);
+        jdbcTemplate.update("UPDATE resources SET tags = NULL WHERE id = ?", publishedSpring);
 
         mockMvc.perform(get("/api/resources"))
             .andExpect(status().isOk())
@@ -170,6 +184,16 @@ class ResourceControllerIntegrationTest {
     }
 
     @Test
+    void shouldPreferUserIdWhenResolvingResourceAuthor() throws Exception {
+        long resourceId = createResource("作者关联资料", "PDF", "PUBLIC", "java", "作者校验");
+        jdbcTemplate.update("UPDATE resources SET owner_key = ? WHERE id = ?", "legacy-owner-key", resourceId);
+
+        mockMvc.perform(get("/api/resources/{id}", resourceId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.author").value(DEFAULT_USER));
+    }
+
+    @Test
     void shouldUpdateAndPublishResource() throws Exception {
         long resourceId = createResource("旧标题", "PDF", "PUBLIC", "java", "旧简介");
 
@@ -199,6 +223,7 @@ class ResourceControllerIntegrationTest {
         mockMvc.perform(get("/api/resources/{id}", resourceId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("新标题"))
+            .andExpect(jsonPath("$.data.tags", containsInAnyOrder("spring", "guide")))
             .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
     }
 
@@ -269,6 +294,13 @@ class ResourceControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value("DELETED"));
 
+        Map<String, Object> deletedRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM resources WHERE id = ?",
+            resourceId
+        );
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_at")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_by")).isEqualTo(DEFAULT_USER);
+
         mockMvc.perform(get("/api/resources/{id}", resourceId))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"));
@@ -277,6 +309,33 @@ class ResourceControllerIntegrationTest {
                 .header(USER_KEY_HEADER, DEFAULT_USER))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldRestoreDeletedResource() throws Exception {
+        long resourceId = createResource("待恢复资料", "PDF", "PUBLIC", "java", "恢复");
+        publishResource(resourceId);
+
+        mockMvc.perform(delete("/api/resources/{id}", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/resources/{id}/restore", resourceId)
+                .header(USER_KEY_HEADER, DEFAULT_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(resourceId))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        Map<String, Object> restoredRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM resources WHERE id = ?",
+            resourceId
+        );
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_at")).isNull();
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_by")).isNull();
+
+        mockMvc.perform(get("/api/resources/{id}", resourceId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(resourceId));
     }
 
     @Test

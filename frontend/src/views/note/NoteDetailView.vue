@@ -95,7 +95,7 @@
 
   <div v-else-if="notFound" class="detail-shell" data-testid="note-detail-not-found">
     <BaseErrorState title="笔记不存在" description="可能已删除、当前账号不可见，或你访问了他人的笔记。">
-      <BaseButton @click="router.push('/community')">返回社区</BaseButton>
+      <BaseButton @click="router.push('/community')">返回笔记广场</BaseButton>
     </BaseErrorState>
   </div>
 
@@ -233,7 +233,7 @@ async function handleDeleteNote() {
   if (!confirmed) return
   try {
     await deleteNote(note.value.id)
-    appStore.showToast('删除成功', '帖子已从社区移除')
+    appStore.showToast('删除成功', '内容已从笔记广场移除')
     router.push('/community')
   } catch (error: any) {
     appStore.showToast('删除失败', error?.response?.data?.msg ?? '请稍后再试', 'error')

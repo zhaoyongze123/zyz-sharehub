@@ -1,12 +1,14 @@
 package com.sharehub.interaction;
 
 import com.sharehub.admin.AdminAuditLogDto;
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import com.sharehub.note.RelatedNoteDto;
 import com.sharehub.note.NoteRepository;
 import com.sharehub.resource.ResourceDto;
 import com.sharehub.resource.ResourceRepository;
+import com.sharehub.tag.TagAssignmentRepository;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -29,15 +31,21 @@ public class InteractionRepository {
     private final JdbcTemplate jdbcTemplate;
     private final ResourceRepository resourceRepository;
     private final NoteRepository noteRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
+    private final UserProfileRepository userProfileRepository;
 
     public InteractionRepository(
         JdbcTemplate jdbcTemplate,
         ResourceRepository resourceRepository,
-        NoteRepository noteRepository
+        NoteRepository noteRepository,
+        TagAssignmentRepository tagAssignmentRepository,
+        UserProfileRepository userProfileRepository
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.resourceRepository = resourceRepository;
         this.noteRepository = noteRepository;
+        this.tagAssignmentRepository = tagAssignmentRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     private static final String STATUS_VISIBLE = "VISIBLE";
@@ -61,12 +69,13 @@ public class InteractionRepository {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         Long finalResourceId = effectiveResourceId;
         Long finalNoteId = noteId;
+        Long authorUserId = resolveUserId(authorKey);
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
                 PreparedStatement statement = connection.prepareStatement(
                     """
-                        INSERT INTO comments (resource_id, note_id, parent_id, author_key, content, status, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO comments (resource_id, note_id, parent_id, author_key, user_id, content, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                     new String[] {"id"}
                 );
@@ -74,9 +83,10 @@ public class InteractionRepository {
                 bindLong(statement, 2, finalNoteId);
                 bindLong(statement, 3, parentId);
                 statement.setString(4, authorKey);
-                statement.setString(5, content);
-                statement.setString(6, STATUS_VISIBLE);
-                statement.setTimestamp(7, Timestamp.from(Instant.now()));
+                statement.setObject(5, authorUserId);
+                statement.setString(6, content);
+                statement.setString(7, STATUS_VISIBLE);
+                statement.setTimestamp(8, Timestamp.from(Instant.now()));
                 return statement;
             },
             keyHolder
@@ -86,6 +96,7 @@ public class InteractionRepository {
 
     public int addFavorite(Long resourceId, String userKey) {
         requireResource(resourceId);
+        Long userId = resolveUserId(userKey);
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM favorites WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             Integer.class,
@@ -94,9 +105,10 @@ public class InteractionRepository {
         );
         if (exists == null || exists == 0) {
             jdbcTemplate.update(
-                "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO favorites (resource_id, note_id, user_key, user_id, created_at) VALUES (?, NULL, ?, ?, CURRENT_TIMESTAMP)",
                 resourceId,
-                userKey
+                userKey,
+                userId
             );
         }
         Integer total = jdbcTemplate.queryForObject(
@@ -119,6 +131,7 @@ public class InteractionRepository {
 
     public int addNoteFavorite(Long noteId, String userKey) {
         requireAccessibleNote(noteId, userKey);
+        Long userId = resolveUserId(userKey);
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM favorites WHERE note_id = ? AND resource_id IS NULL AND user_key = ?",
             Integer.class,
@@ -127,9 +140,10 @@ public class InteractionRepository {
         );
         if (exists == null || exists == 0) {
             jdbcTemplate.update(
-                "INSERT INTO favorites (resource_id, note_id, user_key, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO favorites (resource_id, note_id, user_key, user_id, created_at) VALUES (NULL, ?, ?, ?, CURRENT_TIMESTAMP)",
                 noteId,
-                userKey
+                userKey,
+                userId
             );
         }
         Integer total = jdbcTemplate.queryForObject(
@@ -244,7 +258,7 @@ public class InteractionRepository {
                 SELECT COUNT(*)
                 FROM favorites f
                 JOIN resources r ON r.id = f.resource_id
-                WHERE f.user_key = ? AND f.resource_id IS NOT NULL
+                WHERE f.user_key = ? AND f.resource_id IS NOT NULL AND r.deleted_at IS NULL
                 """,
             Long.class,
             userKey
@@ -255,7 +269,7 @@ public class InteractionRepository {
                 SELECT r.id, r.title, r.type, r.summary, r.tags, r.external_url, r.object_key, r.visibility, r.status
                 FROM favorites f
                 JOIN resources r ON r.id = f.resource_id
-                WHERE f.user_key = ? AND f.resource_id IS NOT NULL
+                WHERE f.user_key = ? AND f.resource_id IS NOT NULL AND r.deleted_at IS NULL
                 ORDER BY f.id DESC
                 LIMIT ? OFFSET ?
                 """,
@@ -285,7 +299,7 @@ public class InteractionRepository {
                 SELECT COUNT(*)
                 FROM favorites f
                 JOIN notes n ON n.id = f.note_id
-                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL
+                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL AND n.deleted_at IS NULL
                 """,
             Long.class,
             userKey
@@ -309,9 +323,11 @@ public class InteractionRepository {
                   COUNT(all_f.id) AS favorite_count
                 FROM favorites f
                 JOIN notes n ON n.id = f.note_id
-                LEFT JOIN users u ON u.login = n.owner_key
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
                 LEFT JOIN favorites all_f ON all_f.note_id = n.id AND all_f.resource_id IS NULL
-                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL
+                WHERE f.user_key = ? AND f.note_id IS NOT NULL AND f.resource_id IS NULL AND n.deleted_at IS NULL
                 GROUP BY
                   n.id,
                   n.title,
@@ -346,28 +362,37 @@ public class InteractionRepository {
             safePageSize,
             offset
         );
+        Map<Long, List<String>> tagsByNoteId = tagAssignmentRepository.findNoteTagsByNoteIds(
+            items.stream().map(RelatedNoteDto::id).toList()
+        );
+        items = items.stream()
+            .map(item -> item.withTags(tagsByNoteId.getOrDefault(item.id(), List.of())))
+            .toList();
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
     public long countFavoritedPublishedNotesByOwner(String ownerKey) {
+        Long userId = resolveUserId(ownerKey);
         Long total = jdbcTemplate.queryForObject(
             """
                 SELECT COUNT(*)
                 FROM favorites f
                 JOIN notes n ON n.id = f.note_id
-                WHERE n.owner_key = ?
+                WHERE (%s)
                   AND n.status = 'PUBLISHED'
+                  AND n.deleted_at IS NULL
                   AND f.note_id IS NOT NULL
                   AND f.resource_id IS NULL
-                """,
+                """.formatted(noteOwnerMatchClause(userId)),
             Long.class,
-            ownerKey
+            noteOwnerArgs(userId, ownerKey)
         );
         return total == null ? 0L : total;
     }
 
     public int addLike(Long resourceId, String userKey) {
         requireResource(resourceId);
+        Long userId = resolveUserId(userKey);
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM likes WHERE resource_id = ? AND note_id IS NULL AND user_key = ?",
             Integer.class,
@@ -376,9 +401,10 @@ public class InteractionRepository {
         );
         if (exists == null || exists == 0) {
             jdbcTemplate.update(
-                "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (?, NULL, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO likes (resource_id, note_id, user_key, user_id, created_at) VALUES (?, NULL, ?, ?, CURRENT_TIMESTAMP)",
                 resourceId,
-                userKey
+                userKey,
+                userId
             );
         }
         Integer total = jdbcTemplate.queryForObject(
@@ -401,6 +427,7 @@ public class InteractionRepository {
 
     public int addNoteLike(Long noteId, String userKey) {
         requireAccessibleNote(noteId, userKey);
+        Long userId = resolveUserId(userKey);
         Integer exists = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM likes WHERE note_id = ? AND resource_id IS NULL AND user_key = ?",
             Integer.class,
@@ -409,9 +436,10 @@ public class InteractionRepository {
         );
         if (exists == null || exists == 0) {
             jdbcTemplate.update(
-                "INSERT INTO likes (resource_id, note_id, user_key, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO likes (resource_id, note_id, user_key, user_id, created_at) VALUES (NULL, ?, ?, ?, CURRENT_TIMESTAMP)",
                 noteId,
-                userKey
+                userKey,
+                userId
             );
         }
         Integer total = jdbcTemplate.queryForObject(
@@ -444,22 +472,24 @@ public class InteractionRepository {
 
     private ReportRecord insertReport(String targetType, Long targetId, String reason, String reporter) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
+        Long userId = resolveUserId(reporter);
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
                 PreparedStatement statement = connection.prepareStatement(
                     """
-                        INSERT INTO reports (target_type, target_id, reporter_key, reason, details, status, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO reports (target_type, target_id, reporter_key, user_id, reason, details, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                     new String[] {"id"}
                 );
                 statement.setString(1, targetType);
                 statement.setLong(2, targetId);
                 statement.setString(3, reporter);
-                statement.setString(4, reason == null || reason.isBlank() ? "无" : reason);
-                statement.setString(5, null);
-                statement.setString(6, "OPEN");
-                statement.setTimestamp(7, Timestamp.from(Instant.now()));
+                statement.setObject(4, userId);
+                statement.setString(5, reason == null || reason.isBlank() ? "无" : reason);
+                statement.setString(6, null);
+                statement.setString(7, "OPEN");
+                statement.setTimestamp(8, Timestamp.from(Instant.now()));
                 return statement;
             },
             keyHolder
@@ -640,6 +670,24 @@ public class InteractionRepository {
     private Long nullableLong(ResultSet resultSet, String column) throws SQLException {
         Object value = resultSet.getObject(column);
         return value == null ? null : resultSet.getLong(column);
+    }
+
+    private Long resolveUserId(String login) {
+        return userProfileRepository.findIdOptionalByLogin(login).orElse(null);
+    }
+
+    private String noteOwnerMatchClause(Long userId) {
+        if (userId != null) {
+            return "n.user_id = ? OR (n.user_id IS NULL AND n.owner_key = ?)";
+        }
+        return "n.owner_key = ?";
+    }
+
+    private Object[] noteOwnerArgs(Long userId, String ownerKey) {
+        if (userId != null) {
+            return new Object[] {userId, ownerKey};
+        }
+        return new Object[] {ownerKey};
     }
 
     private List<String> splitTags(String tags) {

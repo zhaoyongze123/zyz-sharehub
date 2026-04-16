@@ -16,7 +16,7 @@ if [[ -d "/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/H
   export PATH="${JAVA_HOME}/bin:${PATH}"
 fi
 
-SPRING_PORT="${SERVER_PORT:-8080}"
+SPRING_PORT="${SERVER_PORT:-18080}"
 SPRING_PROFILES="cloud-dev"
 
 if [[ -n "${GITHUB_CLIENT_ID:-}" && -n "${GITHUB_CLIENT_SECRET:-}" ]]; then

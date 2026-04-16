@@ -109,8 +109,16 @@ public class UserProfileRepository {
         return findOptional(login);
     }
 
+    public Optional<Long> findIdOptionalByLogin(String login) {
+        return findOptional(login).map(UserProfileDto::id);
+    }
+
     public UserProfileDto findById(Long id) {
         return findOptionalById(id).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+    }
+
+    public Optional<UserProfileDto> findOptionalById(Long id) {
+        return findOptionalByIdInternal(id);
     }
 
     public UserProfileDto updateStatus(Long id, String status) {
@@ -189,7 +197,7 @@ public class UserProfileRepository {
         return value == null || value.isBlank() ? null : value;
     }
 
-    private Optional<UserProfileDto> findOptionalById(Long id) {
+    private Optional<UserProfileDto> findOptionalByIdInternal(Long id) {
         List<UserProfileDto> results = jdbcTemplate.query(
             """
                 SELECT id, login, name, bio, avatar_file_id, status

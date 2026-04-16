@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,6 +48,8 @@ class RoadmapControllerIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM resumes");
         jdbcTemplate.update("DELETE FROM files");
+        jdbcTemplate.update("DELETE FROM roadmap_node_progress");
+        jdbcTemplate.update("DELETE FROM roadmap_enrollments");
         jdbcTemplate.update("DELETE FROM roadmap_progress");
         jdbcTemplate.update("DELETE FROM roadmap_nodes");
         jdbcTemplate.update("DELETE FROM roadmaps");
@@ -67,6 +70,10 @@ class RoadmapControllerIntegrationTest {
             .getContentAsString();
 
         Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+        jdbcTemplate.update("UPDATE roadmaps SET owner_key = ? WHERE id = ?", "legacy-roadmap-owner", roadmapId);
+        Long ownerId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, OWNER);
+        Long roadmapUserId = jdbcTemplate.queryForObject("SELECT user_id FROM roadmaps WHERE id = ?", Long.class, roadmapId);
+        org.assertj.core.api.Assertions.assertThat(roadmapUserId).isEqualTo(ownerId);
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER)
@@ -94,17 +101,41 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"percent":75,"completedNodeIds":[1]}
-                    """))
+                    {"percent":75,"completedNodeIds":[%d]}
+                    """.formatted(nodeId)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.percent").value(75));
 
-        mockMvc.perform(get("/api/me/roadmaps")
+        Integer completedNodeProgressCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM roadmap_node_progress WHERE roadmap_id = ? AND user_key = ? AND status = 'COMPLETED'",
+            Integer.class,
+            roadmapId,
+            OWNER
+        );
+        org.assertj.core.api.Assertions.assertThat(completedNodeProgressCount).isEqualTo(1);
+        Long progressUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM roadmap_progress WHERE roadmap_id = ? AND user_key = ?",
+            Long.class,
+            roadmapId,
+            OWNER
+        );
+        Long nodeProgressUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM roadmap_node_progress WHERE roadmap_id = ? AND user_key = ? AND node_id = ?",
+            Long.class,
+            roadmapId,
+            OWNER,
+            nodeId
+        );
+        org.assertj.core.api.Assertions.assertThat(progressUserId).isEqualTo(ownerId);
+        org.assertj.core.api.Assertions.assertThat(nodeProgressUserId).isEqualTo(ownerId);
+
+        mockMvc.perform(get("/api/me/authored-roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, OWNER))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.total").value(1))
             .andExpect(jsonPath("$.data.items[0].title").value("路线A"))
-            .andExpect(jsonPath("$.data.items[0].progressPercent").value(75));
+            .andExpect(jsonPath("$.data.items[0].progressPercent").value(75))
+            .andExpect(jsonPath("$.data.items[0].enrollmentStatus").isEmpty());
 
         mockMvc.perform(get("/api/me/roadmaps")
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
@@ -124,7 +155,26 @@ class RoadmapControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.progress").isMap())
             .andExpect(jsonPath("$.data.progress.percent").doesNotExist())
+            .andExpect(jsonPath("$.data.enrollment").isEmpty())
             .andExpect(jsonPath("$.data.nodes[0].title").value("节点1"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.roadmapId").value(roadmapId))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/me/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.items[0].title").value("路线A"))
+            .andExpect(jsonPath("$.data.items[0].enrollmentStatus").value("ACTIVE"));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.enrollment.status").value("ACTIVE"));
 
         mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER)
@@ -149,6 +199,154 @@ class RoadmapControllerIntegrationTest {
                 .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
+    }
+
+    @Test
+    void enrollmentLifecycleShouldBeIdempotentAndQueryable() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线生命周期","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment/pause")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("PAUSED"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment/resume")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/enrollment/complete")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.data.completedAt").exists());
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId + "/enrollment")
+                .header(RequestAccessService.USER_KEY_HEADER, OTHER_USER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+        Long otherUserId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE login = ?", Long.class, OTHER_USER);
+        Long enrollmentUserId = jdbcTemplate.queryForObject(
+            "SELECT user_id FROM roadmap_enrollments WHERE roadmap_id = ? AND user_key = ?",
+            Long.class,
+            roadmapId,
+            OTHER_USER
+        );
+        org.assertj.core.api.Assertions.assertThat(enrollmentUserId).isEqualTo(otherUserId);
+    }
+
+    @Test
+    void shouldSyncNodeProgressAndSupportRevokingCompletedNodes() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"路线进度同步","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点1","orderNo":1}
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/nodes")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"节点2","orderNo":2}
+                    """))
+            .andExpect(status().isOk());
+
+        Long firstNodeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND order_no = 1",
+            Long.class,
+            roadmapId
+        );
+        Long secondNodeId = jdbcTemplate.queryForObject(
+            "SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND order_no = 2",
+            Long.class,
+            roadmapId
+        );
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"completedNodeIds":[%d,%d]}
+                    """.formatted(firstNodeId, secondNodeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.percent").value(100))
+            .andExpect(jsonPath("$.data.completedNodeIds.length()").value(2));
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/progress")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"completedNodeIds":[%d]}
+                    """.formatted(firstNodeId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.percent").value(50))
+            .andExpect(jsonPath("$.data.completedNodeIds.length()").value(1));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.progress.percent").value(50))
+            .andExpect(jsonPath("$.data.progress.completedNodeIds.length()").value(1));
+
+        mockMvc.perform(get("/api/me/authored-roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].completedNodeCount").value(1))
+            .andExpect(jsonPath("$.data.items[0].progressPercent").value(50));
+
+        String firstNodeStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM roadmap_node_progress WHERE roadmap_id = ? AND node_id = ? AND user_key = ?",
+            String.class,
+            roadmapId,
+            firstNodeId,
+            OWNER
+        );
+        String secondNodeStatus = jdbcTemplate.queryForObject(
+            "SELECT status FROM roadmap_node_progress WHERE roadmap_id = ? AND node_id = ? AND user_key = ?",
+            String.class,
+            roadmapId,
+            secondNodeId,
+            OWNER
+        );
+        org.assertj.core.api.Assertions.assertThat(firstNodeStatus).isEqualTo("COMPLETED");
+        org.assertj.core.api.Assertions.assertThat(secondNodeStatus).isEqualTo("NOT_STARTED");
     }
 
     @Test
@@ -336,5 +534,76 @@ class RoadmapControllerIntegrationTest {
             .andExpect(jsonPath("$.data.items[0].status").value("PUBLISHED"))
             .andExpect(jsonPath("$.data.items[1].title").value("路线A"))
             .andExpect(jsonPath("$.data.items[1].status").value("DRAFT"));
+    }
+
+    @Test
+    void shouldSoftDeleteRoadmapAndHideItFromDefaultQueries() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"待删除路线","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(delete("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data").value("DELETED"));
+
+        Map<String, Object> deletedRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM roadmaps WHERE id = ?",
+            roadmapId
+        );
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_at")).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(deletedRow.get("deleted_by")).isEqualTo(OWNER);
+
+        mockMvc.perform(get("/api/roadmaps")
+                .param("page", "1")
+                .param("pageSize", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/roadmaps/" + roadmapId))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("ROADMAP_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldRestoreSoftDeletedRoadmap() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/roadmaps")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"title":"待恢复路线","description":"desc","visibility":"PUBLIC","status":"PUBLISHED"}
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        Long roadmapId = Long.valueOf(String.valueOf(((Map<?, ?>) objectMapper.readValue(createResponse, Map.class).get("data")).get("id")));
+
+        mockMvc.perform(delete("/api/roadmaps/" + roadmapId)
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/roadmaps/" + roadmapId + "/restore")
+                .header(RequestAccessService.USER_KEY_HEADER, OWNER))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(roadmapId))
+            .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
+
+        Map<String, Object> restoredRow = jdbcTemplate.queryForMap(
+            "SELECT deleted_at, deleted_by FROM roadmaps WHERE id = ?",
+            roadmapId
+        );
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_at")).isNull();
+        org.assertj.core.api.Assertions.assertThat(restoredRow.get("deleted_by")).isNull();
     }
 }

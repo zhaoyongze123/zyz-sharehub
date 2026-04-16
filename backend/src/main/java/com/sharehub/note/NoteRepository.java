@@ -1,5 +1,6 @@
 package com.sharehub.note;
 
+import com.sharehub.auth.UserProfileRepository;
 import com.sharehub.common.NotFoundException;
 import com.sharehub.common.PageResponse;
 import java.sql.PreparedStatement;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -19,6 +21,7 @@ import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
+import com.sharehub.tag.TagAssignmentRepository;
 
 @Repository
 public class NoteRepository {
@@ -26,12 +29,21 @@ public class NoteRepository {
     private static final Pattern TOKEN_SPLIT = Pattern.compile("[\\s,.;:!?()\\[\\]{}，。；：！？、/\\\\|\\-]+");
 
     private final JdbcTemplate jdbcTemplate;
+    private final TagAssignmentRepository tagAssignmentRepository;
+    private final UserProfileRepository userProfileRepository;
 
-    public NoteRepository(JdbcTemplate jdbcTemplate) {
+    public NoteRepository(
+        JdbcTemplate jdbcTemplate,
+        TagAssignmentRepository tagAssignmentRepository,
+        UserProfileRepository userProfileRepository
+    ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.tagAssignmentRepository = tagAssignmentRepository;
+        this.userProfileRepository = userProfileRepository;
     }
 
     public NoteDto save(String ownerKey, NoteDto note) {
+        Long userId = userProfileRepository.findIdOptionalByLogin(ownerKey).orElse(null);
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(
             (PreparedStatementCreator) connection -> {
@@ -41,31 +53,41 @@ public class NoteRepository {
                           title,
                           content_md,
                           owner_key,
+                          user_id,
                           visibility,
                           status,
                           category,
                           is_official,
                           is_pinned,
+                          published_at,
                           created_at,
                           updated_at
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """,
                     new String[] {"id"}
                 );
                 statement.setString(1, note.title());
                 statement.setString(2, note.contentMd());
                 statement.setString(3, ownerKey);
-                statement.setString(4, nullable(note.visibility()));
-                statement.setString(5, defaultStatus(note.status()));
-                statement.setString(6, nullable(note.category()));
-                statement.setBoolean(7, note.isOfficial());
-                statement.setBoolean(8, note.isPinned());
+                statement.setObject(4, userId);
+                statement.setString(5, nullable(note.visibility()));
+                statement.setString(6, defaultStatus(note.status()));
+                statement.setString(7, nullable(note.category()));
+                statement.setBoolean(8, note.isOfficial());
+                statement.setBoolean(9, note.isPinned());
+                if ("PUBLISHED".equalsIgnoreCase(defaultStatus(note.status()))) {
+                    statement.setTimestamp(10, Timestamp.from(Instant.now()));
+                } else {
+                    statement.setNull(10, java.sql.Types.TIMESTAMP);
+                }
                 return statement;
             },
             keyHolder
         );
-        return findOwned(keyHolder.getKey().longValue(), ownerKey);
+        Long noteId = keyHolder.getKey().longValue();
+        tagAssignmentRepository.syncNoteTags(noteId, note.tags());
+        return findOwned(noteId, ownerKey);
     }
 
     public PageResponse<NoteDto> list(String ownerKey, int page, int pageSize) {
@@ -79,13 +101,13 @@ public class NoteRepository {
             """
                 SELECT COUNT(*)
                 FROM notes
-                WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED'
+                WHERE visibility = 'PUBLIC' AND status = 'PUBLISHED' AND deleted_at IS NULL
                 """,
             Long.class
         );
 
         int offset = (safePage - 1) * safePageSize;
-        List<NoteDto> items = jdbcTemplate.query(
+        List<NoteDto> items = attachTagsToNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -105,8 +127,10 @@ public class NoteRepository {
                     ELSE '/api/files/' || u.avatar_file_id::text
                   END AS owner_avatar_url
                 FROM notes n
-                LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED'
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
+                WHERE n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED' AND n.deleted_at IS NULL
                 ORDER BY n.is_pinned DESC, n.id DESC
                 LIMIT ? OFFSET ?
                 """,
@@ -127,7 +151,7 @@ public class NoteRepository {
             ),
             safePageSize,
             offset
-        );
+        ));
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
@@ -135,9 +159,10 @@ public class NoteRepository {
         int safePage = Math.max(1, page);
         int safePageSize = Math.max(1, pageSize);
         String normalizedStatus = normalize(status);
-        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM notes WHERE owner_key = ?");
+        Long userId = resolveUserId(ownerKey);
+        StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM notes WHERE " + ownerMatchClause("notes", userId) + " AND deleted_at IS NULL");
         List<Object> countArgs = new ArrayList<>();
-        countArgs.add(ownerKey);
+        appendOwnerMatchArgs(countArgs, userId, ownerKey);
         if (normalizedStatus != null) {
             countSql.append(" AND status = ?");
             countArgs.add(normalizedStatus);
@@ -165,12 +190,15 @@ public class NoteRepository {
                     ELSE '/api/files/' || u.avatar_file_id::text
                   END AS owner_avatar_url
                 FROM notes n
-                LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.owner_key = ?
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
+                WHERE %s AND n.deleted_at IS NULL
                 """
+                .formatted(ownerMatchClause("n", userId))
         );
         List<Object> listArgs = new ArrayList<>();
-        listArgs.add(ownerKey);
+        appendOwnerMatchArgs(listArgs, userId, ownerKey);
         if (normalizedStatus != null) {
             listSql.append(" AND n.status = ?");
             listArgs.add(normalizedStatus);
@@ -179,7 +207,7 @@ public class NoteRepository {
         listArgs.add(safePageSize);
         listArgs.add(offset);
 
-        List<NoteDto> items = jdbcTemplate.query(
+        List<NoteDto> items = attachTagsToNotes(jdbcTemplate.query(
             listSql.toString(),
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),
@@ -197,7 +225,7 @@ public class NoteRepository {
                 resultSet.getBoolean("is_pinned")
             ),
             listArgs.toArray()
-        );
+        ));
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
@@ -227,6 +255,10 @@ public class NoteRepository {
                     category = ?,
                     is_official = ?,
                     is_pinned = ?,
+                    published_at = CASE
+                      WHEN ? = 'PUBLISHED' AND published_at IS NULL THEN CURRENT_TIMESTAMP
+                      ELSE published_at
+                    END,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND owner_key = ?
                 """,
@@ -237,28 +269,67 @@ public class NoteRepository {
             nullable(note.category()),
             note.isOfficial(),
             note.isPinned(),
+            normalizeForUpdate(note.status(), existing.status()),
             id,
             ownerKey
         );
+        tagAssignmentRepository.syncNoteTags(id, note.tags());
         return findOwned(id, ownerKey);
     }
 
     public void deleteOwned(Long id, String ownerKey) {
-        int affected = jdbcTemplate.update("DELETE FROM notes WHERE id = ? AND owner_key = ?", id, ownerKey);
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ? AND owner_key = ? AND deleted_at IS NULL",
+            ownerKey,
+            id,
+            ownerKey
+        );
         if (affected == 0) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
     }
 
-    public void deleteById(Long id) {
-        int affected = jdbcTemplate.update("DELETE FROM notes WHERE id = ?", id);
+    public void deleteById(Long id, String operatorKey) {
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = CURRENT_TIMESTAMP, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+            operatorKey,
+            id
+        );
         if (affected == 0) {
             throw new NotFoundException("NOTE_NOT_FOUND");
         }
+    }
+
+    public NoteDto restoreOwned(Long id, String ownerKey) {
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND owner_key = ? AND deleted_at IS NOT NULL",
+            id,
+            ownerKey
+        );
+        if (affected == 0) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
+        }
+        return findOwned(id, ownerKey);
+    }
+
+    public NoteDto restoreById(Long id) {
+        int affected = jdbcTemplate.update(
+            "UPDATE notes SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            id
+        );
+        if (affected == 0) {
+            throw new NotFoundException("NOTE_NOT_FOUND");
+        }
+        return findPublicPublished(id).orElseThrow(() -> new NotFoundException("NOTE_NOT_FOUND"));
     }
 
     public long countByOwner(String ownerKey) {
-        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notes WHERE owner_key = ?", Long.class, ownerKey);
+        Long userId = resolveUserId(ownerKey);
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM notes WHERE " + ownerMatchClause("notes", userId) + " AND deleted_at IS NULL",
+            Long.class,
+            ownerArgs(userId, ownerKey)
+        );
         return count == null ? 0L : count;
     }
 
@@ -267,7 +338,7 @@ public class NoteRepository {
             return false;
         }
         Boolean exists = jdbcTemplate.queryForObject(
-            "SELECT EXISTS(SELECT 1 FROM notes WHERE id = ?)",
+            "SELECT EXISTS(SELECT 1 FROM notes WHERE id = ? AND deleted_at IS NULL)",
             Boolean.class,
             id
         );
@@ -276,6 +347,7 @@ public class NoteRepository {
 
     public List<RelatedNoteDto> findRelated(Long id, String viewerKey) {
         NoteDto source = findAccessible(id, viewerKey);
+        Long viewerUserId = resolveUserId(viewerKey);
         List<NoteCandidate> candidates = jdbcTemplate.query(
             """
                 SELECT
@@ -293,23 +365,27 @@ public class NoteRepository {
                   n.category,
                   n.updated_at
                 FROM notes n
-                LEFT JOIN users u ON u.login = n.owner_key
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
                 WHERE n.id <> ?
+                  AND n.deleted_at IS NULL
                   AND (
-                    (? IS NOT NULL AND n.owner_key = ?)
+                    (? IS NOT NULL AND %s)
                     OR (n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED')
                   )
                 ORDER BY n.updated_at DESC, n.id DESC
                 LIMIT 40
-                """,
+                """.formatted(ownerMatchClause("n", viewerUserId)),
             (resultSet, rowNum) -> mapCandidate(resultSet),
-            id,
-            viewerKey,
-            viewerKey
+            concatArgs(
+                new Object[] {id, viewerKey},
+                ownerArgs(viewerUserId, viewerKey)
+            )
         );
 
         Set<String> sourceTokens = extractTokens(source.title() + "\n" + source.contentMd());
-        return candidates.stream()
+        List<RelatedNoteDto> related = candidates.stream()
             .sorted(
                 Comparator.comparingInt((NoteCandidate candidate) -> relatedScore(source, sourceTokens, candidate)).reversed()
                     .thenComparing(NoteCandidate::updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -318,6 +394,7 @@ public class NoteRepository {
             .limit(4)
             .map(this::toRelatedDto)
             .toList();
+        return attachTagsToRelatedNotes(related);
     }
 
     public void recordView(Long id, String viewerKey) {
@@ -353,13 +430,13 @@ public class NoteRepository {
                 SELECT COUNT(*)
                 FROM note_view_history h
                 JOIN notes n ON n.id = h.note_id
-                WHERE h.user_key = ?
+                WHERE h.user_key = ? AND n.deleted_at IS NULL
                 """,
             Long.class,
             viewerKey
         );
         int offset = (safePage - 1) * safePageSize;
-        List<RelatedNoteDto> items = jdbcTemplate.query(
+        List<RelatedNoteDto> items = attachTagsToRelatedNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -378,13 +455,15 @@ public class NoteRepository {
                   MAX(CASE WHEN uf.user_key IS NOT NULL THEN 1 ELSE 0 END) AS favorited
                 FROM note_view_history h
                 JOIN notes n ON n.id = h.note_id
-                LEFT JOIN users u ON u.login = n.owner_key
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
                 LEFT JOIN favorites f ON f.note_id = n.id AND f.resource_id IS NULL
                 LEFT JOIN favorites uf
                   ON uf.note_id = n.id
                  AND uf.resource_id IS NULL
                  AND uf.user_key = ?
-                WHERE h.user_key = ?
+                WHERE h.user_key = ? AND n.deleted_at IS NULL
                 GROUP BY
                   n.id,
                   n.title,
@@ -418,12 +497,13 @@ public class NoteRepository {
             viewerKey,
             safePageSize,
             offset
-        );
+        ));
         return PageResponse.of(items, safePage, safePageSize, total == null ? 0L : total);
     }
 
     private Optional<NoteDto> findOptional(Long id, String ownerKey) {
-        List<NoteDto> results = jdbcTemplate.query(
+        Long userId = resolveUserId(ownerKey);
+        List<NoteDto> results = attachTagsToNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -443,9 +523,11 @@ public class NoteRepository {
                     ELSE '/api/files/' || u.avatar_file_id::text
                   END AS owner_avatar_url
                 FROM notes n
-                LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.id = ? AND n.owner_key = ?
-                """,
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
+                WHERE n.id = ? AND %s AND n.deleted_at IS NULL
+                """.formatted(ownerMatchClause("n", userId)),
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),
                 resultSet.getString("title"),
@@ -461,14 +543,13 @@ public class NoteRepository {
                 resultSet.getBoolean("is_official"),
                 resultSet.getBoolean("is_pinned")
             ),
-            id,
-            ownerKey
-        );
+            concatArgs(new Object[] {id}, ownerArgs(userId, ownerKey))
+        ));
         return results.stream().findFirst();
     }
 
     private Optional<NoteDto> findPublicPublished(Long id) {
-        List<NoteDto> results = jdbcTemplate.query(
+        List<NoteDto> results = attachTagsToNotes(jdbcTemplate.query(
             """
                 SELECT
                   n.id,
@@ -488,8 +569,10 @@ public class NoteRepository {
                     ELSE '/api/files/' || u.avatar_file_id::text
                   END AS owner_avatar_url
                 FROM notes n
-                LEFT JOIN users u ON u.login = n.owner_key
-                WHERE n.id = ? AND n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED'
+                LEFT JOIN users u
+                  ON u.id = n.user_id
+                 OR (n.user_id IS NULL AND u.login = n.owner_key)
+                WHERE n.id = ? AND n.visibility = 'PUBLIC' AND n.status = 'PUBLISHED' AND n.deleted_at IS NULL
                 """,
             (resultSet, rowNum) -> mapDto(
                 resultSet.getLong("id"),
@@ -507,7 +590,7 @@ public class NoteRepository {
                 resultSet.getBoolean("is_pinned")
             ),
             id
-        );
+        ));
         return results.stream().findFirst();
     }
 
@@ -533,6 +616,7 @@ public class NoteRepository {
             visibility,
             status,
             category,
+            List.of(),
             ownerKey,
             ownerName,
             ownerAvatarUrl,
@@ -545,6 +629,42 @@ public class NoteRepository {
 
     private Instant toInstant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    private Long resolveUserId(String login) {
+        if (login == null || login.isBlank()) {
+            return null;
+        }
+        return userProfileRepository.findIdOptionalByLogin(login).orElse(null);
+    }
+
+    private String ownerMatchClause(String alias, Long userId) {
+        String prefix = alias == null || alias.isBlank() ? "" : alias + ".";
+        if (userId != null) {
+            return "(" + prefix + "user_id = ? OR (" + prefix + "user_id IS NULL AND " + prefix + "owner_key = ?))";
+        }
+        return prefix + "owner_key = ?";
+    }
+
+    private void appendOwnerMatchArgs(List<Object> args, Long userId, String ownerKey) {
+        if (userId != null) {
+            args.add(userId);
+        }
+        args.add(ownerKey);
+    }
+
+    private Object[] ownerArgs(Long userId, String ownerKey) {
+        if (userId != null) {
+            return new Object[] {userId, ownerKey};
+        }
+        return new Object[] {ownerKey};
+    }
+
+    private Object[] concatArgs(Object[] head, Object[] tail) {
+        Object[] args = new Object[head.length + tail.length];
+        System.arraycopy(head, 0, args, 0, head.length);
+        System.arraycopy(tail, 0, args, head.length, tail.length);
+        return args;
     }
 
     private NoteCandidate mapCandidate(ResultSet resultSet) throws SQLException {
@@ -571,7 +691,7 @@ public class NoteRepository {
             candidate.updatedAt(),
             candidate.status(),
             candidate.category(),
-            candidate.category() == null ? List.of() : List.of(candidate.category()),
+            List.of(),
             candidate.ownerKey(),
             candidate.ownerName(),
             candidate.ownerAvatarUrl(),
@@ -600,13 +720,31 @@ public class NoteRepository {
             activityAt == null ? null : activityAt.toInstant(),
             status,
             category,
-            category == null ? List.of() : List.of(category),
+            List.of(),
             ownerKey,
             ownerName,
             ownerAvatarUrl,
             favorites,
             favorited
         );
+    }
+
+    private List<NoteDto> attachTagsToNotes(List<NoteDto> notes) {
+        Map<Long, List<String>> tagsByNoteId = tagAssignmentRepository.findNoteTagsByNoteIds(
+            notes.stream().map(NoteDto::id).toList()
+        );
+        return notes.stream()
+            .map(note -> note.withTags(tagsByNoteId.getOrDefault(note.id(), List.<String>of())))
+            .toList();
+    }
+
+    private List<RelatedNoteDto> attachTagsToRelatedNotes(List<RelatedNoteDto> notes) {
+        Map<Long, List<String>> tagsByNoteId = tagAssignmentRepository.findNoteTagsByNoteIds(
+            notes.stream().map(RelatedNoteDto::id).toList()
+        );
+        return notes.stream()
+            .map(note -> note.withTags(tagsByNoteId.getOrDefault(note.id(), List.<String>of())))
+            .toList();
     }
 
     private int relatedScore(NoteDto source, Set<String> sourceTokens, NoteCandidate candidate) {

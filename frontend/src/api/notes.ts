@@ -31,6 +31,7 @@ export interface NoteDTO {
   visibility: string | null
   status: string | null
   category?: string | null
+  tags: string[]
   ownerKey?: string
   ownerName?: string | null
   ownerAvatarUrl?: string | null
@@ -80,6 +81,7 @@ export interface CreateNotePayload {
   visibility?: string | null
   status?: string | null
   category?: string | null
+  tags?: string[]
   isPinned?: boolean
 }
 
@@ -94,7 +96,8 @@ function normalizeNoteDto(dto: RawNoteDTO): NoteDTO {
     createdAt: dto.createdAt ?? dto.created_at ?? null,
     updatedAt: dto.updatedAt ?? dto.updated_at ?? null,
     isOfficial: dto.isOfficial ?? dto.is_official ?? false,
-    isPinned: dto.isPinned ?? dto.is_pinned ?? false
+    isPinned: dto.isPinned ?? dto.is_pinned ?? false,
+    tags: Array.isArray(dto.tags) ? dto.tags.filter((tag) => Boolean(tag?.trim())) : []
   }
 }
 

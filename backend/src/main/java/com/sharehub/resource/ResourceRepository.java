@@ -17,6 +17,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.ownerKey = :ownerKey
+          and r.deletedAt is null
           and (:status is null or r.status = :status)
           and (:visibility is null or r.visibility = :visibility)
         order by r.updatedAt desc
@@ -38,13 +39,13 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status in (:statuses)
+          and r.deletedAt is null
           and (
             :keyword = ''
             or lower(r.title) like lower(concat('%', :keyword, '%'))
             or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%'))
           )
           and (:type = '' or r.type = :type)
-          and (:tag = '' or (r.tags is not null and lower(r.tags) like lower(concat('%', :tag, '%'))))
           and (:visibility = '' or r.visibility = :visibility)
         order by r.updatedAt desc
         """)
@@ -52,7 +53,6 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         @Param("statuses") List<String> statuses,
         @Param("keyword") String keyword,
         @Param("type") String type,
-        @Param("tag") String tag,
         @Param("visibility") String visibility,
         Pageable pageable);
 
@@ -60,20 +60,64 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select count(r)
         from ResourceEntity r
         where r.status in (:statuses)
+          and r.deletedAt is null
           and (
             :keyword = ''
             or lower(r.title) like lower(concat('%', :keyword, '%'))
             or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%'))
           )
           and (:type = '' or r.type = :type)
-          and (:tag = '' or (r.tags is not null and lower(r.tags) like lower(concat('%', :tag, '%'))))
           and (:visibility = '' or r.visibility = :visibility)
         """)
     long countByVisibleFilters(
         @Param("statuses") List<String> statuses,
         @Param("keyword") String keyword,
         @Param("type") String type,
-        @Param("tag") String tag,
+        @Param("visibility") String visibility
+    );
+
+    @Query("""
+        select r
+        from ResourceEntity r
+        where r.id in (:ids)
+          and r.deletedAt is null
+          and r.status in (:statuses)
+          and (
+            :keyword = ''
+            or lower(r.title) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%'))
+          )
+          and (:type = '' or r.type = :type)
+          and (:visibility = '' or r.visibility = :visibility)
+        order by r.updatedAt desc
+        """)
+    Page<ResourceEntity> findVisibleByFiltersAndIdsOrderByUpdatedAtDesc(
+        @Param("ids") Collection<Long> ids,
+        @Param("statuses") List<String> statuses,
+        @Param("keyword") String keyword,
+        @Param("type") String type,
+        @Param("visibility") String visibility,
+        Pageable pageable);
+
+    @Query("""
+        select count(r)
+        from ResourceEntity r
+        where r.id in (:ids)
+          and r.deletedAt is null
+          and r.status in (:statuses)
+          and (
+            :keyword = ''
+            or lower(r.title) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(r.summary, '')) like lower(concat('%', :keyword, '%'))
+          )
+          and (:type = '' or r.type = :type)
+          and (:visibility = '' or r.visibility = :visibility)
+        """)
+    long countByVisibleFiltersAndIds(
+        @Param("ids") Collection<Long> ids,
+        @Param("statuses") List<String> statuses,
+        @Param("keyword") String keyword,
+        @Param("type") String type,
         @Param("visibility") String visibility
     );
 
@@ -85,6 +129,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status = 'PUBLISHED'
+          and r.deletedAt is null
         order by r.updatedAt desc
         """)
     List<ResourceEntity> findTop6ByPublishedOrderByUpdatedAtDesc();
@@ -93,6 +138,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.status = 'PUBLISHED'
+          and r.deletedAt is null
           and r.id <> :id
         order by r.updatedAt desc
         """)
@@ -102,6 +148,7 @@ public interface ResourceRepository extends JpaRepository<ResourceEntity, Long> 
         select r
         from ResourceEntity r
         where r.id in :ids
+          and r.deletedAt is null
         order by r.updatedAt desc
         """)
     List<ResourceEntity> findAllByIdInOrderByUpdatedAtDesc(@Param("ids") Collection<Long> ids);
