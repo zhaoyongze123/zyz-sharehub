@@ -6,5 +6,6 @@ import java.util.Map;
 public record RoadmapDetailResponse(
     RoadmapDto roadmap,
     List<RoadmapNodeTree> nodes,
-    Map<String, Object> progress
+    Map<String, Object> progress,
+    RoadmapEnrollmentDto enrollment
 ) {}

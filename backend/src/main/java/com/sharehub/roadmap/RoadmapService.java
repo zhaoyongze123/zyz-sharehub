@@ -7,6 +7,7 @@ import com.sharehub.files.FileRecord;
 import com.sharehub.files.FileRepository;
 import com.sharehub.files.FileStorageService;
 import com.sharehub.files.StoredFileDto;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,21 +20,25 @@ import org.springframework.web.multipart.MultipartFile;
 public class RoadmapService {
 
   private final RoadmapJdbcRepository repository;
+  private final RoadmapEnrollmentRepository enrollmentRepository;
   private final FileRepository fileRepository;
   private final FileStorageService fileStorageService;
 
   public RoadmapService(
       RoadmapJdbcRepository repository,
+      RoadmapEnrollmentRepository enrollmentRepository,
       FileRepository fileRepository,
       FileStorageService fileStorageService) {
     this.repository = repository;
+    this.enrollmentRepository = enrollmentRepository;
     this.fileRepository = fileRepository;
     this.fileStorageService = fileStorageService;
   }
 
   public RoadmapDto create(String ownerKey, RoadmapDto req) {
+    String normalizedStatus = normalizeStatus(req.status());
     RoadmapDto payload =
-        new RoadmapDto(null, req.title(), req.description(), req.visibility(), normalizeStatus(req.status()));
+        new RoadmapDto(null, req.title(), req.description(), req.visibility(), normalizedStatus);
     return repository.save(ownerKey, payload);
   }
 
@@ -51,7 +56,10 @@ public class RoadmapService {
     List<RoadmapNodeDto> flatNodes = enrichNodes(repository.findNodes(id));
     List<RoadmapNodeTree> tree = buildTree(flatNodes);
     Map<String, Object> progress = ownerKey == null ? Map.of() : repository.findProgress(id, ownerKey);
-    return new RoadmapDetailResponse(roadmap, tree, progress == null ? Map.of() : progress);
+    RoadmapEnrollmentDto enrollment = ownerKey == null
+        ? null
+        : enrollmentRepository.findByRoadmapIdAndUserKey(id, ownerKey).orElse(null);
+    return new RoadmapDetailResponse(roadmap, tree, progress == null ? Map.of() : progress, enrollment);
   }
 
   public List<RoadmapNodeDto> addNode(String ownerKey, Long id, RoadmapNodeDto req) {
@@ -81,6 +89,39 @@ public class RoadmapService {
 
   public Map<String, Object> updateProgress(String ownerKey, Long id, Map<String, Object> payload) {
     return repository.saveProgress(ownerKey, id, payload);
+  }
+
+  public RoadmapEnrollmentDto enroll(String userKey, Long roadmapId) {
+    repository.requireRoadmapExists(roadmapId);
+    return enrollmentRepository.createOrActivate(roadmapId, userKey);
+  }
+
+  public RoadmapEnrollmentDto getEnrollment(String userKey, Long roadmapId) {
+    repository.requireRoadmapExists(roadmapId);
+    return enrollmentRepository.findByRoadmapIdAndUserKey(roadmapId, userKey).orElse(null);
+  }
+
+  public RoadmapEnrollmentDto pauseEnrollment(String userKey, Long roadmapId) {
+    repository.requireRoadmapExists(roadmapId);
+    return enrollmentRepository.pause(roadmapId, userKey);
+  }
+
+  public RoadmapEnrollmentDto resumeEnrollment(String userKey, Long roadmapId) {
+    repository.requireRoadmapExists(roadmapId);
+    return enrollmentRepository.resume(roadmapId, userKey);
+  }
+
+  public RoadmapEnrollmentDto completeEnrollment(String userKey, Long roadmapId) {
+    repository.requireRoadmapExists(roadmapId);
+    return enrollmentRepository.complete(roadmapId, userKey);
+  }
+
+  public void delete(String ownerKey, Long roadmapId) {
+    repository.softDelete(ownerKey, roadmapId, Instant.now());
+  }
+
+  public RoadmapDto restore(String ownerKey, Long roadmapId) {
+    return repository.restore(ownerKey, roadmapId);
   }
 
   private String normalizeStatus(String status) {

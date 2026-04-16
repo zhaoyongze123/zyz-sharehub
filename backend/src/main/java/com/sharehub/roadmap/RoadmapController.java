@@ -91,6 +91,70 @@ public class RoadmapController {
         return ApiResponse.ok(service.updateProgress(requireActiveUser(authentication, request), id, req));
     }
 
+    @PostMapping("/{id}/enrollment")
+    public ApiResponse<RoadmapEnrollmentDto> enroll(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.enroll(requireActiveUser(authentication, request), id));
+    }
+
+    @GetMapping("/{id}/enrollment")
+    public ApiResponse<RoadmapEnrollmentDto> enrollment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.getEnrollment(requireActiveUser(authentication, request), id));
+    }
+
+    @PostMapping("/{id}/enrollment/pause")
+    public ApiResponse<RoadmapEnrollmentDto> pauseEnrollment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.pauseEnrollment(requireActiveUser(authentication, request), id));
+    }
+
+    @PostMapping("/{id}/enrollment/resume")
+    public ApiResponse<RoadmapEnrollmentDto> resumeEnrollment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.resumeEnrollment(requireActiveUser(authentication, request), id));
+    }
+
+    @PostMapping("/{id}/enrollment/complete")
+    public ApiResponse<RoadmapEnrollmentDto> completeEnrollment(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.completeEnrollment(requireActiveUser(authentication, request), id));
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> delete(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        service.delete(requireActiveUser(authentication, request), id);
+        return ApiResponse.ok("DELETED");
+    }
+
+    @PostMapping("/{id}/restore")
+    public ApiResponse<RoadmapDto> restore(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        return ApiResponse.ok(service.restore(requireActiveUser(authentication, request), id));
+    }
+
     private String resolveActiveUser(Authentication authentication, HttpServletRequest request) {
         Optional<String> resolvedUser = requestAccessService.resolveUser(authentication, request);
         if (resolvedUser.isEmpty()) {

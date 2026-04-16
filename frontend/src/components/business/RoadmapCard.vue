@@ -4,7 +4,7 @@
     <h3>{{ item.title }}</h3>
     <p>{{ item.summary ?? item.description ?? '暂无简介' }}</p>
     <div class="roadmap-card__meta">
-      <span>{{ item.ownerName || item.author || '社区贡献者' }}</span>
+      <span>{{ item.ownerName || item.author || '笔记广场贡献者' }}</span>
       <span v-if="item.visibility">可见性：{{ item.visibility }}</span>
       <span>{{ item.nodeCount ?? item.stageCount ?? 0 }} 个阶段</span>
       <span>{{ item.followers ?? '0' }} 人跟学</span>

@@ -236,7 +236,7 @@ const statCards = computed(() => {
     },
     {
       key: 'notes',
-      label: '社区笔记',
+      label: '笔记广场笔记',
       value: dashboard.value.stats.notes,
       description: `当前草稿 ${dashboard.value.stats.draftNotes} 条`
     },

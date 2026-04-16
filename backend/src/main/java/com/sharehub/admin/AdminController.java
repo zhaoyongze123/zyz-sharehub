@@ -12,6 +12,7 @@ import com.sharehub.resource.ResourceEntity;
 import com.sharehub.resource.ResourceRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import java.time.Instant;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -71,11 +72,18 @@ public class AdminController {
 
     @PostMapping("/reports/{id}/resolve")
     @Transactional
-    public ApiResponse<InteractionRepository.ReportRecord> resolve(@PathVariable Long id) {
+    public ApiResponse<InteractionRepository.ReportRecord> resolve(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String operatorKey = resolveOperator(authentication, request);
         InteractionRepository.ReportRecord resolved = interactionRepository.resolveReport(id);
         if ("RESOURCE".equalsIgnoreCase(resolved.targetType())) {
             resourceRepository.findById(resolved.targetId()).ifPresent(resource -> {
                 resource.setStatus("REMOVED");
+                resource.setReviewedAt(Instant.now());
+                resource.setReviewedBy(operatorKey);
                 resourceRepository.save(resource);
             });
             interactionRepository.appendAuditLog(
@@ -90,20 +98,34 @@ public class AdminController {
 
     @PostMapping("/resources/{id}/block")
     @Transactional
-    public ApiResponse<ResourceDto> blockResource(@PathVariable Long id) {
+    public ApiResponse<ResourceDto> blockResource(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String operatorKey = resolveOperator(authentication, request);
         ResourceEntity resource = resourceRepository.findById(id)
             .orElseThrow(() -> new com.sharehub.common.NotFoundException("RESOURCE_NOT_FOUND"));
         resource.setStatus("REMOVED");
+        resource.setReviewedAt(Instant.now());
+        resource.setReviewedBy(operatorKey);
         interactionRepository.appendAuditLog("BLOCK_RESOURCE", "RESOURCE", String.valueOf(id), "{}");
         return ApiResponse.ok(resourceRepository.save(resource).toDto());
     }
 
     @PostMapping("/resources/{id}/restore")
     @Transactional
-    public ApiResponse<ResourceDto> restoreResource(@PathVariable Long id) {
+    public ApiResponse<ResourceDto> restoreResource(
+        Authentication authentication,
+        HttpServletRequest request,
+        @PathVariable Long id
+    ) {
+        String operatorKey = resolveOperator(authentication, request);
         ResourceEntity resource = resourceRepository.findById(id)
             .orElseThrow(() -> new com.sharehub.common.NotFoundException("RESOURCE_NOT_FOUND"));
         resource.setStatus("PUBLISHED");
+        resource.setReviewedAt(Instant.now());
+        resource.setReviewedBy(operatorKey);
         interactionRepository.appendAuditLog("RESTORE_RESOURCE", "RESOURCE", String.valueOf(id), "{}");
         return ApiResponse.ok(resourceRepository.save(resource).toDto());
     }
@@ -176,5 +198,12 @@ public class AdminController {
             );
         }
         return login;
+    }
+
+    private String resolveOperator(Authentication authentication, HttpServletRequest request) {
+        if (authentication != null && authentication.getName() != null && !authentication.getName().isBlank()) {
+            return authentication.getName();
+        }
+        return requestAccessService.resolveUser(authentication, request).orElse("admin");
     }
 }

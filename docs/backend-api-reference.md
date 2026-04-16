@@ -175,6 +175,7 @@
 
 - `GET /api/me/resources`
 - `GET /api/me/roadmaps`
+- `GET /api/me/authored-roadmaps`
 - `GET /api/me/favorites`
 - `GET /api/me/favorite-notes`
 - `GET /api/me/notes`
@@ -189,7 +190,7 @@
 当前支持的筛选：
 
 - `my resources`: `status`、`visibility`
-- `my roadmaps`: `status`
+- `my roadmaps`: `status`（按 enrollment 状态过滤：`ACTIVE`、`PAUSED`、`COMPLETED`、`QUIT`）
 - `my notes`: `status`
 - `my resumes`: `status`、`templateKey`、`keyword`
 
@@ -203,7 +204,9 @@
 - 这些列表接口的 `page`、`pageSize` 传入小于 `1` 的值时，都会按 `1` 兜底
 - `GET /api/me/resources` 的 `status`、`visibility` 为空字符串或仅空白时，按未传处理
 - `GET /api/me/resources` 的 `status`、`visibility` 若带前后空白，会先裁剪再参与筛选
+- `GET /api/me/roadmaps` 返回当前用户的跟学路线列表，兼容“仅有 progress、尚未 enrollment”的历史数据
 - `GET /api/me/roadmaps` 的 `status` 为空字符串或仅空白时，按未传处理；若带前后空白，会先裁剪再参与筛选
+- `GET /api/me/authored-roadmaps` 返回当前用户自己发布的路线工作台列表
 - `GET /api/me/notes` 的 `status` 为空字符串或仅空白时，按未传处理，不额外收窄结果；若带前后空白，会先裁剪再参与筛选
 - `GET /api/me/favorite-notes` 返回当前用户收藏的笔记列表，按收藏时间倒序
 - `GET /api/me/note-history` 返回当前用户浏览过的笔记列表，按最近浏览时间倒序
@@ -338,6 +341,8 @@
 - `GET /api/roadmaps/{id}` 的 `progress` 按当前请求用户读取；未登录、未写入进度或切换到其他用户时返回空对象；如果请求里显式带了已封禁用户，则返回 `403 USER_BANNED`
 - `GET /api/roadmaps/{id}` 仅在路线不存在时返回 `404 ROADMAP_NOT_FOUND`
 - 节点标题、描述、顺序与进度已持久化
+- 路线进度现已拆为 `roadmap_node_progress` 节点明细表与 `roadmap_progress` 汇总快照；外部接口仍返回 `progress.completedNodeIds` 与 `progress.percent` 兼容旧前端
+- `POST /api/roadmaps/{id}/progress` 会先同步节点明细，再刷新快照；工作台完成节点数优先以节点明细统计
 - 节点附件通过 `files` 表持久化，按 `referenceType=ROADMAP_NODE` 与 `category=ROADMAP_NODE_ATTACHMENT` 绑定
 - 列表筛选仍较弱，暂未覆盖前端清单中的标签筛选
 

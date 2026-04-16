@@ -14,6 +14,16 @@ interface BackendPageResponse<T> {
   total: number
 }
 
+type RawNoteDTO = NoteDTO & {
+  created_at?: string | null
+  updated_at?: string | null
+  owner_key?: string
+  owner_name?: string | null
+  owner_avatar_url?: string | null
+  is_official?: boolean
+  is_pinned?: boolean
+}
+
 export interface NoteDTO {
   id: number
   title: string
@@ -21,9 +31,12 @@ export interface NoteDTO {
   visibility: string | null
   status: string | null
   category?: string | null
+  tags: string[]
   ownerKey?: string
   ownerName?: string | null
   ownerAvatarUrl?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
   isOfficial?: boolean
   isPinned?: boolean
 }
@@ -68,18 +81,33 @@ export interface CreateNotePayload {
   visibility?: string | null
   status?: string | null
   category?: string | null
+  tags?: string[]
   isPinned?: boolean
 }
 
 export interface UpdateNotePayload extends CreateNotePayload {}
 
+function normalizeNoteDto(dto: RawNoteDTO): NoteDTO {
+  return {
+    ...dto,
+    ownerKey: dto.ownerKey ?? dto.owner_key,
+    ownerName: dto.ownerName ?? dto.owner_name,
+    ownerAvatarUrl: dto.ownerAvatarUrl ?? dto.owner_avatar_url,
+    createdAt: dto.createdAt ?? dto.created_at ?? null,
+    updatedAt: dto.updatedAt ?? dto.updated_at ?? null,
+    isOfficial: dto.isOfficial ?? dto.is_official ?? false,
+    isPinned: dto.isPinned ?? dto.is_pinned ?? false,
+    tags: Array.isArray(dto.tags) ? dto.tags.filter((tag) => Boolean(tag?.trim())) : []
+  }
+}
+
 export async function fetchNotes(params: FetchNotesParams) {
-  const response = await apiClient.get<BackendApiResponse<BackendPageResponse<NoteDTO>>>('/notes', {
+  const response = await apiClient.get<BackendApiResponse<BackendPageResponse<RawNoteDTO>>>('/notes', {
     params
   })
   const data = response.data.data
   return {
-    list: data.items || [],
+    list: (data.items || []).map(normalizeNoteDto),
     total: data.total ?? 0,
     pageNum: data.page ?? params.page ?? 1,
     pageSize: data.pageSize ?? params.pageSize ?? 10
@@ -87,12 +115,12 @@ export async function fetchNotes(params: FetchNotesParams) {
 }
 
 export async function fetchCommunityNotes(params: FetchNotesParams) {
-  const response = await apiClient.get<BackendApiResponse<BackendPageResponse<NoteDTO>>>('/notes/community', {
+  const response = await apiClient.get<BackendApiResponse<BackendPageResponse<RawNoteDTO>>>('/notes/community', {
     params
   })
   const data = response.data.data
   return {
-    list: data.items || [],
+    list: (data.items || []).map(normalizeNoteDto),
     total: data.total ?? 0,
     pageNum: data.page ?? params.page ?? 1,
     pageSize: data.pageSize ?? params.pageSize ?? 10
@@ -100,18 +128,18 @@ export async function fetchCommunityNotes(params: FetchNotesParams) {
 }
 
 export async function createNote(payload: CreateNotePayload) {
-  const response = await apiClient.post<BackendApiResponse<NoteDTO>>('/notes', payload)
-  return response.data.data
+  const response = await apiClient.post<BackendApiResponse<RawNoteDTO>>('/notes', payload)
+  return normalizeNoteDto(response.data.data)
 }
 
 export async function fetchNoteDetail(id: number) {
-  const response = await apiClient.get<BackendApiResponse<NoteDTO>>(`/notes/${id}`)
-  return response.data.data
+  const response = await apiClient.get<BackendApiResponse<RawNoteDTO>>(`/notes/${id}`)
+  return normalizeNoteDto(response.data.data)
 }
 
 export async function updateNote(id: number, payload: UpdateNotePayload) {
-  const response = await apiClient.put<BackendApiResponse<NoteDTO>>(`/notes/${id}`, payload)
-  return response.data.data
+  const response = await apiClient.put<BackendApiResponse<RawNoteDTO>>(`/notes/${id}`, payload)
+  return normalizeNoteDto(response.data.data)
 }
 
 export async function deleteNote(id: number) {

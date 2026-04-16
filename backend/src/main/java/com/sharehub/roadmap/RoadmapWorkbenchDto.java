@@ -8,6 +8,9 @@ public record RoadmapWorkbenchDto(
     String status,
     int nodeCount,
     int completedNodeCount,
-    int progressPercent
+    int progressPercent,
+    String enrollmentStatus,
+    java.time.Instant startedAt,
+    java.time.Instant completedAt
 ) {
 }

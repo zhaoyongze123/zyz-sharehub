@@ -20,7 +20,7 @@
           </RouterLink>
           <RouterLink to="/community" class="nav-item">
             <div class="i-carbon-forum nav-icon"></div>
-            <span>社区</span>
+            <span>笔记广场</span>
           </RouterLink>
         </div>
 
