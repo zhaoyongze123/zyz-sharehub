@@ -139,10 +139,14 @@ node scripts/import_notes_seed.mjs
 
 <div align="center">
 
-### 🔗 联系方式
+### 📬 联系方式
 
-[![GitHub](https://img.shields.io/badge/GitHub-zhaoyongze123-333.svg?style=flat-square&logo=github)](https://github.com/zhaoyongze123)
-[![Email](https://img.shields.io/badge/Email-zhaoyongze@email.com-EA4335.svg?style=flat-square&logo=gmail)](mailto:zhaoyongze@email.com)
+| 平台 | 地址 |
+|------|------|
+| 🐙 GitHub | [zhaoyongze123](https://github.com/zhaoyongze123) |
+| 📧 Email | [zhaoyongze@outlook.com](mailto:zhaoyongze@outlook.com) |
+| 💬 微信 | `zhaoyongze123` |
+| 💬 QQ | `3152938537` |
 
 ### 🏆 统计数据
 
@@ -151,6 +155,16 @@ node scripts/import_notes_seed.mjs
 ![Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=zhaoyongze123&theme=radical&hide_border=false)
 
 </div>
+
+---
+
+### 💡 项目承诺
+
+> 📌 **永不收费，永不植入广告，永久维护**
+>
+> 🔗 **永久开源地址**: [zhaoyongze123/zyz-sharehub](https://github.com/zhaoyongze123/zyz-sharehub)
+>
+> 这个项目的所有功能会持续迭代开发，欢迎关注！
 
 ---
 
