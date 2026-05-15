@@ -1,104 +1,90 @@
-# ShareHub 原创资料分享平台  网站地址：https://zyzsharehub.cn/
+# 📚 ShareHub - 原创资料分享平台
 
-ShareHub 是一个面向学习者和创作者的原创资料分享平台，围绕资料发布、学习路线、笔记沉淀、简历工作台、互动反馈和后台治理构建完整闭环。
+[![GitHub stars](https://img.shields.io/github/stars/zhaoyongze123/zyz-sharehub?style=social)](https://github.com/zhaoyongze123/zyz-sharehub/stargazers)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-green.svg)](https://spring.io/projects/spring-boot)
+[![Vue](https://img.shields.io/badge/Vue-3-orange.svg)](https://vuejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg)](https://www.typescriptlang.org/)
 
-项目当前已形成前后端分离架构：
+> 🔥 **在线访问**: [https://zyzsharehub.cn](https://zyzsharehub.cn)
 
-- 后端：Spring Boot 3、PostgreSQL、Redis、Flyway、GitHub OAuth。
-- 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、UnoCSS。
-- 部署：Docker Compose、Nginx、DigitalOcean 单机部署模板。
-- 测试：Spring Boot 集成测试、Playwright E2E、部署 smoke 脚本。
+ShareHub 是一个面向学习者和创作者的**原创资料分享平台**，围绕资料发布、学习路线、笔记沉淀、简历工作台、互动反馈和后台治理构建完整闭环。
 
-## 核心功能
+---
 
-### 内容广场
+## ✨ 功能特色
 
-- 原创资料发布、编辑、详情展示。
-- 资料分类、标签、关键词检索和热度排序。
-- Markdown 内容展示。
-- 文件上传与下载。
-- 软删除、审核状态、可见性控制。
+| 模块 | 说明 |
+|------|------|
+| 📖 **内容广场** | 原创资料发布、分类检索、标签筛选、热度排序、Markdown 展示、文件上传下载 |
+| 🛤️ **学习路线** | 路线发布、节点树管理、用户跟学、进度记录 |
+| 📝 **笔记系统** | 笔记广场、本地编辑、收藏浏览、官方推荐 |
+| 📄 **简历工作台** | 多模板简历预览、智能解析、PDF 导出 |
+| ❤️ **用户互动** | GitHub OAuth 登录、点赞收藏评论举报 |
+| ⚙️ **后台治理** | 审核管理、用户管理、审计日志 |
 
-### 学习路线
+---
 
-- 路线发布与路线详情。
-- 路线节点树与附件。
-- 用户跟学、进度记录和状态管理。
-- 作者工作台与个人路线列表。
+## 🖼️ 截图预览
 
-### 笔记系统
+| 首页 | 资料详情 |
+|:---:|:---:|
+| ![首页](docs/screenshots/home.png) | ![资料详情](docs/screenshots/resource-detail.png) |
 
-- 笔记广场。
-- 本地笔记编辑。
-- 笔记详情、收藏、浏览历史。
-- 官方推荐与分类筛选。
+| 学习路线 | 笔记广场 |
+|:---:|:---:|
+| ![学习路线](docs/screenshots/roadmap.png) | ![笔记广场](docs/screenshots/notes.png) |
 
-### 简历工作台
+---
 
-- 简历列表与详情。
-- 多模板简历预览。
-- 简历解析与结构化处理。
-- PDF 导出能力。
+## 🛠️ 技术栈
 
-### 用户与互动
+### 后端
+<p>
+  <img src="https://img.shields.io/badge/Java-17-red.svg?style=flat-square&logo=openjdk" alt="Java">
+  <img src="https://img.shields.io/badge/Spring%20Boot-3.3.5-green.svg?style=flat-square&logo=spring" alt="Spring Boot">
+  <img src="https://img.shields.io/badge/PostgreSQL-16-blue.svg?style=flat-square&logo=postgresql" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/Redis-7-red.svg?style=flat-square&logo=redis" alt="Redis">
+  <img src="https://img.shields.io/badge/Flyway-Migration-yellow.svg?style=flat-square" alt="Flyway">
+</p>
 
-- GitHub OAuth 登录。
-- 用户资料、头像上传和个人中心聚合。
-- 点赞、收藏、评论、举报。
-- 用户内容统计。
+### 前端
+<p>
+  <img src="https://img.shields.io/badge/Vue-3-44AAFF.svg?style=flat-square&logo=vue.js" alt="Vue 3">
+  <img src="https://img.shields.io/badge/Vite-5-646CFF.svg?style=flat-square&logo=vite" alt="Vite">
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6.svg?style=flat-square&logo=typescript" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Pinia-2-FFD859.svg?style=flat-square" alt="Pinia">
+  <img src="https://img.shields.io/badge/UnoCSS-Active-333333.svg?style=flat-square" alt="UnoCSS">
+</p>
 
-### 后台治理
+---
 
-- 管理员白名单。
-- 举报审核、内容审核、用户管理。
-- 审计日志。
-- 生产环境禁止依赖 `X-Admin-Token` 作为后台鉴权方式，后台鉴权以 GitHub OAuth 和 PostgreSQL 白名单为准。
+## 📁 项目结构
 
-## 技术栈
-
-| 模块 | 技术 |
-| --- | --- |
-| 后端框架 | Spring Boot 3.3.5 |
-| 后端语言 | Java 17 |
-| 数据库 | PostgreSQL |
-| 缓存 | Redis |
-| 数据迁移 | Flyway |
-| API 文档 | OpenAPI、springdoc-openapi |
-| 前端框架 | Vue 3 |
-| 构建工具 | Vite |
-| 前端语言 | TypeScript |
-| 状态管理 | Pinia |
-| 路由 | Vue Router |
-| 样式 | Sass、UnoCSS、设计 Token |
-| E2E 测试 | Playwright |
-| 部署 | Docker Compose、Nginx |
-
-## 目录结构
-
-```text
+```
 .
 ├── backend/                 # Spring Boot 后端服务
 ├── frontend/                # Vue 3 前端应用
 ├── data/seeds/              # 资料、路线、笔记种子数据
 ├── deploy/                  # Docker Compose 与 Nginx 部署配置
 ├── docs/                    # API、部署、发布和专项文档
+│   └── screenshots/         # 项目截图
 ├── scripts/                 # 本地联调、导入、部署、自动化脚本
 └── README.md
 ```
 
-## 快速启动
+---
 
-### 1. 环境要求
+## 🚀 快速开始
 
-- JDK 17
-- Node.js 20 或兼容版本
-- npm
-- PostgreSQL
-- Redis
+### 环境要求
 
-### 2. 后端启动
+- ☕ JDK 17+
+- 📦 Node.js 20+ / npm
+- 🐘 PostgreSQL 16+
+- 🗃️ Redis 7+
 
-默认后端端口为 `18080`。
+### 后端启动
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
@@ -106,60 +92,12 @@ cd backend
 mvn spring-boot:run
 ```
 
-如需启用 GitHub OAuth：
-
-```bash
-export GITHUB_OAUTH_ENABLED=true
-export GITHUB_CLIENT_ID=xxx
-export GITHUB_CLIENT_SECRET=xxx
-mvn spring-boot:run -Dspring-boot.run.profiles=oauth
-```
-
-健康检查：
-
-```bash
-curl http://127.0.0.1:18080/actuator/health
-```
-
-### 3. 前端启动
-
-默认 Vite 开发服务端口由本地 Vite 配置决定。
+### 前端启动
 
 ```bash
 cd frontend
 npm install
 npm run dev
-```
-
-如果需要指定后端代理：
-
-```bash
-cd frontend
-export VITE_API_PROXY_TARGET='http://127.0.0.1:18080'
-npm run dev -- --host 127.0.0.1 --port 14173 --strictPort
-```
-
-## 常用脚本
-
-### 后端测试
-
-```bash
-cd backend
-mvn test
-```
-
-### 前端构建
-
-```bash
-cd frontend
-npm run build
-```
-
-### 前端 E2E
-
-```bash
-cd frontend
-npm run test:e2e
 ```
 
 ### 导入种子数据
@@ -170,61 +108,58 @@ node scripts/import_roadmaps_seed.mjs
 node scripts/import_notes_seed.mjs
 ```
 
-种子文件位于：
+---
 
-- `data/seeds/resources.seed.json`
-- `data/seeds/roadmaps.seed.json`
-- `data/seeds/notes.seed.json`
+## 📖 API 文档
 
-## API 文档
+- 📄 [OpenAPI 契约](docs/openapi.yaml)
+- 📘 [后端接口参考](docs/backend-api-reference.md)
 
-- OpenAPI 契约：`docs/openapi.yaml`
-- 中文后端接口说明：`docs/backend-api-reference.md`
-- 本地后端启动后可通过 springdoc 查看接口文档。
+> 💡 本地启动后可通过 `springdoc` 查看交互式 API 文档
 
-统一响应结构：
+---
 
-```json
-{
-  "success": true,
-  "code": "OK",
-  "data": {},
-  "message": "OK"
-}
-```
+## 🚢 部署
 
-## 部署
+部署配置位于 `deploy/`：
 
-部署配置位于 `deploy/`，当前支持生产和 staging 两套 Docker Compose 配置：
+| 环境 | 配置文件 |
+|------|----------|
+| 🏭 生产环境 | `docker-compose.prod.yml` |
+| 🧪 测试环境 | `docker-compose.staging.yml` |
 
-- `deploy/docker-compose.prod.yml`
-- `deploy/docker-compose.staging.yml`
-- `deploy/nginx/`
+详细部署文档：
+- [部署运行手册](docs/deployment-runbook.md)
+- [DigitalOcean 部署指南](docs/deploy-digitalocean.md)
+- [发布检查清单](docs/release-checklist.md)
 
-部署说明：
+---
 
-- `docs/deployment-runbook.md`
-- `docs/deploy-digitalocean.md`
-- `docs/release-checklist.md`
+## 👨‍💻 关于作者
 
-生产和 staging 建议使用独立 compose project、独立 PostgreSQL、独立 Redis，并由系统级 Nginx 或 Caddy 统一接入公网流量。
+<div align="center">
 
-## 当前进度
+### 🔗 联系方式
 
-- 已完成标签标准化、内容治理字段与软删除。
-- 已完成资料、路线图、笔记的可重复导入种子脚本。
-- 已完成内容域 `user_id` 渐进迁移第一阶段。
-- 已补充内容查询索引取证脚本 `backend/scripts/explain_content_indexes.sql`。
-- 已补充后台专项部署运行手册和夜间自动化推进脚本。
+[![GitHub](https://img.shields.io/badge/GitHub-zhaoyongze123-333.svg?style=flat-square&logo=github)](https://github.com/zhaoyongze123)
+[![Email](https://img.shields.io/badge/Email-zhaoyongze@email.com-EA4335.svg?style=flat-square&logo=gmail)](mailto:zhaoyongze@email.com)
 
-## 开发约定
+### 🏆 统计数据
 
-- `main` 分支保持可部署。
-- 功能开发使用 `feature/*`、`fix/*`、`refactor/*`、`test/*` 分支。
-- 后端数据结构变更通过 Flyway migration 管理。
-- 生产环境以 PostgreSQL 为准，不依赖内存态数据。
-- 代码修改后需要运行最小回归测试，并记录真实执行结果。
+![Stats](https://github-readme-stats.vercel.app/api?username=zhaoyongze123&theme=radical&hide_border=false)
 
-## License
+![Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=zhaoyongze123&theme=radical&hide_border=false)
 
-当前仓库暂未声明开源许可证。如需公开复用，请先补充 `LICENSE` 文件。
+</div>
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+## 📄 License
+
+本项目采用 [MIT License](LICENSE) 开源。
